@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "files": [
+    {
+      "name": "final_log.npy",
+      "sha256": "e53b54821b50ef61c5d15fb9e71916c415fa8d98575c569851f1b9b00a279911",
+      "chunks": [
+        {
+          "name": "final_log.npy.gz.000",
+          "sha256": "553c6e91b03b91e82258b5680246dd797ce5ef4794c3246059f8615052b6355f"
+        }
+      ]
+    },
+    {
+      "name": "final_scaled.npy",
+      "sha256": "b01929972565cc332bcbd52bb8132119558942eb750b1b890c5b08ecf8114095",
+      "chunks": [
+        {
+          "name": "final_scaled.npy.gz.000",
+          "sha256": "0cf2533f42aec185e4fc2a1d465b991ea772fbc3d0b06e80536796a4162c8d6e"
+        }
+      ]
+    },
+    {
+      "name": "fold_1_train.npy",
+      "sha256": "949e66b2d825eb5ea3d2877fa41314ac56a3c05e9970cc22711d5d183dd9eb61",
+      "chunks": [
+        {
+          "name": "fold_1_train.npy.gz.000",
+          "sha256": "648458d0b2122e0740a8b5792ecf59b8a0125ef647017189cd2d016520bc52d8"
+        }
+      ]
+    },
+    {
+      "name": "fold_1_validation.npy",
+      "sha256": "0032f592bba790334c2de4fc45f143c868f1495b7dac88821dc951ab97ad4a99",
+      "chunks": [
+        {
+          "name": "fold_1_validation.npy.gz.000",
+          "sha256": "4e82876661d8eb9332526bc4ebd9a371b90648bf90f4225a5f4b94237525691b"
+        }
+      ]
+    },
+    {
+      "name": "fold_2_train.npy",
+      "sha256": "ededbae20c9760341da4f972805ae4bfc229b0bb4c53f7f53080bb4322bf49b3",
+      "chunks": [
+        {
+          "name": "fold_2_train.npy.gz.000",
+          "sha256": "5ac64f508dd63d935539c04c60702165a4517fbb602471bbb0e219649c83114c"
+        }
+      ]
+    },
+    {
+      "name": "fold_2_validation.npy",
+      "sha256": "b71ab309688bfabe391fe377ab642106671546e4670d127b2e754ca859a00ddd",
+      "chunks": [
+        {
+          "name": "fold_2_validation.npy.gz.000",
+          "sha256": "49c8ac6eeeaa7e73b2418c8c45da49519e501ad9254a49c1b7aa13333f89db9e"
+        }
+      ]
+    },
+    {
+      "name": "fold_3_train.npy",
+      "sha256": "95a202c4212f38237bba5ca2d0c605f7892edd68cc5ca0b21bf01ba73b396ef5",
+      "chunks": [
+        {
+          "name": "fold_3_train.npy.gz.000",
+          "sha256": "48f84b65364cb4f788022c592b1e7074e80438c7303fe1f8db4102c1a56f436c"
+        }
+      ]
+    },
+    {
+      "name": "fold_3_validation.npy",
+      "sha256": "738e5e90630455691451d5850c13e5eee77be710bb3a4873567786d46f355deb",
+      "chunks": [
+        {
+          "name": "fold_3_validation.npy.gz.000",
+          "sha256": "d09d1b0e5104d63b106d48ad2c37be74caf4c6c5933603b174283dd704e9cd0e"
+        }
+      ]
+    },
+    {
+      "name": "fold_4_train.npy",
+      "sha256": "be5f61d38d4aa21a0ff77d3875d8545b7522b01db688c396384523bbc2504c5b",
+      "chunks": [
+        {
+          "name": "fold_4_train.npy.gz.000",
+          "sha256": "5f7b6b84dec6662c65d3bbb37ad9c9ec8a8f8387d9250b7c5c007101cb75c4bb"
+        }
+      ]
+    },
+    {
+      "name": "fold_4_validation.npy",
+      "sha256": "7ed9b9d84ce05869de87b45d735758d2c46e128da7cb192f53e859c0b2f53091",
+      "chunks": [
+        {
+          "name": "fold_4_validation.npy.gz.000",
+          "sha256": "9ae7396fc8e983a8c6a52c0a23fab77cd390d7ceda73f5b8c16941c542c0089c"
+        }
+      ]
+    },
+    {
+      "name": "fold_5_train.npy",
+      "sha256": "db7b0dbbef74d9c223d68b29d08fa32d1f2c6efbb851649dacdc6b9e40be09af",
+      "chunks": [
+        {
+          "name": "fold_5_train.npy.gz.000",
+          "sha256": "4f349d114f5c269245ec5f6602c7f0a3f95d3e9b7bab97695bd2a53cfff6ad2a"
+        }
+      ]
+    },
+    {
+      "name": "fold_5_validation.npy",
+      "sha256": "02a7747dfc293bd4c80cee56d7a84cc4a72787ff501eba4c99de23d9a9af0ff0",
+      "chunks": [
+        {
+          "name": "fold_5_validation.npy.gz.000",
+          "sha256": "5cd1f3ead823e4ff5382e2b8c8190e3c499eb601b3cdc548acb68dec9471e79f"
+        }
+      ]
+    },
+    {
+      "name": "labels.npy",
+      "sha256": "45e494228d5037e4e610271078ee89bd7a0530f6adb13deaad4d81fcc9a9e5a9",
+      "chunks": [
+        {
+          "name": "labels.npy.gz.000",
+          "sha256": "42b2cc19585ad0b762ed27b217eeea6fc0f8cce0e94ce08357366f202b58a17c"
+        }
+      ]
+    },
+    {
+      "name": "manifest.json",
+      "sha256": "163243f2636c36559d87189fb923d2ceaac501e8069d3afa263f97366e4f6a53",
+      "chunks": [
+        {
+          "name": "manifest.json.gz.000",
+          "sha256": "8c80265f4a8262abd4e5e1f9f4b0f32a1ce8f3c039b342d3918e63f93456e4e8"
+        }
+      ]
+    },
+    {
+      "name": "mean.npy",
+      "sha256": "1736778be7fb607792509b1f0b0352781ec90422e9cf0f95cf9ae4510f46aa69",
+      "chunks": [
+        {
+          "name": "mean.npy.gz.000",
+          "sha256": "b5a4029c91127664c9603518ea014bbda5f5ac67c6c4c246f7f21eec9bf577f9"
+        }
+      ]
+    },
+    {
+      "name": "medians.npy",
+      "sha256": "378f3fffa8795fc399ab75955d591bf87b82069e5b7ca9479a3df9db2d571097",
+      "chunks": [
+        {
+          "name": "medians.npy.gz.000",
+          "sha256": "c326511fc678a5a6e0fc5eb3fcb0f9db0e49a04ead18b2f33b5e55b7b5d191e2"
+        }
+      ]
+    },
+    {
+      "name": "raw_genes.json",
+      "sha256": "f1e501c49bf03ba44cc3d44a6b4a2c688bf41f3599fdb3a27db06a2d9c5cfb75",
+      "chunks": [
+        {
+          "name": "raw_genes.json.gz.000",
+          "sha256": "48fd9df97f7d6c3d5071434c8b2725948048d4120cf8672aac66bcc28164beea"
+        }
+      ]
+    },
+    {
+      "name": "raw_tpm.npy",
+      "sha256": "00676275abd2a864f5b00f75eb092decb91b19f233af409c63720691fe1ab0d5",
+      "chunks": [
+        {
+          "name": "raw_tpm.npy.gz.000",
+          "sha256": "a2141f2ec264c905ef3feefdad8fd2fa37cfb1019557f7e30b62eb96829c502e"
+        },
+        {
+          "name": "raw_tpm.npy.gz.001",
+          "sha256": "fd1681684d798c02f756bdef7743300195a0a87bd43fd8c5da82f319f48391fa"
+        }
+      ]
+    },
+    {
+      "name": "scale.npy",
+      "sha256": "ae9642d5c695aa9a0825e02e448a18f11d2e3b4fc16d34aef960a62ae887021a",
+      "chunks": [
+        {
+          "name": "scale.npy.gz.000",
+          "sha256": "3e1a1b9bd829d2607045126bd388ac65dee90dc68ebe7a9d98ae01e199dbfda2"
+        }
+      ]
+    }
+  ]
+}
