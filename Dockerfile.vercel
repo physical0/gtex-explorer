@@ -1,0 +1,25 @@
+FROM node:24-bookworm-slim AS node
+FROM python:3.12-slim-bookworm
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && apt-get update && apt-get install -y --no-install-recommends libgomp1 libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY requirements-cloud.txt package.json package-lock.json ./
+RUN pip install --no-cache-dir -r requirements-cloud.txt \
+    && pip install --no-cache-dir --no-deps xgboost==3.2.0 \
+    && npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+COPY app.py cloud_app.py desktop.py ./
+COPY gtex_explorer/ gtex_explorer/
+COPY scripts/ scripts/
+COPY cloud-config.toml .streamlit/config.toml
+COPY data/ data/
+COPY assets/ assets/
+COPY model_bundle/ model_bundle/
+COPY baseline_bundle/ baseline_bundle/
+COPY resources/ resources/
+RUN python -m scripts.bundled_training_data restore
+ENV GTEX_CLOUD=1 GTEX_DESKTOP_STATE_DIR=/tmp/gtex-cloud-state \
+    PYTHONUNBUFFERED=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PORT=80
+CMD ["sh", "-c", "exec python -m streamlit run cloud_app.py --server.address 0.0.0.0 --server.port ${PORT:-80} --server.headless true --server.fileWatcherType none --browser.gatherUsageStats false"]

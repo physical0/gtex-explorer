@@ -1,0 +1,66 @@
+{
+  "description": "Fixed union of existing local prediction examples. Missing measurements remain missing.",
+  "samples": 6,
+  "genes": 5000,
+  "observed_measurements_per_sample": {
+    "GTEX-11EQ9-0626-SM-5A5K1": 1000,
+    "GTEX-1192W-0226-SM-5EGGT": 1000,
+    "GTEX-11DXX-2626-SM-5Q5A3": 1000,
+    "GTEX-1117F-0426-SM-5EGHI": 5000,
+    "GTEX-1117F-0626-SM-5N9CS": 5000,
+    "GTEX-111CU-0126-SM-5GZWZ": 5000
+  },
+  "sha256": "39547c7655c4bb5f1c45ed602130fb89f7ee6974abfd409ae26d1bc6cc7e115a",
+  "sources": [
+    {
+      "source": "C:\\Users\\Univ_and_Work_files\\bioinformatics thesis\\gtex_tissue_explorer\\data\\demo_tpm.csv",
+      "sha256": "fb8d9dead0f3ba6bf8de3183fdc06d7f378d9363b599964baf6a77d00f58a2d6",
+      "samples": [
+        "GTEX-11EQ9-0626-SM-5A5K1",
+        "GTEX-1192W-0226-SM-5EGGT",
+        "GTEX-11DXX-2626-SM-5Q5A3"
+      ],
+      "genes": 1000
+    },
+    {
+      "source": "C:\\Users\\Univ_and_Work_files\\bioinformatics thesis\\gtex_tissue_explorer\\baseline_bundle\\demo_tpm.csv",
+      "sha256": "e047fe09eaa661cb8cf379036ec4f50889579aadbfae3af46af8c0ab40259533",
+      "samples": [
+        "GTEX-1117F-0426-SM-5EGHI",
+        "GTEX-1117F-0626-SM-5N9CS",
+        "GTEX-111CU-0126-SM-5GZWZ"
+      ],
+      "genes": 5000
+    },
+    {
+      "source": "C:\\Users\\axela\\AppData\\Local\\GTExTissueExplorer\\models\\run_0f3547cbd50e435da199639b5f88e0a1\\demo_tpm.csv",
+      "sha256": "4fad2ab14379d503d595aeab38aacc020385df70e70eb6726805a01b838ffd83",
+      "samples": [
+        "GTEX-1117F-0426-SM-5EGHI",
+        "GTEX-1117F-0626-SM-5N9CS",
+        "GTEX-111CU-0126-SM-5GZWZ"
+      ],
+      "genes": 1000
+    },
+    {
+      "source": "C:\\Users\\axela\\AppData\\Local\\GTExTissueExplorer\\models\\run_6d3ed751ea8845feb0a9d048f3844478\\demo_tpm.csv",
+      "sha256": "4fad2ab14379d503d595aeab38aacc020385df70e70eb6726805a01b838ffd83",
+      "samples": [
+        "GTEX-1117F-0426-SM-5EGHI",
+        "GTEX-1117F-0626-SM-5N9CS",
+        "GTEX-111CU-0126-SM-5GZWZ"
+      ],
+      "genes": 1000
+    },
+    {
+      "source": "C:\\Users\\axela\\AppData\\Local\\GTExTissueExplorer\\models\\run_b3ca2565b0e3426582a888255568bb63\\demo_tpm.csv",
+      "sha256": "e047fe09eaa661cb8cf379036ec4f50889579aadbfae3af46af8c0ab40259533",
+      "samples": [
+        "GTEX-1117F-0426-SM-5EGHI",
+        "GTEX-1117F-0626-SM-5N9CS",
+        "GTEX-111CU-0126-SM-5GZWZ"
+      ],
+      "genes": 5000
+    }
+  ]
+}

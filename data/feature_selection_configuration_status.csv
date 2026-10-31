@@ -1,0 +1,16 @@
+selector_id,selector_label,feature_selection,l1_c,genes,expected_folds,observed_folds,converged_all_folds,fully_supported_all_folds,eligible_for_primary_comparison,eligibility_reason
+anova,ANOVA,anova,,500,5,5,True,True,True,eligible
+anova,ANOVA,anova,,1000,5,5,True,True,True,eligible
+anova,ANOVA,anova,,2000,5,5,True,True,True,eligible
+mutual_information,Mutual information,mutual_information,,500,5,5,True,True,True,eligible
+mutual_information,Mutual information,mutual_information,,1000,5,5,True,True,True,eligible
+mutual_information,Mutual information,mutual_information,,2000,5,5,True,True,True,eligible
+l1_c_1,L1 (C=1),l1,1.0,500,5,5,True,True,True,eligible
+l1_c_1,L1 (C=1),l1,1.0,1000,5,5,True,True,True,eligible
+l1_c_1,L1 (C=1),l1,1.0,2000,5,5,True,False,False,top-k mencakup skor nol atau tidak didukung | flag eligibility fold gagal
+l1_c_0p1,L1 (C=0.1),l1,0.1,500,5,5,True,False,False,top-k mencakup skor nol atau tidak didukung | flag eligibility fold gagal
+l1_c_0p1,L1 (C=0.1),l1,0.1,1000,5,5,True,False,False,top-k mencakup skor nol atau tidak didukung | flag eligibility fold gagal
+l1_c_0p1,L1 (C=0.1),l1,0.1,2000,5,5,True,False,False,top-k mencakup skor nol atau tidak didukung | flag eligibility fold gagal
+l1_c_0p01,L1 (C=0.01),l1,0.01,500,5,5,True,False,False,top-k mencakup skor nol atau tidak didukung | flag eligibility fold gagal
+l1_c_0p01,L1 (C=0.01),l1,0.01,1000,5,5,True,False,False,top-k mencakup skor nol atau tidak didukung | flag eligibility fold gagal
+l1_c_0p01,L1 (C=0.01),l1,0.01,2000,5,5,True,False,False,top-k mencakup skor nol atau tidak didukung | flag eligibility fold gagal

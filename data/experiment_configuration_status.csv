@@ -1,0 +1,17 @@
+selector_id,selector_label,feature_selection,l1_c,genes,expected_folds,observed_folds,converged_all_folds,fully_supported_all_folds,eligible_for_primary_comparison,eligibility_reason,configuration_id,configuration_label,experiment_type,uses_feature_selection,valid_for_performance_comparison,eligible_for_selector_ranking
+anova,ANOVA,anova,,500,5,5,True,True,True,eligible,anova__genes_500,ANOVA — 500 genes,feature_selection,True,True,True
+anova,ANOVA,anova,,1000,5,5,True,True,True,eligible,anova__genes_1000,"ANOVA — 1,000 genes",feature_selection,True,True,True
+anova,ANOVA,anova,,2000,5,5,True,True,True,eligible,anova__genes_2000,"ANOVA — 2,000 genes",feature_selection,True,True,True
+mutual_information,Mutual information,mutual_information,,500,5,5,True,True,True,eligible,mutual_information__genes_500,Mutual information — 500 genes,feature_selection,True,True,True
+mutual_information,Mutual information,mutual_information,,1000,5,5,True,True,True,eligible,mutual_information__genes_1000,"Mutual information — 1,000 genes",feature_selection,True,True,True
+mutual_information,Mutual information,mutual_information,,2000,5,5,True,True,True,eligible,mutual_information__genes_2000,"Mutual information — 2,000 genes",feature_selection,True,True,True
+l1_c_1,L1 (C=1),l1,1.0,500,5,5,True,True,True,eligible,l1_c_1__genes_500,L1 (C=1) — 500 genes,feature_selection,True,True,True
+l1_c_1,L1 (C=1),l1,1.0,1000,5,5,True,True,True,eligible,l1_c_1__genes_1000,"L1 (C=1) — 1,000 genes",feature_selection,True,True,True
+l1_c_1,L1 (C=1),l1,1.0,2000,5,5,True,False,False,top-k mencakup skor nol atau tidak didukung | flag eligibility fold gagal,l1_c_1__genes_2000,"L1 (C=1) — 2,000 genes",feature_selection,True,True,False
+l1_c_0p1,L1 (C=0.1),l1,0.1,500,5,5,True,False,False,top-k mencakup skor nol atau tidak didukung | flag eligibility fold gagal,l1_c_0p1__genes_500,L1 (C=0.1) — 500 genes,feature_selection,True,True,False
+l1_c_0p1,L1 (C=0.1),l1,0.1,1000,5,5,True,False,False,top-k mencakup skor nol atau tidak didukung | flag eligibility fold gagal,l1_c_0p1__genes_1000,"L1 (C=0.1) — 1,000 genes",feature_selection,True,True,False
+l1_c_0p1,L1 (C=0.1),l1,0.1,2000,5,5,True,False,False,top-k mencakup skor nol atau tidak didukung | flag eligibility fold gagal,l1_c_0p1__genes_2000,"L1 (C=0.1) — 2,000 genes",feature_selection,True,True,False
+l1_c_0p01,L1 (C=0.01),l1,0.01,500,5,5,True,False,False,top-k mencakup skor nol atau tidak didukung | flag eligibility fold gagal,l1_c_0p01__genes_500,L1 (C=0.01) — 500 genes,feature_selection,True,True,False
+l1_c_0p01,L1 (C=0.01),l1,0.01,1000,5,5,True,False,False,top-k mencakup skor nol atau tidak didukung | flag eligibility fold gagal,l1_c_0p01__genes_1000,"L1 (C=0.01) — 1,000 genes",feature_selection,True,True,False
+l1_c_0p01,L1 (C=0.01),l1,0.01,2000,5,5,True,False,False,top-k mencakup skor nol atau tidak didukung | flag eligibility fold gagal,l1_c_0p01__genes_2000,"L1 (C=0.01) — 2,000 genes",feature_selection,True,True,False
+,,,,5000,5,5,,,False,"reference baseline, not a selector candidate",xgboost_all_5000,"XGBoost — All 5,000 Genes (No Feature Selection)",baseline,False,True,False

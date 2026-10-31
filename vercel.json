@@ -1,0 +1,23 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["sin1"],
+  "services": {
+    "web": {"root": ".", "runtime": "container", "entrypoint": "Dockerfile.vercel"},
+    "uploads": {"root": "cloud_upload_api", "runtime": "container", "entrypoint": "Dockerfile"}
+  },
+  "rewrites": [
+    {"source": "/api/uploads", "destination": {"service": "uploads"}},
+    {"source": "/api/files", "destination": {"service": "uploads"}},
+    {"source": "/(.*)", "destination": {"service": "web"}}
+  ],
+  "daemons": {
+    "training": {
+      "root": ".",
+      "entrypoint": "Dockerfile.vercel",
+      "command": ["python", "-m", "gtex_explorer.cloud.daemon"],
+      "instances": {"sin1": 1},
+      "resources": {"requests": {"memory": "2Gi"}},
+      "terminationGracePeriodSeconds": 60
+    }
+  }
+}

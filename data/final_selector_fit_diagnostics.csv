@@ -1,0 +1,2 @@
+selector_id,feature_selection,l1_c,training_samples,training_donors,converged,n_iter_max,max_iter,tol,positive_or_nonzero_gene_count,top_k_fully_supported,diagnostic_note
+l1_c_1,l1,1.0,807,494,True,609,20000,0.001,1623,True,Top-k dibatasi pada koefisien nonzero.

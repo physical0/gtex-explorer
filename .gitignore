@@ -1,0 +1,91 @@
+# Python environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.pytype/
+
+# Build output (keep desktop.spec and build_desktop.ps1)
+/build/
+/dist/
+*.egg-info/
+
+# Test caches, coverage, and local test reports
+.pytest_cache/
+/.pytest_tmp*/
+/.test_runtime_temp/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+/.black-box-*.xml
+/.prediction-layout-*.xml
+/.training-*.xml
+/.top3-tests.xml
+
+# Disposable desktop checks and isolated test/runtime state
+/.desktop-*/
+/.black-box-*/
+/.*-build-check/
+/.*-test-temp/
+/.*-tests/
+/.*-check/
+/.overview-qa*/
+/.training-cache/
+/qa_*/
+/qa_*
+/qa-*
+
+# Large generated development matrices; recreate with export_training_data.py
+# Keep data/, model_bundle/, baseline_bundle/, and assets/ for app resources.
+/training_data/
+
+# User uploads, models, runs, and local state when stored inside this checkout
+/state/
+/user_data/
+/uploads/
+/datasets/
+/models/
+/runs/
+
+# Local credentials (keep shared .streamlit/config.toml)
+.env
+.env.*
+!.env.example
+!.env.sample
+.streamlit/secrets.toml
+
+# Logs, partial writes, and temporary files
+*.log
+*.part
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Generated visual QA captures in the repository root
+/design-qa-*.png
+/implementation-*.png
+
+# Machine-specific editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+.vercel
+.env*
+/.cloud_tools/
+/node_modules/
+/cloud_upload_api/node_modules/
+/.cloud_deploy/
+
+
+/docs/
+/designs/
+/.superpowers/

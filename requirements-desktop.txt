@@ -1,0 +1,5 @@
+-r requirements.txt
+# Pin the embedded server API used by the desktop wrapper.
+streamlit==1.63.0
+pywebview==6.2.1
+pyinstaller==6.22.3

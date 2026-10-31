@@ -1,0 +1,32 @@
+{
+  "cache_path": "C:\\Users\\Univ_and_Work_files\\bioinformatics thesis\\results\\notebook_run_500_1000_2000_l1_grid\\part_a_cache.joblib",
+  "cache_schema_version": 3,
+  "development_samples": 807,
+  "test_samples": 193,
+  "selected_genes": 1000,
+  "classes": [
+    "Adipose - Subcutaneous",
+    "Adipose - Visceral (Omentum)",
+    "Adrenal Gland",
+    "Artery - Aorta",
+    "Artery - Coronary",
+    "Artery - Tibial",
+    "Heart - Atrial Appendage",
+    "Heart - Left Ventricle",
+    "Liver",
+    "Muscle - Skeletal",
+    "Pancreas",
+    "Pituitary",
+    "Thyroid"
+  ],
+  "measured_test_metrics": {
+    "macro_f1": 0.9625016551364369,
+    "macro_precision": 0.9754609381699683,
+    "macro_recall": 0.9548951048951048,
+    "balanced_accuracy": 0.9548951048951048,
+    "accuracy": 0.9637305699481865
+  },
+  "maximum_metric_difference_from_notebook": 0.0,
+  "xgboost_model_sha256": "e9fd736a9bcdaa90ba715c5255c8c29786f6ca84a200d75f3734c6db13a8fe77",
+  "status": "validated"
+}

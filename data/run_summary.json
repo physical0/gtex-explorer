@@ -1,0 +1,71 @@
+{
+  "part_a_schema_version": 4,
+  "selector_pipeline_version": "2026-08-12-selector-diagnostics-v4",
+  "experiment_fingerprint": "827073e65504bf4fc82a621aa3bee47177f1f2552aaf705cfc90ff847e7b7729",
+  "fixed_classifier": "xgboost",
+  "feature_counts": [
+    500,
+    1000,
+    2000
+  ],
+  "l1_c_values": [
+    1.0,
+    0.1,
+    0.01
+  ],
+  "mi_neighbor_values": [
+    3,
+    5,
+    10
+  ],
+  "mi_primary_n_neighbors": 3,
+  "selector_ids": [
+    "anova",
+    "mutual_information",
+    "l1_c_1",
+    "l1_c_0p1",
+    "l1_c_0p01"
+  ],
+  "best_selector_id": "l1_c_1",
+  "best_selector": "l1",
+  "best_l1_c": 1.0,
+  "best_feature_count": 1000,
+  "selector_fold_results": 75,
+  "selector_configurations": 15,
+  "eligible_configurations": 8,
+  "target_sample_count": 1000,
+  "samples_loaded": 1000,
+  "technical_genes_retained": 19233,
+  "variance_prefilter_genes": 5000,
+  "development_samples": 807,
+  "development_donors": 494,
+  "test_samples": 193,
+  "test_donors": 124,
+  "cv_folds": 5,
+  "xgboost_parameters": {
+    "objective": "multi:softprob",
+    "eval_metric": "mlogloss",
+    "n_estimators": 300,
+    "learning_rate": 0.05,
+    "max_depth": 6,
+    "min_child_weight": 1,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_lambda": 1.0,
+    "tree_method": "hist",
+    "n_jobs": 4,
+    "random_state": 42,
+    "verbosity": 0
+  },
+  "random_state": 42,
+  "anova_pvalues_donor_aware": false,
+  "baseline_id": "xgboost_all_5000",
+  "baseline_label": "XGBoost — All 5,000 Genes (No Feature Selection)",
+  "baseline_genes": 5000,
+  "baseline_uses_feature_selection": false,
+  "baseline_fold_results": 5,
+  "baseline_configurations": 1,
+  "experiment_fold_results": 80,
+  "experiment_configurations": 16,
+  "baseline_fingerprint": "32fab4e60b010c815f1d078a822c5087938f2c21a0d8b8f79b7da6acd48c14b1"
+}

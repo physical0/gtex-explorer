@@ -1,0 +1,11 @@
+{
+  "tests": 275,
+  "failures": 0,
+  "errors": 0,
+  "original_resources_checked": 65,
+  "changed_original_resources": [],
+  "packaged_modules_checked": 15,
+  "packaged_source_mismatches": [],
+  "development_harness_packaged": false,
+  "model_sha256": "e9fd736a9bcdaa90ba715c5255c8c29786f6ca84a200d75f3734c6db13a8fe77"
+}

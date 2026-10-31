@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "experiment_fingerprint": "827073e65504bf4fc82a621aa3bee47177f1f2552aaf705cfc90ff847e7b7729",
+  "source": "results/notebook_run_500_1000_2000_l1_grid/part_a_only",
+  "files": {
+    "anova_gene_diagnostics_by_fold.csv.gz": {
+      "sha256": "282a9080c88d71b743afed6b01360f14108bf06382e371894407f452ffb751dc",
+      "rows": 25000,
+      "source_sha256": "3bc7eeb4d572bf2419f658704ec8e88618e7ce59e70fc69a79144f27f49b9903"
+    },
+    "anova_diagnostics_summary.csv": {
+      "sha256": "e84bcae703d1cbf4cb94c5476979888ec1c645d9c6b01900e9c8a63ccf586b88",
+      "rows": 15,
+      "source_sha256": "c7a608a92c1db2baf4cbb8e527d680d1cbca6f33d5143eca09be27549a79fc4a"
+    },
+    "mutual_information_gene_diagnostics.csv.gz": {
+      "sha256": "a10d1093ef668fd6c53b3b6fee7a14132a91ebb47a45bbaeb32e81fc37fc2a48",
+      "rows": 25000,
+      "source_sha256": "8c944026df7cb5c1c0f3c634de1691beaca38627457d7dd01ac81c7513e448af"
+    },
+    "mutual_information_neighbor_stability.csv": {
+      "sha256": "0c65175f57acd6ab94a70309f4a17e7dc71a3de989cf83429868cef6401c2dda",
+      "rows": 45,
+      "source_sha256": "a83f0b819b03293547bc53e93855d14e0841d1536a3c78cec5dd413e9234cc70"
+    },
+    "l1_fit_diagnostics.csv": {
+      "sha256": "02511a2b6fad9d605aacc317259adc06ec35a18338970eac7e97c321abbc485f",
+      "rows": 15,
+      "source_sha256": "de8c3295df10ac100af4e872704d793366c441a54b675ba636766b23aca4a70a"
+    },
+    "feature_selection_stability_pairs.csv": {
+      "sha256": "b9537746a7ed781456e5265b10b0ebd467a010f2e0ed9198ed6ff7a24c7d4f24",
+      "rows": 150,
+      "source_sha256": "a6f1498c8d52a6d2db4cd3797bf566b6d7a26e3d0083615aaac7127f35145a0a"
+    }
+  },
+  "bindings": {
+    "experiment_cv_folds.csv": "b1a52c8b81c1827a77bbb71b586b823db38768dcd4d2d5f4607f060fc5d8db2f",
+    "cv_gene_rankings.csv.gz": "7b8d00e1a37ca449409e80a39092ee71fdb77de511be6e54fdab304fd9af83ac",
+    "final_selector_fit_diagnostics.csv": "d41e7571831e152419c56b01812321c54096e99c2e7c14b11766a0a495affed8"
+  }
+}

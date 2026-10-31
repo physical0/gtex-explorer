@@ -1,0 +1,96 @@
+{
+  "status": "passed",
+  "configuration_count": 16,
+  "folds_per_configuration": 5,
+  "fold_level_results": 80,
+  "selector_configurations": 15,
+  "baseline_configurations": 1,
+  "baseline_genes": 5000,
+  "baseline_uses_feature_selection": false,
+  "xgboost_parameters_sha256": "4725535419827080a561b2f7349bab65bcba08e34212882ea9d68ddbcd5cc56e",
+  "checks": [
+    {
+      "check": "configuration_count",
+      "passed": true,
+      "detail": "observed=16, expected=16"
+    },
+    {
+      "check": "fold_result_count",
+      "passed": true,
+      "detail": "observed=80, expected=80"
+    },
+    {
+      "check": "no_duplicate_configuration_fold",
+      "passed": true,
+      "detail": "0"
+    },
+    {
+      "check": "no_missing_configuration_fold",
+      "passed": true,
+      "detail": "missing=0, extra=0"
+    },
+    {
+      "check": "five_folds_per_configuration",
+      "passed": true,
+      "detail": "{'anova__genes_1000': 5, 'anova__genes_2000': 5, 'anova__genes_500': 5, 'l1_c_0p01__genes_1000': 5, 'l1_c_0p01__genes_2000': 5, 'l1_c_0p01__genes_500': 5, 'l1_c_0p1__genes_1000': 5, 'l1_c_0p1__genes_2000': 5, 'l1_c_0p1__genes_500': 5, 'l1_c_1__genes_1000': 5, 'l1_c_1__genes_2000': 5, 'l1_c_1__genes_500': 5, 'mutual_information__genes_1000': 5, 'mutual_information__genes_2000': 5, 'mutual_information__genes_500': 5, 'xgboost_all_5000': 5}"
+    },
+    {
+      "check": "baseline_once_per_fold",
+      "passed": true,
+      "detail": "rows=5"
+    },
+    {
+      "check": "baseline_all_5000_genes",
+      "passed": true,
+      "detail": "unique_gene_counts=[np.int64(5000)]"
+    },
+    {
+      "check": "baseline_has_no_feature_selection",
+      "passed": true,
+      "detail": "uses_feature_selection=False; direct full-matrix handling"
+    },
+    {
+      "check": "identical_xgboost_parameters",
+      "passed": true,
+      "detail": "4725535419827080a561b2f7349bab65bcba08e34212882ea9d68ddbcd5cc56e"
+    },
+    {
+      "check": "no_train_validation_donor_leakage",
+      "passed": true,
+      "detail": "[]"
+    },
+    {
+      "check": "identical_donor_grouped_folds",
+      "passed": true,
+      "detail": "all 16 configurations carry the prepared-fold identity for each fold"
+    },
+    {
+      "check": "metrics_finite_and_bounded",
+      "passed": true,
+      "detail": "all metric values are finite and within [0, 1]"
+    },
+    {
+      "check": "baseline_metrics_recomputed_from_predictions",
+      "passed": true,
+      "detail": "maximum_absolute_difference=0.000e+00"
+    },
+    {
+      "check": "metrics_aggregated_consistently",
+      "passed": true,
+      "detail": "maximum_absolute_difference=0.000e+00"
+    },
+    {
+      "check": "macro_recall_matches_balanced_accuracy",
+      "passed": true,
+      "detail": "all validation folds contain the same 13-class label set"
+    },
+    {
+      "check": "selector_and_baseline_grains",
+      "passed": true,
+      "detail": "selector_rows=75, baseline_rows=5, status_rows=16, summary_rows=16"
+    }
+  ],
+  "selector_experiment_fingerprint": "827073e65504bf4fc82a621aa3bee47177f1f2552aaf705cfc90ff847e7b7729",
+  "baseline_fingerprint": "32fab4e60b010c815f1d078a822c5087938f2c21a0d8b8f79b7da6acd48c14b1",
+  "fold_fingerprint": "c848dcc32b45ef7340facdaa5dc72e89b54585eb73afe21d9cef4c4f82183267"
+}

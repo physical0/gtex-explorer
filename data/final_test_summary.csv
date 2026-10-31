@@ -1,0 +1,2 @@
+classifier,selector_id,genes,macro_f1,macro_precision,macro_recall,balanced_accuracy,accuracy
+xgboost,l1_c_1,1000,0.9625016551364369,0.9754609381699683,0.9548951048951048,0.9548951048951048,0.9637305699481865

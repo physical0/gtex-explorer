@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "holdout_samples": 193,
+  "holdout_donors": 124,
+  "selected_configuration_locked_by_cv": true,
+  "holdout_used_for_model_selection": false,
+  "baseline_genes": 5000,
+  "same_preprocessing_source": true,
+  "same_xgboost_parameters": true,
+  "maximum_saved_selected_metric_difference": 0.0,
+  "checks": {
+    "two_final_configurations": true,
+    "same_holdout_samples": true,
+    "baseline_uses_5000_genes": true,
+    "selected_matrix_is_exact_subset": true,
+    "same_xgboost_parameters": true,
+    "development_test_donors_disjoint": true,
+    "selected_result_reproduced": true,
+    "metrics_finite": true
+  }
+}

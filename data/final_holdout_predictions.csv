@@ -1,0 +1,194 @@
+SAMPID,SUBJID,true_tissue,selected_model_prediction,all_5000_prediction,selected_model_correct,all_5000_correct
+GTEX-1192W-0226-SM-5EGGT,GTEX-1192W,Heart - Atrial Appendage,Heart - Atrial Appendage,Heart - Atrial Appendage,True,True
+GTEX-11DXX-2626-SM-5Q5A3,GTEX-11DXX,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-11DXZ-0626-SM-5GU77,GTEX-11DXZ,Heart - Left Ventricle,Heart - Left Ventricle,Heart - Left Ventricle,True,True
+GTEX-11EQ9-0626-SM-5A5K1,GTEX-11EQ9,Thyroid,Thyroid,Thyroid,True,True
+GTEX-11EQ9-1026-SM-5H134,GTEX-11EQ9,Pancreas,Pancreas,Pancreas,True,True
+GTEX-11EQ9-2226-SM-5987H,GTEX-11EQ9,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-11GSO-2526-SM-5PNVX,GTEX-11GSO,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-11NV4-0326-SM-5HL58,GTEX-11NV4,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-11VI4-1826-SM-GHWOX,GTEX-11VI4,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-11WQK-3226-SM-5EGI3,GTEX-11WQK,Pituitary,Pituitary,Pituitary,True,True
+GTEX-11XUK-2426-SM-5GU72,GTEX-11XUK,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-12WSE-1126-SM-7DUEH,GTEX-12WSE,Artery - Coronary,Artery - Tibial,Muscle - Skeletal,False,False
+GTEX-1313W-0726-SM-5EGK1,GTEX-1313W,Thyroid,Thyroid,Thyroid,True,True
+GTEX-1313W-1426-SM-5KLZU,GTEX-1313W,Heart - Left Ventricle,Heart - Left Ventricle,Heart - Left Ventricle,True,True
+GTEX-132Q8-1726-SM-5EGK8,GTEX-132Q8,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-1399Q-0626-SM-GI4VZ,GTEX-1399Q,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-1399R-1826-SM-5J2M9,GTEX-1399R,Artery - Coronary,Artery - Coronary,Artery - Coronary,True,True
+GTEX-1399R-2326-SM-5PNYT,GTEX-1399R,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-1399U-0326-SM-5P9G5,GTEX-1399U,Thyroid,Thyroid,Thyroid,True,True
+GTEX-1399U-0926-SM-5IFHA,GTEX-1399U,Pancreas,Pancreas,Pancreas,True,True
+GTEX-1399U-2426-SM-5K7XB,GTEX-1399U,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-139TT-0226-SM-5K7YH,GTEX-139TT,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-139UW-0426-SM-5K7V4,GTEX-139UW,Artery - Aorta,Artery - Aorta,Artery - Aorta,True,True
+GTEX-139UW-0626-SM-GHWP3,GTEX-139UW,Heart - Left Ventricle,Heart - Left Ventricle,Heart - Left Ventricle,True,True
+GTEX-139UW-2626-SM-5K7W1,GTEX-139UW,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-13N11-0926-SM-5IJG2,GTEX-13N11,Liver,Liver,Liver,True,True
+GTEX-13N11-1026-SM-5K7XQ,GTEX-13N11,Thyroid,Thyroid,Thyroid,True,True
+GTEX-13N11-2926-SM-5K7VD,GTEX-13N11,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-13NZ8-2126-SM-5L3EO,GTEX-13NZ8,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-13O3O-1626-SM-5KM1O,GTEX-13O3O,Adrenal Gland,Adrenal Gland,Adrenal Gland,True,True
+GTEX-13O61-0626-SM-5L3D1,GTEX-13O61,Artery - Coronary,Artery - Coronary,Artery - Coronary,True,True
+GTEX-13OVJ-0326-SM-5L3GL,GTEX-13OVJ,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-13QJC-0626-SM-5S2O9,GTEX-13QJC,Artery - Coronary,Artery - Coronary,Artery - Coronary,True,True
+GTEX-13SLW-0226-SM-5S2NA,GTEX-13SLW,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-13X6K-0526-SM-5LU51,GTEX-13X6K,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-13X6K-0726-SM-5LU2Z,GTEX-13X6K,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-13X6K-1426-SM-HAV3B,GTEX-13X6K,Thyroid,Thyroid,Thyroid,True,True
+GTEX-13X6K-1826-SM-5O9CR,GTEX-13X6K,Heart - Left Ventricle,Heart - Left Ventricle,Heart - Left Ventricle,True,True
+GTEX-144FL-2326-SM-5LUAC,GTEX-144FL,Thyroid,Thyroid,Artery - Coronary,True,False
+GTEX-144GN-0126-SM-GJ3RY,GTEX-144GN,Heart - Left Ventricle,Heart - Left Ventricle,Heart - Left Ventricle,True,True
+GTEX-144GN-2426-SM-GINAZ,GTEX-144GN,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-145LT-1526-SM-5O98P,GTEX-145LT,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-145LT-1826-SM-5QGP4,GTEX-145LT,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-148VI-0326-SM-5RQK7,GTEX-148VI,Heart - Left Ventricle,Heart - Left Ventricle,Heart - Left Ventricle,True,True
+GTEX-1497J-2626-SM-5MR6L,GTEX-1497J,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-14C39-0126-SM-6128R,GTEX-14C39,Artery - Aorta,Artery - Aorta,Artery - Aorta,True,True
+GTEX-14ICL-0326-SM-5S2OS,GTEX-14ICL,Artery - Aorta,Artery - Aorta,Artery - Aorta,True,True
+GTEX-14ICL-1926-SM-5RQIZ,GTEX-14ICL,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-14PJM-0826-SM-6LLIW,GTEX-14PJM,Heart - Atrial Appendage,Heart - Atrial Appendage,Heart - Atrial Appendage,True,True
+GTEX-14PJM-1326-SM-664NX,GTEX-14PJM,Thyroid,Thyroid,Thyroid,True,True
+GTEX-14PJO-1826-SM-69LPR,GTEX-14PJO,Pancreas,Pancreas,Pancreas,True,True
+GTEX-15CHR-2026-SM-7MXU2,GTEX-15CHR,Pancreas,Pancreas,Pancreas,True,True
+GTEX-15DYW-2126-SM-6M47B,GTEX-15DYW,Adrenal Gland,Adrenal Gland,Adrenal Gland,True,True
+GTEX-15EO6-3126-SM-6LPIQ,GTEX-15EO6,Pituitary,Pituitary,Pituitary,True,True
+GTEX-15SHU-0426-SM-GNIOU,GTEX-15SHU,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-15SHU-1926-SM-7KUMO,GTEX-15SHU,Adrenal Gland,Adrenal Gland,Adrenal Gland,True,True
+GTEX-15UF7-1626-SM-HAV2R,GTEX-15UF7,Heart - Left Ventricle,Heart - Left Ventricle,Heart - Atrial Appendage,True,False
+GTEX-15UF7-1726-SM-GQ1E2,GTEX-15UF7,Artery - Aorta,Artery - Aorta,Artery - Aorta,True,True
+GTEX-15UF7-2126-SM-GMXBI,GTEX-15UF7,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-169BO-1526-SM-9KNVR,GTEX-169BO,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-16NFA-0326-SM-GOQZM,GTEX-16NFA,Artery - Aorta,Artery - Aorta,Artery - Aorta,True,True
+GTEX-16NFA-1126-SM-7KUE7,GTEX-16NFA,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-16NFA-2626-SM-GOR12,GTEX-16NFA,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-16XZY-0426-SM-793BI,GTEX-16XZY,Heart - Left Ventricle,Heart - Left Ventricle,Heart - Left Ventricle,True,True
+GTEX-17EVQ-1226-SM-7LG59,GTEX-17EVQ,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-17EVQ-2926-SM-7EWE3,GTEX-17EVQ,Pituitary,Pituitary,Pituitary,True,True
+GTEX-17GQL-0426-SM-7LG5V,GTEX-17GQL,Artery - Coronary,Artery - Coronary,Artery - Coronary,True,True
+GTEX-17GQL-0626-SM-731CN,GTEX-17GQL,Heart - Atrial Appendage,Heart - Atrial Appendage,Heart - Atrial Appendage,True,True
+GTEX-17HGU-1026-SM-79OKL,GTEX-17HGU,Heart - Left Ventricle,Heart - Left Ventricle,Heart - Left Ventricle,True,True
+GTEX-17HGU-1726-SM-79OKM,GTEX-17HGU,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-18A6Q-0226-SM-718AS,GTEX-18A6Q,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-18A6Q-1826-SM-72D6I,GTEX-18A6Q,Adrenal Gland,Adrenal Gland,Adrenal Gland,True,True
+GTEX-1A8G6-2026-SM-73KYC,GTEX-1A8G6,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-1AMEY-0526-SM-72D62,GTEX-1AMEY,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-1AMEY-0726-SM-72D5X,GTEX-1AMEY,Artery - Aorta,Artery - Aorta,Artery - Aorta,True,True
+GTEX-1AMEY-1526-SM-73KYW,GTEX-1AMEY,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-1AMFI-1026-SM-73KYM,GTEX-1AMFI,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-1B97J-1126-SM-7SB79,GTEX-1B97J,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-1C6WA-0326-SM-7DUGE,GTEX-1C6WA,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-1CAMQ-0326-SM-7MXUI,GTEX-1CAMQ,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-1CAMQ-0426-SM-7IGPL,GTEX-1CAMQ,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-1CB4J-0726-SM-7IGN8,GTEX-1CB4J,Liver,Liver,Liver,True,True
+GTEX-1CB4J-1426-SM-7MKFR,GTEX-1CB4J,Thyroid,Thyroid,Thyroid,True,True
+GTEX-1CB4J-3126-SM-7MKFS,GTEX-1CB4J,Pituitary,Pituitary,Pituitary,True,True
+GTEX-1EWIQ-0526-SM-7PBYV,GTEX-1EWIQ,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-1EWIQ-0726-SM-7MKFW,GTEX-1EWIQ,Liver,Liver,Liver,True,True
+GTEX-1EWIQ-2526-SM-7EPIJ,GTEX-1EWIQ,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-1F6IF-0426-SM-7PBZV,GTEX-1F6IF,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-1F6IF-1126-SM-9KNV2,GTEX-1F6IF,Thyroid,Thyroid,Thyroid,True,True
+GTEX-1F6IF-2926-SM-7MKGB,GTEX-1F6IF,Pituitary,Pituitary,Pituitary,True,True
+GTEX-1F88F-0726-SM-7P8R7,GTEX-1F88F,Thyroid,Thyroid,Thyroid,True,True
+GTEX-1F88F-3226-SM-9JGH1,GTEX-1F88F,Pituitary,Pituitary,Pituitary,True,True
+GTEX-1FIGZ-1626-SM-7SB8L,GTEX-1FIGZ,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-1GZ4H-0626-SM-9OSXJ,GTEX-1GZ4H,Pancreas,Pancreas,Pancreas,True,True
+GTEX-1GZ4H-1826-SM-9MQLE,GTEX-1GZ4H,Adipose - Subcutaneous,Artery - Tibial,Artery - Tibial,False,False
+GTEX-1H11D-0826-SM-9OSWB,GTEX-1H11D,Liver,Liver,Liver,True,True
+GTEX-1H11D-1026-SM-9QEIU,GTEX-1H11D,Heart - Atrial Appendage,Heart - Atrial Appendage,Heart - Atrial Appendage,True,True
+GTEX-1H1DE-1726-SM-A9G3G,GTEX-1H1DE,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-1HBPH-0226-SM-9WYSM,GTEX-1HBPH,Heart - Atrial Appendage,Heart - Atrial Appendage,Heart - Atrial Appendage,True,True
+GTEX-1HBPH-0726-SM-ARZNA,GTEX-1HBPH,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-1HBPH-0826-SM-ARZNB,GTEX-1HBPH,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-1HCUA-2226-SM-ADEHF,GTEX-1HCUA,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-1HKZK-0126-SM-B2LWF,GTEX-1HKZK,Adrenal Gland,Adrenal Gland,Adrenal Gland,True,True
+GTEX-1HR9M-2926-SM-ACKVO,GTEX-1HR9M,Pituitary,Muscle - Skeletal,Adrenal Gland,False,False
+GTEX-1I1GP-0326-SM-CNPQ4,GTEX-1I1GP,Thyroid,Thyroid,Thyroid,True,True
+GTEX-1I1GP-1426-SM-ACKVZ,GTEX-1I1GP,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-1I1GP-2126-SM-CKZPJ,GTEX-1I1GP,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-1I1GU-0326-SM-AHZ2K,GTEX-1I1GU,Pancreas,Pancreas,Pancreas,True,True
+GTEX-1IL2V-0426-SM-COH4G,GTEX-1IL2V,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-1J8Q2-0126-SM-E9J2G,GTEX-1J8Q2,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-1JJE9-0226-SM-CY8HU,GTEX-1JJE9,Thyroid,Thyroid,Thyroid,True,True
+GTEX-1JJE9-1226-SM-CNPOI,GTEX-1JJE9,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-1JMQJ-2426-SM-E9TIL,GTEX-1JMQJ,Artery - Aorta,Artery - Aorta,Artery - Aorta,True,True
+GTEX-1K9T9-1126-SM-D3L9E,GTEX-1K9T9,Heart - Left Ventricle,Heart - Left Ventricle,Heart - Left Ventricle,True,True
+GTEX-1KD5A-0826-SM-DKPQ9,GTEX-1KD5A,Artery - Aorta,Artery - Aorta,Artery - Aorta,True,True
+GTEX-1KD5A-0926-SM-D4P3U,GTEX-1KD5A,Heart - Atrial Appendage,Heart - Left Ventricle,Heart - Left Ventricle,False,False
+GTEX-1KD5A-1326-SM-CYPTB,GTEX-1KD5A,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-1KD5A-2526-SM-CXZK8,GTEX-1KD5A,Pituitary,Pituitary,Pituitary,True,True
+GTEX-1LG7Z-0226-SM-E6CIG,GTEX-1LG7Z,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-1LG7Z-0626-SM-D3LA2,GTEX-1LG7Z,Artery - Aorta,Artery - Aorta,Artery - Aorta,True,True
+GTEX-1LG7Z-2126-SM-CXKYU,GTEX-1LG7Z,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-1MCC2-0326-SM-EV7AK,GTEX-1MCC2,Heart - Left Ventricle,Heart - Left Ventricle,Heart - Left Ventricle,True,True
+GTEX-1MCC2-2326-SM-E9U5G,GTEX-1MCC2,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-1MJIX-0326-SM-EVR42,GTEX-1MJIX,Heart - Left Ventricle,Heart - Left Ventricle,Heart - Left Ventricle,True,True
+GTEX-1MJIX-1326-SM-HK79Z,GTEX-1MJIX,Pancreas,Pancreas,Pancreas,True,True
+GTEX-1N2EF-3026-SM-E6CRJ,GTEX-1N2EF,Pituitary,Pituitary,Pituitary,True,True
+GTEX-1PIEJ-0726-SM-HK799,GTEX-1PIEJ,Thyroid,Thyroid,Thyroid,True,True
+GTEX-1PIGE-0726-SM-DPRZD,GTEX-1PIGE,Thyroid,Thyroid,Thyroid,True,True
+GTEX-1PPH8-0526-SM-E9J2J,GTEX-1PPH8,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-1PPH8-1026-SM-DPRXN,GTEX-1PPH8,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-1PWST-0426-SM-E76QV,GTEX-1PWST,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-1PWST-1426-SM-EY5YU,GTEX-1PWST,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-1QP28-0726-SM-G8LKL,GTEX-1QP28,Artery - Aorta,Artery - Aorta,Artery - Aorta,True,True
+GTEX-1QP9N-0226-SM-E9J4A,GTEX-1QP9N,Artery - Aorta,Artery - Aorta,Artery - Aorta,True,True
+GTEX-1QP9N-1526-SM-DTXFK,GTEX-1QP9N,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-1QP9N-1726-SM-E8VMM,GTEX-1QP9N,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-1RAZR-0526-SM-G8OLF,GTEX-1RAZR,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-1RMOY-0126-SM-EWRNN,GTEX-1RMOY,Thyroid,Thyroid,Thyroid,True,True
+GTEX-1RMOY-0426-SM-GPRYD,GTEX-1RMOY,Heart - Atrial Appendage,Heart - Atrial Appendage,Heart - Atrial Appendage,True,True
+GTEX-1S5VW-0426-SM-E9U6G,GTEX-1S5VW,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-1S5VW-1826-SM-EAZ53,GTEX-1S5VW,Liver,Liver,Liver,True,True
+GTEX-1S82U-1826-SM-HM8TP,GTEX-1S82U,Thyroid,Thyroid,Thyroid,True,True
+GTEX-O5YT-1626-SM-G8W7P,GTEX-O5YT,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-O5YW-3026-SM-3MJHI,GTEX-O5YW,Artery - Coronary,Artery - Coronary,Artery - Coronary,True,True
+GTEX-OHPM-2626-SM-33HC5,GTEX-OHPM,Thyroid,Thyroid,Thyroid,True,True
+GTEX-OXRN-2626-SM-48TBX,GTEX-OXRN,Pituitary,Pituitary,Pituitary,True,True
+GTEX-P4PP-0226-SM-D4P1Z,GTEX-P4PP,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-PW2O-0426-SM-48TCC,GTEX-PW2O,Artery - Aorta,Artery - Aorta,Artery - Aorta,True,True
+GTEX-PX3G-1326-SM-48U18,GTEX-PX3G,Adrenal Gland,Adrenal Gland,Adrenal Gland,True,True
+GTEX-PX3G-3026-SM-48TZR,GTEX-PX3G,Artery - Coronary,Adipose - Subcutaneous,Artery - Coronary,False,True
+GTEX-Q2AH-2026-SM-GI4XR,GTEX-Q2AH,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-QVJO-1926-SM-G8W5S,GTEX-QVJO,Heart - Left Ventricle,Heart - Left Ventricle,Heart - Left Ventricle,True,True
+GTEX-QXCU-0926-SM-G8W6W,GTEX-QXCU,Artery - Aorta,Artery - Aorta,Artery - Aorta,True,True
+GTEX-S32W-0526-SM-4AD6F,GTEX-S32W,Artery - Coronary,Artery - Coronary,Artery - Coronary,True,True
+GTEX-S32W-0626-SM-2XCBG,GTEX-S32W,Heart - Left Ventricle,Heart - Left Ventricle,Heart - Left Ventricle,True,True
+GTEX-SJXC-0426-SM-2XCFH,GTEX-SJXC,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-TMMY-0826-SM-33HB9,GTEX-TMMY,Thyroid,Thyroid,Thyroid,True,True
+GTEX-U412-0726-SM-EVR2Y,GTEX-U412,Thyroid,Thyroid,Thyroid,True,True
+GTEX-UJHI-0326-SM-4IHJE,GTEX-UJHI,Artery - Coronary,Artery - Coronary,Artery - Coronary,True,True
+GTEX-UJHI-1626-SM-3DB9A,GTEX-UJHI,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-UTHO-1826-SM-3GAFE,GTEX-UTHO,Adipose - Visceral (Omentum),Adipose - Subcutaneous,Adipose - Subcutaneous,False,False
+GTEX-WFJO-2326-SM-H7OGD,GTEX-WFJO,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-WL46-0726-SM-3LK5Z,GTEX-WL46,Heart - Atrial Appendage,Heart - Atrial Appendage,Heart - Atrial Appendage,True,True
+GTEX-WOFM-0726-SM-3MJF8,GTEX-WOFM,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-WOFM-1726-SM-3MJFA,GTEX-WOFM,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-X15G-2326-SM-4PQZS,GTEX-X15G,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-X261-0326-SM-3NMD4,GTEX-X261,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-X261-0726-SM-EZ6MH,GTEX-X261,Thyroid,Thyroid,Thyroid,True,True
+GTEX-X4XY-0526-SM-46MW1,GTEX-X4XY,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-X4XY-0826-SM-4E3JM,GTEX-X4XY,Thyroid,Thyroid,Thyroid,True,True
+GTEX-X88G-0226-SM-4GIE4,GTEX-X88G,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-XBEW-1026-SM-4QARV,GTEX-XBEW,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-XV7Q-0726-SM-4BRV6,GTEX-XV7Q,Heart - Atrial Appendage,Heart - Atrial Appendage,Heart - Atrial Appendage,True,True
+GTEX-XV7Q-2926-SM-4BRUL,GTEX-XV7Q,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-Y3I4-0526-SM-4TT6X,GTEX-Y3I4,Heart - Atrial Appendage,Heart - Atrial Appendage,Heart - Atrial Appendage,True,True
+GTEX-Y3I4-0826-SM-4TT2A,GTEX-Y3I4,Pancreas,Pancreas,Pancreas,True,True
+GTEX-Y5V5-0226-SM-5S2N8,GTEX-Y5V5,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-Y5V5-0926-SM-4VBPZ,GTEX-Y5V5,Liver,Liver,Liver,True,True
+GTEX-Y8DK-0526-SM-4TT3R,GTEX-Y8DK,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-YB5E-0526-SM-4VDSD,GTEX-YB5E,Pancreas,Pancreas,Pancreas,True,True
+GTEX-Z9EW-1826-SM-5CVMA,GTEX-Z9EW,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-ZE9C-1326-SM-5S2OW,GTEX-ZE9C,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-ZE9C-3126-SM-4WKHN,GTEX-ZE9C,Pituitary,Pituitary,Pituitary,True,True
+GTEX-ZG7Y-0726-SM-H6Q7X,GTEX-ZG7Y,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-ZP4G-2026-SM-57WEH,GTEX-ZP4G,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True
+GTEX-ZP4G-2326-SM-57WEM,GTEX-ZP4G,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-ZQG8-0626-SM-57WF3,GTEX-ZQG8,Artery - Coronary,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),False,False
+GTEX-ZT9X-0926-SM-5O9C4,GTEX-ZT9X,Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),Adipose - Visceral (Omentum),True,True
+GTEX-ZVP2-1826-SM-5GU62,GTEX-ZVP2,Adipose - Subcutaneous,Adipose - Subcutaneous,Adipose - Subcutaneous,True,True
+GTEX-ZVP2-2226-SM-5GU6Q,GTEX-ZVP2,Artery - Tibial,Artery - Tibial,Artery - Tibial,True,True
+GTEX-ZVT2-0726-SM-5GIER,GTEX-ZVT2,Artery - Aorta,Artery - Aorta,Artery - Aorta,True,True
+GTEX-ZVT2-2026-SM-5NQ8Q,GTEX-ZVT2,Pancreas,Pancreas,Pancreas,True,True
+GTEX-ZYVF-0626-SM-5E43Q,GTEX-ZYVF,Muscle - Skeletal,Muscle - Skeletal,Muscle - Skeletal,True,True

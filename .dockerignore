@@ -1,0 +1,17 @@
+.vercel
+.env*
+.venv
+.cloud_tools
+.cloud_deploy
+node_modules
+**/node_modules
+**/__pycache__
+**/*.log
+**/*.part
+qa*
+tests
+docs
+designs
+build
+dist
+.test_runtime_temp
