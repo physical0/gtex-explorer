@@ -48,6 +48,7 @@ def test_new_session_restores_workspace_page_and_model_from_url(tmp_path, monkey
     assert app.session_state.active_workspace_id == other['id']
     assert app.session_state.page == 'Kamus Biologi'
     assert app.session_state.active_model_id == 'baseline'
+    assert app.query_params['model'] == ['baseline']  # Not dropped before the prediction page runs.
 
 
 def test_url_follows_navigation_and_launcher_clears_it(tmp_path, monkeypatch):

@@ -22,6 +22,7 @@ COPY assets/ assets/
 COPY model_bundle/ model_bundle/
 COPY baseline_bundle/ baseline_bundle/
 COPY --from=training-data /app/training_data/ training_data/
-ENV GTEX_CLOUD=1 GTEX_DESKTOP_STATE_DIR=/tmp/gtex-cloud-state \
+# Run times are shown in Western Indonesia Time; a POSIX TZ string needs no tzdata.
+ENV TZ=WIB-7 GTEX_CLOUD=1 GTEX_DESKTOP_STATE_DIR=/tmp/gtex-cloud-state \
     PYTHONUNBUFFERED=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PORT=80
 CMD ["sh", "-c", "exec python -m streamlit run cloud_app.py --server.address 0.0.0.0 --server.port ${PORT:-80} --server.headless true --server.fileWatcherType none --browser.gatherUsageStats false"]

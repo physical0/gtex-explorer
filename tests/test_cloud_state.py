@@ -256,3 +256,21 @@ def test_garbage_collection_keeps_live_versions_and_drops_old_ones(tmp_path):
     fresh = CloudState(tmp_path / 'fresh', store)
     fresh.pull()
     assert (fresh.root / 'workspaces.json').read_bytes() == b'new'
+
+
+def test_individually_installed_file_is_removed_when_deleted_remotely(tmp_path):
+    # The daemon installs a stop command on its own; after a resume deletes it
+    # remotely, the next pull must not leave the stale command behind.
+    store = MemoryStore()
+    web, daemon = (CloudState(tmp_path / name, store) for name in ['web', 'daemon'])
+    web.pull()
+    daemon.pull()
+    write(web.root, 'runs/run_test/cloud_control.json', b'{"action": "stop"}')
+    web.publish()
+    manifest = json.loads(store.get('gtex/state.json')[0])
+    daemon._install('runs/run_test/cloud_control.json', manifest['files']['runs/run_test/cloud_control.json'])
+    web.pull()
+    (web.root / 'runs/run_test/cloud_control.json').unlink()
+    web.publish()
+    daemon.pull()
+    assert not (daemon.root / 'runs/run_test/cloud_control.json').exists()

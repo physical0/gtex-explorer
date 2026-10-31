@@ -58,12 +58,27 @@ def method_description(config):
     return f"{text} - {config['top_k']:,} gen".replace(',', '.')
 
 
+def run_created(path):
+    """Start time saved with the run; older runs fall back to the file time."""
+    config = Path(path) / 'config.json'
+    try:
+        created = json.loads(config.read_text(encoding='utf-8')).get('created')
+        if isinstance(created, (int, float)):
+            return float(created)
+    except (OSError, ValueError):
+        pass
+    try:
+        return config.stat().st_mtime
+    except OSError:
+        return 0.
+
+
 def run_label(path):
     try:
         saved = json.loads((path / 'config.json').read_text(encoding='utf-8'))
         dataset = saved.get('dataset', {})
         filename = dataset.get('source', {}).get('expression_file', 'Data notebook')
-        stamp = time.strftime('%d/%m %H:%M', time.localtime((path / 'config.json').stat().st_mtime))
+        stamp = time.strftime('%d/%m %H:%M', time.localtime(run_created(path)))
         return f"{stamp} - {method_description(saved['config'])} - {filename} - {path.name[-6:]}"
     except (OSError, ValueError, KeyError):
         return f"Riwayat tidak dapat dibaca - {path.name[-6:]}"
@@ -71,7 +86,7 @@ def run_label(path):
 
 def choose_run(state_root, key, *, gallery_only=False):
     paths = sorted((Path(state_root) / 'runs').glob('run_*/status.json'),
-                   key=lambda p: p.stat().st_mtime, reverse=True)
+                   key=lambda p: run_created(p.parent), reverse=True)
     if gallery_only:
         issues = []
         ready = {entry['run_id'] for entry in list_gallery(state_root, issues=issues)}
@@ -589,7 +604,7 @@ def _gallery_results(state_root):
             records.append({**entry, 'saved': saved,
                 'method': method_description(saved['config']),
                 'filename': saved.get('dataset', {}).get('source', {}).get('expression_file', 'Data eksperimen notebook'),
-                'date': time.strftime('%d/%m/%Y %H:%M', time.localtime(path.stat().st_mtime))})
+                'date': time.strftime('%d/%m/%Y %H:%M', time.localtime(run_created(path.parent)))})
         library, details = st.columns([1, 2.6], gap='large')
         with library, st.container(key='gallery_models'):
             st.subheader('Model tersimpan')

@@ -184,8 +184,9 @@ def start_job(config: TrainingConfig, data_root: Path, state_root: Path) -> JobR
                 portable['data_reference'] = {'kind': 'bundled'}
             else:
                 raise ValueError('Cloud training data must belong to a workspace or bundled reference.')
+        # File times are reset when a hosted instance restores state, so keep the real start time.
         atomic_json(root / 'config.json', {'config': config.to_dict(), 'identity': identity, **portable,
-                                         'data_root': str(data_root), 'dataset': dataset,
+                                         'created': time.time(), 'data_root': str(data_root), 'dataset': dataset,
                                          'data_fingerprint': data.fingerprint, 'split_hash': split})
         atomic_json(root / 'status.json', {'status': 'queued', 'stage': 'queued', 'updated': time.time(),
                                          'error': None, 'cv_summary': None})

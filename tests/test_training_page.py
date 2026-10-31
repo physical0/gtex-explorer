@@ -137,3 +137,16 @@ def test_paused_training_has_live_resume_and_separate_end_button(tmp_path, monke
         assert not any(item.key=='training_resume' for item in app.button)
         assert any('memori' in item.value for item in app.info)
         assert any('12 detik' in item.value for item in app.caption)
+
+
+def test_run_time_uses_saved_start_not_restored_file_time(tmp_path):
+    # Hosted instances rewrite files on restore, so file times are not the run's age.
+    import json, os, time
+    from gtex_explorer.ui.training_page import run_created
+    run = tmp_path / 'run_x'
+    run.mkdir()
+    (run / 'config.json').write_text(json.dumps({'created': 1_000_000.0}), encoding='utf-8')
+    os.utime(run / 'config.json', (time.time(), time.time()))
+    assert run_created(run) == 1_000_000.0
+    (run / 'config.json').write_text(json.dumps({}), encoding='utf-8')
+    assert abs(run_created(run) - (run / 'config.json').stat().st_mtime) < 1e-6

@@ -290,6 +290,9 @@ class CloudState:
             os.replace(temporary, target)
         finally:
             temporary.unlink(missing_ok=True)
+        # Track single installs (e.g. a daemon fetching a stop command) so a
+        # later pull removes the file once it is deleted remotely.
+        self.baseline[name] = digest
 
     def pull(self):
         with self.lock:

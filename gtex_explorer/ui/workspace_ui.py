@@ -62,8 +62,10 @@ def restore_location(root):
 def remember_location():
     """Keep the URL in step with the current workspace, page and model."""
     location = {'ws': st.session_state.active_workspace_id, 'page': st.session_state.page}
-    if st.session_state.get('prediction_model'):
-        location['model'] = st.session_state.prediction_model
+    # Right after a reconnect only the restored active_model_id is known.
+    model = st.session_state.get('prediction_model') or st.session_state.get('active_model_id')
+    if model:
+        location['model'] = model
     if st.query_params.to_dict() != location:
         st.query_params.from_dict(location)
 
