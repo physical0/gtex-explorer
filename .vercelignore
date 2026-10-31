@@ -1,5 +1,7 @@
 .env*
 .venv
+venv
+training_data
 .cloud_tools
 .cloud_deploy
 node_modules
