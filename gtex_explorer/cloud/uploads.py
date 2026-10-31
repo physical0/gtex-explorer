@@ -1,7 +1,9 @@
 """Private direct-to-Storage uploads avoid Function request-body limits."""
 from gtex_explorer.paths import APP_ROOT
 import hashlib
+import hmac
 import math
+import os
 import re
 import time
 import uuid
@@ -22,10 +24,18 @@ def upload_key(upload_id):
     return 'incoming/' + upload_id + '/upload'
 
 
-def validate_reference(value, issued=None):
+def sign(upload_id):
+    # Signed rather than remembered per session: a reconnect may reach another
+    # instance, and the reference must still prove the server issued this ID.
+    key = ('gtex-upload:' + os.environ.get('SUPABASE_SECRET_KEY', '')).encode()
+    return hmac.new(key, upload_id.encode(), hashlib.sha256).hexdigest()
+
+
+def validate_reference(value):
     if (not isinstance(value, dict) or not isinstance(value.get('id'), str)
             or not re.fullmatch(r'[0-9a-f]{32}', value['id'])
-            or (issued is not None and value['id'] not in issued)
+            or not isinstance(value.get('sig'), str)
+            or not hmac.compare_digest(value['sig'], sign(value['id']))
             or not isinstance(value.get('name'), str)
             or not re.fullmatch(r'[^/\\]+\.(csv|tsv|txt|gct)', value['name'], re.I)
             or type(value.get('size')) is not int or not 0 <= value['size'] <= MAX_UPLOAD):
@@ -36,8 +46,7 @@ def validate_reference(value, issued=None):
 def _issue_target():
     upload_id = uuid.uuid4().hex
     store, key = state().store, upload_key(upload_id)
-    st.session_state.setdefault('gtex-upload-issued', set()).add(upload_id)
-    return {'id': upload_id, 'created': time.time(), 'url': store.signed_upload_url(key),
+    return {'id': upload_id, 'sig': sign(upload_id), 'created': time.time(), 'url': store.signed_upload_url(key),
             'parts': [store.signed_upload_url(part_key(key, i)) for i in range(MAX_PARTS)]}
 
 
@@ -51,7 +60,7 @@ def _download(upload_id, size):
 
 class CloudUpload:
     def __init__(self, value):
-        self.reference = validate_reference(value, st.session_state.get('gtex-upload-issued', set()))
+        self.reference = validate_reference(value)
         self.name = value['name']
         self.size = value['size']
 
@@ -91,7 +100,7 @@ def file_uploader(label, *, type, key, on_change=None, disabled=False, label_vis
         target = st.session_state[component_key + '-target'] = _issue_target()
     result = _UPLOAD(key=component_key, data={'accept': ','.join('.' + extension for extension in type),
         'current': current, 'disabled': disabled, 'max_size': MAX_UPLOAD, 'part_size': PART_SIZE,
-        'target': {field: target[field] for field in ('id', 'url', 'parts')}},
+        'target': {field: target[field] for field in ('id', 'sig', 'url', 'parts')}},
         default={'value': None}, on_value_change=on_change or (lambda: None), height='content')
     value = getattr(result, 'value', None)
     return CloudUpload(value) if value is not None else None

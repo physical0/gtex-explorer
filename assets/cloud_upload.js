@@ -53,7 +53,7 @@ export default function(component) {
         }
         await put(target.url, new Blob([PARTS_MAGIC + JSON.stringify({parts: count, size: file.size})]), () => {});
       }
-      setStateValue('value', {id: target.id, name: file.name, size: file.size});
+      setStateValue('value', {id: target.id, sig: target.sig, name: file.name, size: file.size});
     } catch (error) {
       status.textContent = 'Unggah gagal. Periksa koneksi atau akses, lalu pilih berkas kembali.';
     } finally {

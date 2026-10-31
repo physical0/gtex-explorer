@@ -30,6 +30,44 @@ def activate_workspace(state, root, workspace_id):
     remember_workspace(root, workspace_id)
 
 
+PAGES = {'Pelatihan Model', 'Prediksi Jaringan', 'Hasil Pelatihan', 'Panel Gen Pelatihan',
+         'Kamus Biologi', 'Ringkasan', 'Perbandingan Metode', 'Panel Gen'}
+
+
+def restore_location(root):
+    """Re-enter the workspace and page named in the URL once per new session.
+
+    Session state lives in one server's memory. Hosted connections are cut at
+    the platform's maximum duration and may reconnect to a fresh session, so
+    the user's place is also kept in the URL, which the browser preserves.
+    """
+    state = st.session_state
+    if state.get('location_restored'):
+        return
+    state.location_restored = True
+    if state.get('workspace_entered') or not st.query_params.get('ws'):
+        return
+    try:
+        activate_workspace(state, root, st.query_params['ws'])
+    except (ValueError, OSError):
+        st.query_params.clear()
+        return
+    state.workspace_entered = True
+    page = st.query_params.get('page')
+    state.page = page if page in PAGES else 'Pelatihan Model'
+    if st.query_params.get('model'):
+        state.active_model_id = st.query_params['model']
+
+
+def remember_location():
+    """Keep the URL in step with the current workspace, page and model."""
+    location = {'ws': st.session_state.active_workspace_id, 'page': st.session_state.page}
+    if st.session_state.get('prediction_model'):
+        location['model'] = st.session_state.prediction_model
+    if st.query_params.to_dict() != location:
+        st.query_params.from_dict(location)
+
+
 def current_workspace_root(root=None):
     if root is None:
         from gtex_explorer.desktop_runtime import state_directory
@@ -114,6 +152,7 @@ def _return_to_launcher():
     st.session_state.workspace_selection = st.session_state.active_workspace_id
     st.session_state.workspace_entered = False
     st.session_state.pop('workspace_search', None)
+    st.query_params.clear()
 
 
 def _select_workspace(workspace_id):

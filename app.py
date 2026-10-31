@@ -27,7 +27,8 @@ from gtex_explorer.ui.glossary import render_glossary_page
 from gtex_explorer.ui.training_page import render_training_page, render_training_results_page
 from gtex_explorer.ui.training_gene_page import render_training_gene_page
 from gtex_explorer.desktop_runtime import state_directory
-from gtex_explorer.ui.workspace_ui import render_workspace_controls, current_workspace_root, render_workspace_launcher
+from gtex_explorer.ui.workspace_ui import (render_workspace_controls, current_workspace_root, render_workspace_launcher,
+                                           restore_location, remember_location)
 from gtex_explorer.workspaces import bundled_models_enabled
 
 
@@ -1427,6 +1428,7 @@ def render_comparison_page(tables: dict) -> None:
                 st.altair_chart(tissue_chart, width="stretch")
 
 
+restore_location(state_directory())
 if not st.session_state.get('workspace_entered', False):
     render_workspace_launcher(state_directory(), APP_DIR / 'assets' / 'brand_dna.png')
     st.stop()
@@ -1438,6 +1440,7 @@ except (ValueError, FileNotFoundError) as data_error:
     st.info("Sinkronkan tabel dari results/notebook_run_500_1000_2000_l1_grid/part_a_only ke folder data aplikasi.")
     st.stop()
 page = navigation()
+remember_location()
 active_state_root = current_workspace_root(state_directory())
 
 preprocessor = None
