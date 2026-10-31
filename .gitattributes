@@ -1,0 +1,6 @@
+# Exported results and bundles are verified by SHA-256 manifests, so Git must
+# store them byte for byte instead of converting line endings.
+data/** -text
+model_bundle/** -text
+baseline_bundle/** -text
+resources/** -text
