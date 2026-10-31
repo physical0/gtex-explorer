@@ -4,11 +4,10 @@ import hashlib
 import mimetypes
 import os
 from pathlib import Path
-from urllib.parse import urlencode
 
 import streamlit as st
 
-from gtex_explorer.cloud.state import enabled, NodeBlobStore, CloudConflict
+from gtex_explorer.cloud.state import enabled, state, CloudConflict
 
 
 def image(source, **kwargs):
@@ -19,10 +18,11 @@ def image(source, **kwargs):
     return st.image(source, **kwargs)
 
 
-@st.cache_data(max_entries=32, show_spinner=False)
+# Exports are deleted after a day, so re-store well within that window.
+@st.cache_data(ttl=12 * 60 * 60, max_entries=32, show_spinner=False)
 def _store_export(content, prefix):
     name = 'exports/' + prefix + '/' + hashlib.sha256(content).hexdigest()
-    store = NodeBlobStore()
+    store = state().store
     try:
         store.put(name, content, create=True)
     except CloudConflict:
@@ -32,12 +32,18 @@ def _store_export(content, prefix):
     return name
 
 
+# Links stay valid for an hour; re-signing every 30 minutes avoids a call per rerun.
+@st.cache_data(ttl=30 * 60, max_entries=64, show_spinner=False)
+def _signed_url(name, file_name):
+    return state().store.signed_download_url(name, file_name, expires=60 * 60)
+
+
 def download_button(label, data, file_name=None, mime=None, *, key=None, **kwargs):
     if not enabled():
         return st.download_button(label, data=data, file_name=file_name, mime=mime, key=key, **kwargs)
     content = data.encode('utf-8') if isinstance(data, str) else bytes(data)
     name = _store_export(content, os.environ.get('GTEX_CLOUD_PREFIX', 'gtex-production'))
-    url = '/api/files?' + urlencode({'key': name, 'name': file_name or 'export.csv'})
+    url = _signed_url(name, file_name or 'export.csv')
     # Browser download uses a private backing object, not Streamlit's in-memory
     # media registry, so it works even when the HTTP request reaches another instance.
     allowed = {k:v for k,v in kwargs.items() if k in {'type', 'help', 'disabled', 'icon', 'width'}}

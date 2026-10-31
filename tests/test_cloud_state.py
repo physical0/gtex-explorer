@@ -27,6 +27,12 @@ class MemoryStore:
         self.objects[key] = (data, etag)
         return etag
 
+    def signed_upload_url(self, key):
+        return 'https://storage.test/upload/' + key
+
+    def signed_download_url(self, key, filename, expires=3600):
+        return 'https://storage.test/download/' + key
+
 
 def write(root, name, data):
     path = root / name
@@ -138,16 +144,115 @@ def test_partial_and_machine_local_files_are_not_backed_up(tmp_path):
     assert manifest['files'] == {}
 
 
-def test_cloud_read_retries_when_manifest_changes_during_download(monkeypatch):
-    from gtex_explorer.cloud.state import NodeBlobStore
-    calls = []
-    def changing_read(operation, key, path):
-        calls.append(key)
-        if len(calls) < 3:
-            raise CloudConflict('Manifest changed between GET and HEAD')
-        path.write_bytes(b'consistent')
-        return {'found': True, 'etag': 'strong-etag'}
-    store = NodeBlobStore()
-    monkeypatch.setattr(store, '_call', changing_read)
-    assert store.get('gtex/state.json') == (b'consistent', 'strong-etag')
-    assert len(calls) == 3
+class FakeSupabase:
+    """Just enough PostgREST and Storage behaviour to exercise SupabaseStore."""
+    def __init__(self):
+        self.rows = {}
+        self.objects = {}
+        self.calls = []
+
+    def __call__(self, method, path, body=None, headers=None):
+        from urllib.parse import unquote, urlsplit, parse_qs
+        self.calls.append((method, path))
+        url = urlsplit(path)
+        query = {k: v[0] for k, v in parse_qs(url.query).items()}
+        if url.path == '/rest/v1/cloud_manifest':
+            key = query.get('key', 'eq.')[3:]
+            row = self.rows.get(key)
+            if method == 'GET':
+                fields = query['select'].split(',')
+                return 200, json.dumps([{f: row[f] for f in fields}] if row else []).encode()
+            value = json.loads(body)
+            if method == 'POST':
+                if value['key'] in self.rows:
+                    return 409, b'{}'
+                self.rows[value['key']] = value
+                return 201, b''
+            if row is None or str(row['version']) != query['version'][3:]:
+                return 200, b'[]'
+            row.update(version=value['version'], body=value['body'])
+            return 200, json.dumps([row]).encode()
+        if url.path == '/rest/v1/rpc/stale_objects':
+            prefix = json.loads(body)['name_prefix']
+            return 200, json.dumps(sorted(k for k in self.objects if k.startswith(prefix))).encode()
+        if method == 'DELETE':
+            for name in json.loads(body)['prefixes']:
+                self.objects.pop(name, None)
+            return 200, b'[]'
+        name = unquote(url.path.split('/gtex/', 1)[1])
+        if method == 'GET':
+            return (200, self.objects[name]) if name in self.objects else (400, b'{"error":"not_found","message":"Object not found"}')
+        if headers.get('x-upsert') == 'false' and name in self.objects:
+            return 400, b'{"error":"Duplicate","message":"The resource already exists"}'
+        self.objects[name] = body
+        return 200, b'{}'
+
+
+def supabase_store():
+    from gtex_explorer.cloud.state import SupabaseStore
+    store = SupabaseStore('https://example.supabase.co', 'test-key')
+    fake = FakeSupabase()
+    store._request = fake
+    return store, fake
+
+
+def test_unchanged_manifest_is_one_version_query_without_body():
+    store, fake = supabase_store()
+    store.put('gtex/state.json', b'{"v":1}', create=True)
+    assert store.get('gtex/state.json') == (b'{"v":1}', '1')
+    fake.calls.clear()
+    assert store.get('gtex/state.json') == (b'{"v":1}', '1')
+    assert fake.calls == [('GET', '/rest/v1/cloud_manifest?key=eq.gtex%2Fstate.json&select=version')]
+
+
+def test_manifest_compare_and_swap_rejects_stale_version():
+    store, fake = supabase_store()
+    first = store.put('gtex/state.json', b'A', create=True)
+    store.put('gtex/state.json', b'B', expected=first)
+    with pytest.raises(CloudConflict):
+        store.put('gtex/state.json', b'C', expected=first)
+    other, _ = supabase_store()
+    other._request = fake
+    assert other.get('gtex/state.json') == (b'B', '2')
+
+
+def test_objects_above_part_size_round_trip_as_parts(monkeypatch):
+    import gtex_explorer.cloud.state as cloud_state
+    monkeypatch.setattr(cloud_state, 'PART_SIZE', 4)
+    store, fake = supabase_store()
+    store.put('gtex/objects/big', b'0123456789', create=True)
+    assert sorted(fake.objects) == ['gtex/objects/big', 'gtex/objects/big.part000',
+                                    'gtex/objects/big.part001', 'gtex/objects/big.part002']
+    with pytest.raises(CloudConflict):
+        store.put('gtex/objects/big', b'0123456789', create=True)
+    fresh, _ = supabase_store()
+    fresh._request = fake
+    assert fresh.get('gtex/objects/big') == (b'0123456789', 'immutable')
+
+
+def test_publish_without_changes_skips_the_network(tmp_path):
+    store, fake = supabase_store()
+    state = CloudState(tmp_path / 'state', store)
+    state.pull()
+    write(state.root, 'workspaces.json', b'{}')
+    state.publish()
+    state.pull()
+    fake.calls.clear()
+    state.publish()
+    assert fake.calls == []
+
+
+def test_garbage_collection_keeps_live_versions_and_drops_old_ones(tmp_path):
+    store, fake = supabase_store()
+    state = CloudState(tmp_path / 'state', store)
+    state.pull()
+    write(state.root, 'workspaces.json', b'old')
+    state.publish()
+    write(state.root, 'workspaces.json', b'new')
+    state.publish()
+    fake.objects['incoming/abc/upload'] = b'expired upload'
+    assert state.collect_garbage() == 2
+    assert sorted(fake.objects) == ['gtex/objects/' + hashlib.sha256(b'new').hexdigest()]
+    fresh = CloudState(tmp_path / 'fresh', store)
+    fresh.pull()
+    assert (fresh.root / 'workspaces.json').read_bytes() == b'new'

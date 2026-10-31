@@ -89,3 +89,5 @@ Desktop.ini
 /docs/
 /designs/
 /.superpowers/
+.vercel
+.env*

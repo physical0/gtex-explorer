@@ -1,14 +1,18 @@
 """Versioned private artifact storage. Local disk is only a disposable working copy."""
+import collections
+import contextlib
 from contextlib import contextmanager
 import functools
 import hashlib
+import io
 import json
 import os
 from pathlib import Path, PurePosixPath
-import subprocess
-import tempfile
 import threading
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 
 
 class CloudConflict(ValueError):
@@ -39,37 +43,208 @@ def _safe(root, name):
     return root / name
 
 
-class NodeBlobStore:
-    """Use the official JS SDK for streaming files and conditional ETag writes."""
-    def _call(self, operation, key, filename, **options):
-        args = [os.environ.get('GTEX_NODE', 'node'), str(Path(__file__).with_name('blob.mjs')),
-                operation, key, str(filename), json.dumps(options)]
-        result = subprocess.run(args, capture_output=True, text=True, timeout=300)
-        if result.returncode:
-            if result.returncode == 3:
-                raise CloudConflict('Data di server berubah. Muat ulang dan ulangi tindakan.')
-            raise OSError('Penyimpanan cloud tidak tersedia. Perubahan belum dikonfirmasi.')
-        return json.loads(result.stdout)
+UNAVAILABLE = 'Penyimpanan cloud tidak tersedia. Perubahan belum dikonfirmasi.'
+# Supabase Free rejects objects above 50 MB; larger bodies are stored as parts
+# behind a small index object so callers still see one key.
+PART_SIZE = 45 * 1024 * 1024
+PARTS_MAGIC = b'GTEX-PARTS-1\n'
+
+
+def part_key(key, index):
+    return f'{key}.part{index:03d}'
+
+
+class SupabaseStore:
+    """Manifests are versioned Postgres rows; every other key is a private Storage object.
+
+    Unchanged manifests cost one tiny version query, and content-addressed
+    objects are immutable, so both are cached to keep polling egress low.
+    """
+    def __init__(self, url=None, key=None, bucket='gtex'):
+        self.url = (url or os.environ.get('SUPABASE_URL', '')).rstrip('/')
+        self.key = key or os.environ.get('SUPABASE_SECRET_KEY', '')
+        self.bucket = bucket
+        self._rows = {}
+        self._objects = collections.OrderedDict()
+        self._object_bytes = 0
+
+    def _request(self, method, path, body=None, headers=None):
+        if not self.url or not self.key:
+            raise OSError(UNAVAILABLE)
+        request = urllib.request.Request(self.url + path, data=body, method=method, headers={
+            'apikey': self.key, 'Authorization': 'Bearer ' + self.key, **(headers or {})})
+        try:
+            with urllib.request.urlopen(request, timeout=300) as response:
+                return response.status, response.read()
+        except urllib.error.HTTPError as error:
+            return error.code, error.read()
+        except OSError as error:
+            raise OSError(UNAVAILABLE) from error
+
+    def _json(self, method, path, value, headers=None):
+        return self._request(method, path, json.dumps(value).encode(),
+                             {'Content-Type': 'application/json', **(headers or {})})
+
+    @staticmethod
+    def _manifest_key(key):
+        return key.endswith('/state.json')
+
+    def _object_path(self, key):
+        return f'/storage/v1/object/{self.bucket}/' + urllib.parse.quote(key)
+
+    # Manifest rows: version is the ETag, conditional PATCH is the compare-and-swap.
+    def _row_filter(self, key):
+        return '/rest/v1/cloud_manifest?key=eq.' + urllib.parse.quote(key, safe='')
+
+    def _get_row(self, key):
+        cached = self._rows.get(key)
+        status, body = self._request('GET', self._row_filter(key) + '&select=version'
+                                     + ('' if cached else ',body'))
+        if status != 200:
+            raise OSError(UNAVAILABLE)
+        rows = json.loads(body)
+        if not rows:
+            self._rows.pop(key, None)
+            return None
+        version = str(rows[0]['version'])
+        if cached and cached[0] == version:
+            return cached[1], version
+        if cached:
+            # Changed remotely: drop the stale copy and fetch the body.
+            del self._rows[key]
+            return self._get_row(key)
+        data = rows[0]['body'].encode()
+        self._rows[key] = (version, data)
+        return data, version
+
+    def _put_row(self, key, data, expected, create):
+        if expected is None and not create:
+            current = self._get_row(key)
+            if current is None:
+                return self._put_row(key, data, None, True)
+            expected = current[1]
+        text = data.decode()
+        if expected is None:
+            status, _ = self._json('POST', '/rest/v1/cloud_manifest',
+                                   {'key': key, 'version': 1, 'body': text},
+                                   {'Prefer': 'return=minimal'})
+            version = '1'
+        else:
+            version = str(int(expected) + 1)
+            status, body = self._json('PATCH', self._row_filter(key) + '&version=eq.' + str(int(expected)),
+                                      {'version': int(version), 'body': text,
+                                       'updated_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())},
+                                      {'Prefer': 'return=representation'})
+            if status == 200 and not json.loads(body):
+                status = 409
+        if status == 409:
+            raise CloudConflict('Data di server berubah. Muat ulang dan ulangi tindakan.')
+        if status not in {200, 201, 204}:
+            raise OSError(UNAVAILABLE)
+        self._rows[key] = (version, data)
+        return version
+
+    # Storage objects.
+    def _download(self, key):
+        status, body = self._request('GET', f'/storage/v1/object/authenticated/{self.bucket}/'
+                                     + urllib.parse.quote(key))
+        if status == 200:
+            return body
+        if status in {400, 404} and b'not' in body.lower() and b'found' in body.lower():
+            return None
+        raise OSError(UNAVAILABLE)
+
+    def _upload(self, key, data, create):
+        status, body = self._request('POST', self._object_path(key), data, {
+            'Content-Type': 'application/octet-stream', 'x-upsert': 'false' if create else 'true'})
+        if status in {400, 409} and (b'Duplicate' in body or b'already exists' in body):
+            raise CloudConflict('Object already exists')
+        if status != 200:
+            raise OSError(UNAVAILABLE)
+
+    def _remember(self, key, data):
+        if '/objects/' not in key or len(data) > PART_SIZE:
+            return
+        self._objects[key] = data
+        self._object_bytes += len(data)
+        while self._object_bytes > 64 * 1024 * 1024:
+            self._object_bytes -= len(self._objects.popitem(last=False)[1])
 
     def get(self, key):
-        with tempfile.TemporaryDirectory(prefix='gtex-blob-') as temporary:
-            target = Path(temporary) / 'download'
-            for attempt in range(5):
-                try:
-                    result = self._call('get', key, target)
-                    return (target.read_bytes(), result['etag']) if result.get('found') else None
-                except CloudConflict:
-                    if attempt == 4:
-                        raise
+        if self._manifest_key(key):
+            return self._get_row(key)
+        if key in self._objects:
+            self._objects.move_to_end(key)
+            return self._objects[key], 'immutable'
+        data = self._download(key)
+        if data is None:
+            return None
+        if data.startswith(PARTS_MAGIC):
+            index = json.loads(data[len(PARTS_MAGIC):])
+            pieces = [self._download(part_key(key, i)) for i in range(index['parts'])]
+            if any(piece is None for piece in pieces):
+                return None
+            data = b''.join(pieces)
+            if len(data) != index['size']:
+                raise CloudIntegrityError('Incomplete multipart object: ' + key)
+        self._remember(key, data)
+        return data, 'immutable'
 
     def put(self, key, data, *, expected=None, create=False):
-        with tempfile.TemporaryDirectory(prefix='gtex-blob-') as temporary:
-            source = Path(temporary) / 'upload'
-            source.write_bytes(data)
-            return self.put_file(key, source, expected=expected, create=create)
+        if self._manifest_key(key):
+            return self._put_row(key, data, expected, create)
+        return self.put_file(key, io.BytesIO(data), expected=expected, create=create)
 
     def put_file(self, key, path, *, expected=None, create=False):
-        return self._call('put', key, path, expected=expected, create=create)['etag']
+        if self._manifest_key(key):
+            return self._put_row(key, Path(path).read_bytes(), expected, create)
+        with (open(path, 'rb') if isinstance(path, (str, os.PathLike)) else contextlib.nullcontext(path)) as handle:
+            block, pending = handle.read(PART_SIZE), handle.read(PART_SIZE)
+            if not pending:
+                self._upload(key, block, create)
+                return 'immutable'
+            if create and self._download(key) is not None:
+                raise CloudConflict('Object already exists')
+            # Parts are written first; the index makes the object visible last.
+            index = size = 0
+            while block:
+                self._upload(part_key(key, index), block, False)
+                index, size = index + 1, size + len(block)
+                block, pending = pending, handle.read(PART_SIZE) if pending else b''
+            self._upload(key, PARTS_MAGIC + json.dumps({'parts': index, 'size': size}).encode(), create)
+        return 'immutable'
+
+    def delete(self, keys):
+        keys = list(keys)
+        for start in range(0, len(keys), 100):
+            status, _ = self._json('DELETE', f'/storage/v1/object/{self.bucket}', {'prefixes': keys[start:start + 100]})
+            if status != 200:
+                raise OSError(UNAVAILABLE)
+        for key in keys:
+            self._objects.pop(key, None)
+
+    def stale(self, prefix, older_than):
+        status, body = self._json('POST', '/rest/v1/rpc/stale_objects',
+                                  {'name_prefix': prefix, 'older_than': older_than})
+        if status != 200:
+            raise OSError(UNAVAILABLE)
+        return json.loads(body)
+
+    def signed_upload_url(self, key):
+        # Targets belong to one browser session; upsert lets a failed upload retry.
+        status, body = self._request('POST', f'/storage/v1/object/upload/sign/{self.bucket}/'
+                                     + urllib.parse.quote(key), headers={'x-upsert': 'true'})
+        if status != 200:
+            raise OSError(UNAVAILABLE)
+        return self.url + '/storage/v1' + json.loads(body)['url']
+
+    def signed_download_url(self, key, filename, expires=3600):
+        status, body = self._json('POST', f'/storage/v1/object/sign/{self.bucket}/' + urllib.parse.quote(key),
+                                  {'expiresIn': expires})
+        if status != 200:
+            raise OSError(UNAVAILABLE)
+        return (self.url + '/storage/v1' + json.loads(body)['signedURL']
+                + '&' + urllib.parse.urlencode({'download': filename}))
 
 
 class CloudState:
@@ -80,6 +255,7 @@ class CloudState:
         self.prefix = prefix.rstrip('/')
         self.baseline = {}
         self.loaded = False
+        self.remote_exists = False
         self.lock = threading.RLock()
         self.depth = 0
         self._hash_cache = {}
@@ -117,7 +293,8 @@ class CloudState:
 
     def pull(self):
         with self.lock:
-            manifest, _ = self._manifest()
+            manifest, etag = self._manifest()
+            self.remote_exists = etag is not None
             files = manifest['files']
             # Validate every remote path before touching the local working copy.
             for name in files:
@@ -183,6 +360,10 @@ class CloudState:
                 keys = keys & set(only)
             changes = {key: local.get(key) for key in keys
                        if local.get(key) != self.baseline.get(key)}
+            # Most reruns change nothing; skip the manifest round trip. Workers
+            # still read it so a lost lease fences them out.
+            if not changes and lease_owner is None and self.remote_exists:
+                return
             for key, digest in changes.items():
                 if digest is not None:
                     object_key = self.prefix + '/objects/' + digest
@@ -213,6 +394,7 @@ class CloudState:
                         manifest['files'][key] = digest
                 try:
                     self._replace(manifest, etag)
+                    self.remote_exists = True
                     # Only adopt the files actually present locally. Remote changes
                     # merged above will be downloaded on the next pull.
                     if only is None:
@@ -228,6 +410,19 @@ class CloudState:
                 except CloudConflict:
                     continue
             raise CloudConflict('Penyimpanan sedang digunakan. Coba kembali.')
+
+    def collect_garbage(self, *, grace='1 hour', transient='1 day'):
+        """Delete unreferenced artifact versions and expired uploads/exports."""
+        manifest, _ = self._manifest()
+        live = set(manifest['files'].values())
+        objects = self.prefix + '/objects/'
+        stale = [name for name in self.store.stale(objects, grace)
+                 if name[len(objects):].split('.part')[0] not in live]
+        for prefix in ['incoming/', 'exports/' + self.prefix + '/']:
+            stale += self.store.stale(prefix, transient)
+        if stale:
+            self.store.delete(stale)
+        return len(stale)
 
     def acquire_lease(self, owner, *, now=None, ttl=60):
         now = time.time() if now is None else now
@@ -278,7 +473,7 @@ def state():
     global _instance
     if _instance is None:
         root = Path(os.environ['GTEX_DESKTOP_STATE_DIR'])
-        _instance = CloudState(root, NodeBlobStore(), os.environ.get('GTEX_CLOUD_PREFIX', 'gtex'))
+        _instance = CloudState(root, SupabaseStore(), os.environ.get('GTEX_CLOUD_PREFIX', 'gtex'))
     return _instance
 
 

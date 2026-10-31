@@ -3,17 +3,31 @@ import pytest
 from gtex_explorer.cloud.uploads import validate_reference
 
 
-@pytest.mark.parametrize('path', ['gtex-production/state.json', '../state.json',
-    'incoming/a/test.csv', 'https://example.com/a.csv', 'incoming/' + 'a' * 36 + '/file.exe'])
-def test_upload_reference_cannot_read_other_private_objects(path):
+ISSUED = '0123456789abcdef0123456789abcdef'
+
+
+@pytest.mark.parametrize('upload_id', ['../state', 'gtex-production/state.json', ISSUED.upper(),
+                                       'fedcba9876543210fedcba9876543210'])
+def test_upload_reference_cannot_read_other_private_objects(upload_id):
     with pytest.raises(ValueError):
-        validate_reference({'pathname': path, 'name': 'test.csv', 'size': 100})
+        validate_reference({'id': upload_id, 'name': 'test.csv', 'size': 100}, {ISSUED})
 
 
-def test_generated_private_upload_reference_is_accepted():
-    value = {'pathname': 'incoming/01234567-89ab-cdef-0123-456789abcdef/tpm.csv',
-             'name': 'Ekspresi gen.csv', 'size': 512}
-    assert validate_reference(value) == value
+@pytest.mark.parametrize('name', ['file.exe', '../tpm.csv', 'a/b.csv'])
+def test_upload_reference_rejects_unsupported_names(name):
+    with pytest.raises(ValueError):
+        validate_reference({'id': ISSUED, 'name': name, 'size': 100}, {ISSUED})
+
+
+def test_upload_reference_rejects_oversized_files():
+    from gtex_explorer.cloud.uploads import MAX_UPLOAD
+    with pytest.raises(ValueError):
+        validate_reference({'id': ISSUED, 'name': 'tpm.csv', 'size': MAX_UPLOAD + 1}, {ISSUED})
+
+
+def test_issued_private_upload_reference_is_accepted():
+    value = {'id': ISSUED, 'name': 'Ekspresi gen.csv', 'size': 512}
+    assert validate_reference(value, {ISSUED}) == value
 
 
 def test_hosted_form_handles_namespaced_upload_keys_without_component_error(tmp_path, monkeypatch):

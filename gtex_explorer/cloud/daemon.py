@@ -12,6 +12,10 @@ import uuid
 from gtex_explorer.cloud.state import state, CloudConflict, CloudLeaseLost
 from gtex_explorer.training.jobs import atomic_json, pause_job, unpause_job, request_cancel, resolve_job_data
 
+# An idle poll is one small version query; queued jobs start within this delay.
+IDLE_POLL = 10
+CLEANUP_INTERVAL = 60 * 60
+
 
 def candidates(manifest):
     return sorted(name for name in manifest['files']
@@ -33,14 +37,20 @@ def main():
     handled = None
     owns_lease = False
     next_heartbeat = 0.
+    next_cleanup = time.monotonic() + 60
     try:
         while not stopped.is_set():
             try:
                 if child is None:
+                    if time.monotonic() >= next_cleanup:
+                        next_cleanup = time.monotonic() + CLEANUP_INTERVAL
+                        removed = durable.collect_garbage()
+                        if removed:
+                            print('Cloud cleanup removed', removed, 'objects', flush=True)
                     manifest, _ = durable._manifest()
                     lease = manifest.get('lease') or {}
                     if lease.get('expires', 0) > time.time() and lease.get('owner') != owner:
-                        stopped.wait(5)
+                        stopped.wait(IDLE_POLL)
                         continue
                     queued = []
                     for name in candidates(manifest):
@@ -51,7 +61,7 @@ def main():
                         if value['status'] == 'queued':
                             queued.append(name)
                     if not queued:
-                        stopped.wait(5)
+                        stopped.wait(IDLE_POLL)
                         continue
                     if not durable.acquire_lease(owner, ttl=90):
                         continue
