@@ -82,7 +82,7 @@ def test_overview_actions_open_existing_pages(key, title):
 
 def test_prediction_header_follows_bundle_and_has_no_duplicate_footer():
     app = AppTest.from_string(
-        "from gtex_explorer.analysis.core import load_reference_tables, load_model_bundle\nfrom gtex_explorer.ui.prediction_page import render_prediction_page\ntables=load_reference_tables()\np,c=load_model_bundle()\np.update(selector_id='anova', feature_selection='anova', feature_count=500)\nfrom unittest.mock import patch\nwith patch('prediction_page._choose_model', return_value=(p,c)):\n    render_prediction_page(p,c,tables)\n", default_timeout=60,
+        "from gtex_explorer.analysis.core import load_reference_tables, load_model_bundle\nfrom gtex_explorer.ui.prediction_page import render_prediction_page\ntables=load_reference_tables()\np,c=load_model_bundle()\np.update(selector_id='anova', feature_selection='anova', feature_count=500)\nfrom unittest.mock import patch\nwith patch('gtex_explorer.ui.prediction_page._choose_model', return_value=(p,c)):\n    render_prediction_page(p,c,tables)\n", default_timeout=60,
     ).run()
     assert not app.exception
     text = "\n".join(element.value for element in app.markdown)

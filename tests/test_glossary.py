@@ -123,7 +123,7 @@ def test_dictionary_download_contains_entire_filtered_index_and_source_addresses
     app = glossary_app()
     with patch("streamlit.download_button") as download:
         app.selectbox(key="glossary_category").set_value("Jaringan dan anatomi").run()
-        csv = pd.read_csv(io.BytesIO(download.call_args.args[1]))
+        csv = pd.read_csv(io.BytesIO(download.call_args.kwargs["data"]))
     assert len(csv) == 14  # Thirteen target tissues and the general tissue concept.
     assert {"Istilah", "Nama Inggris atau GTEx", "Definisi", "Rujukan", "Alamat rujukan"} <= set(csv)
     assert csv["Kategori"].eq("Jaringan dan anatomi").all()
