@@ -141,3 +141,14 @@ def test_deterministic_failures_do_not_offer_checkpoint_resume():
     assert can_resume(record('failed', {'type': 'WorkerStopped'}))
     assert not can_resume(record('failed', {'type': 'SelectorEligibilityError'}))
     assert not can_resume(record('completed'))
+
+
+def test_training_form_values_survive_visiting_another_page(tmp_path, monkeypatch):
+    from ui_helpers import enter_application
+    monkeypatch.setenv('GTEX_DESKTOP_STATE_DIR', str(tmp_path))
+    app = enter_application(AppTest.from_file(str(APP), default_timeout=60).run(), 'Pelatihan Model')
+    app.number_input(key='training_xgb_n_estimators').set_value(500).run()
+    app.button(key='nav_Kamus Biologi').click().run()
+    app.button(key='nav_Pelatihan Model').click().run()
+    assert not app.exception
+    assert app.number_input(key='training_xgb_n_estimators').value == 500

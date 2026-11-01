@@ -1439,13 +1439,14 @@ except (ValueError, FileNotFoundError) as data_error:
     st.error(f"Ekspor Part A tidak konsisten atau belum tersedia: {data_error}")
     st.info("Sinkronkan tabel dari results/notebook_run_500_1000_2000_l1_grid/part_a_only ke folder data aplikasi.")
     st.stop()
-page = navigation()
-remember_location()
 # Streamlit drops widget values for widgets not drawn in a run; re-assigning keeps the training form
-# intact while the user visits other pages. Workspace switches clear these keys separately.
+# intact while the user visits other pages. This must run before navigation(), which reruns early.
+# Workspace switches clear these keys separately.
 for key in TRAINING_FORM_KEYS:
     if key in st.session_state:
         st.session_state[key] = st.session_state[key]
+page = navigation()
+remember_location()
 active_state_root = current_workspace_root(state_directory())
 
 preprocessor = None
