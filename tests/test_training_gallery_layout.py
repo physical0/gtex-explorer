@@ -73,3 +73,19 @@ def test_model_actions_precede_metrics_and_keep_correct_run_on_navigation(galler
     app.button(key='training_open_genes').click().run()
     assert app.session_state.training_panel_run == first
     assert app.session_state.page == 'Panel Gen Pelatihan'
+
+
+def test_removing_a_gallery_model_deletes_its_files_and_selects_the_next(gallery_app, tmp_path):
+    app, first, second = gallery_app
+    assert len(list(tmp_path.rglob(first))) == 2  # The run and its model.
+    app.button(key=f'gallery_select_{first}').click().run()
+    assert app.button(key='training_delete_run').label == 'Hapus model'
+    app.button(key='training_delete_run').click().run()
+    assert not app.exception
+    assert app.button(key=f'gallery_select_{first}')  # Nothing is removed before confirming.
+    app.button(key='training_delete_confirm').click().run()
+    assert not app.exception
+    assert not list(tmp_path.rglob(first))
+    assert not any(button.key == f'gallery_select_{first}' for button in app.button)
+    assert app.session_state.training_gallery_run == second
+    assert list(tmp_path.rglob(second))

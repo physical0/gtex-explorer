@@ -28,6 +28,12 @@ mengganti workspace aktif. Pergantian melalui **Buka workspace** membersihkan
 unggahan dan hasil audit/prediksi sebelumnya, tetapi tidak menghapus file tersimpan atau menghentikan
 training. Tautan **Buka proses** membawa pengguna ke workspace proses aktif.
 Hanya satu worker training dapat berjalan atau dijeda dalam seluruh aplikasi.
+
+**Hapus** pada layar pemilihan menghapus permanen workspace beserta hasil
+pelatihan, model, dan dataset unggahannya setelah namanya diketik persis. Workspace
+**Default** dan workspace dengan pelatihan aktif tidak dapat dihapus. **Hapus model**
+dan **Hapus hasil pelatihan** pada halaman Hasil Pelatihan menghapus satu run beserta
+modelnya; dataset unggahan tetap tersimpan sampai workspace dihapus.
 Referensi eksperimen, kamus, dan contoh lokal tetap merupakan aset bersama.
 Nilai widget sementara dapat kembali ke default ketika halamannya tidak lagi
 ditampilkan. Pemeriksaan integritas pada launcher desktop tetap memeriksa aset
