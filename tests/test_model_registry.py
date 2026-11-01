@@ -90,3 +90,28 @@ def test_baseline_export_uses_every_candidate_and_development_example(tmp_path):
     assert pre['feature_selection'] == 'baseline'
     assert model.get_booster().num_boosted_rounds() == 300
     assert 'HOLDOUT' not in pd.read_csv(entry.demo_path).SAMPID.tolist()
+
+
+def test_listing_models_loads_each_bundle_only_when_its_files_change(tmp_path, monkeypatch):
+    import shutil
+    from pathlib import Path
+    import gtex_explorer.model_registry as registry
+    root = tmp_path / 'resources'
+    root.mkdir()
+    shutil.copytree(Path(__file__).resolve().parents[1] / 'baseline_bundle', root / 'baseline_bundle')
+    state = tmp_path / 'state'
+    state.mkdir()
+    loads = []
+    real = registry.load_saved_model
+    monkeypatch.setattr(registry, 'load_saved_model', lambda entry: loads.append(entry.model_id) or real(entry))
+    monkeypatch.setattr(registry, '_validated_bundles', {})
+    assert [e.bundle_dir.name for e in registry.list_models(root, state)] == ['baseline_bundle']
+    registry.list_models(root, state)
+    assert len(loads) == 1
+
+    # A changed file is checked again, so a damaged bundle still leaves the list.
+    with (root / 'baseline_bundle' / 'xgboost_model.json').open('ab') as handle:
+        handle.write(b' ')
+    issues = []
+    assert registry.list_models(root, state, issues=issues) == []
+    assert issues and len(loads) == 2

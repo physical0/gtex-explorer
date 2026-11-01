@@ -51,7 +51,8 @@ def sync_prediction_model(state, entry) -> None:
     state['active_model_id'] = entry.model_id
 
 
-@st.cache_resource(show_spinner="Memuat model prediksi...")
+# Models are large once loaded, so an instance keeps only the few in recent use.
+@st.cache_resource(max_entries=3, show_spinner="Memuat model prediksi...")
 def _selected_bundle(entry):
     from gtex_explorer.model_registry import load_prediction_model
     return load_prediction_model(entry)

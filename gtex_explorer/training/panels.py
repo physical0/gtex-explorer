@@ -5,7 +5,7 @@ import tempfile
 
 import pandas as pd
 
-from gtex_explorer.training.data import atomic_publish_directory, file_hash, verify_files
+from gtex_explorer.training.data import atomic_publish_directory, file_hash, verify_files_cached
 from gtex_explorer.training.jobs import job_path
 
 
@@ -26,7 +26,7 @@ def read_fold_panel(root, identity):
     payload = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
     if payload['identity'] != identity:
         raise ValueError('Panel identity mismatch')
-    verify_files(root, payload['files'])
+    verify_files_cached(root, payload['files'])
     return pd.read_csv(root / 'genes.csv'), payload['diagnostics']
 
 
@@ -38,7 +38,7 @@ def load_run_panel(state_root, run_id, scope):
         manifest = json.loads((bundle / 'bundle_manifest.json').read_text(encoding='utf-8'))
         if manifest['provenance']['identity'] != saved['identity']:
             raise ValueError('Model/panel identity mismatch')
-        verify_files(bundle, manifest['files'])
+        verify_files_cached(bundle, manifest['files'])
         return (pd.read_csv(bundle / 'selected_genes.csv'),
                 json.loads((bundle / 'diagnostics.json').read_text(encoding='utf-8')))
     if type(scope) is not int or not 1 <= scope <= 10:

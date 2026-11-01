@@ -193,6 +193,15 @@ def supabase_store():
     store = SupabaseStore('https://example.supabase.co', 'test-key')
     fake = FakeSupabase()
     store._request = fake
+
+    def stream(key, write):
+        data = store._download(key)
+        if data is None:
+            return False
+        write(data)
+        return True
+
+    store._stream = stream
     return store, fake
 
 
@@ -301,3 +310,96 @@ def test_page_run_does_not_block_other_sessions(tmp_path):
     release.set()
     page.join(5)
     assert json.loads(store.objects['gtex/state.json'][0])['files']['other.json']
+
+
+def test_web_instance_defers_uploaded_matrix_until_a_run_needs_it(tmp_path, monkeypatch):
+    store = MemoryStore()
+    name = 'workspaces/ws_a/datasets/abc/raw_tpm.npy'
+    writer = CloudState(tmp_path / 'writer', store)
+    write(writer.root, 'workspaces/ws_a/datasets/abc/manifest.json', b'{}')
+    write(writer.root, name, b'matrix')
+    writer.publish()
+
+    monkeypatch.setenv('GTEX_CLOUD', '1')
+    monkeypatch.setenv('GTEX_CLOUD_ROLE', 'web')
+    web = CloudState(tmp_path / 'web', store)
+    web.pull()
+    assert (web.root / 'workspaces/ws_a/datasets/abc/manifest.json').is_file()
+    assert not (web.root / name).exists()
+
+    # A skipped file must not be published as a deletion.
+    write(web.root, 'other.json', b'{}')
+    web.publish()
+    files = json.loads(store.objects['gtex/state.json'][0])['files']
+    assert name in files and 'other.json' in files
+
+    web.pull()
+    assert not (web.root / name).exists()
+    web.ensure(web.root / 'workspaces/ws_a/datasets/abc')
+    assert (web.root / name).read_bytes() == b'matrix'
+
+    # A fetched matrix stays in step: later syncs neither re-upload nor delete it.
+    before = store.counter
+    web.pull()
+    web.publish()
+    assert store.counter == before
+    assert (web.root / name).is_file()
+
+
+def test_download_to_disk_handles_multipart_objects(tmp_path, monkeypatch):
+    from gtex_explorer.cloud.state import SupabaseStore, PARTS_MAGIC, part_key
+    remote = {'k': PARTS_MAGIC + json.dumps({'parts': 2, 'size': 6}).encode(),
+              part_key('k', 0): b'abc', part_key('k', 1): b'def', 'small': b'plain'}
+    store = SupabaseStore('https://storage.test', 'key')
+
+    def stream(key, write):
+        if key not in remote:
+            return False
+        write(remote[key])
+        return True
+
+    monkeypatch.setattr(store, '_stream', stream)
+    target = tmp_path / 'out'
+    assert store.download_to('k', target) and target.read_bytes() == b'abcdef'
+    assert store.download_to('small', target) and target.read_bytes() == b'plain'
+    assert not store.download_to('missing', target)
+    remote['k'] = PARTS_MAGIC + json.dumps({'parts': 2, 'size': 99}).encode()
+    with pytest.raises(CloudIntegrityError):
+        store.download_to('k', target)
+
+
+def test_streamed_download_over_http(tmp_path):
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    import threading
+    from gtex_explorer.cloud.state import SupabaseStore
+    body = b'x' * (3 * 1024 * 1024 + 7)
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            code, payload = 200, body
+            if self.path.endswith('/missing'):
+                code, payload = 404, b'{"message":"Object not found"}'
+            elif self.path.endswith('/broken'):
+                code, payload = 500, b'{"message":"internal"}'
+            assert self.headers['Authorization'] == 'Bearer key'
+            self.send_response(code)
+            self.send_header('Content-Length', str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(('127.0.0.1', 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        store = SupabaseStore(f'http://127.0.0.1:{server.server_port}', 'key')
+        target = tmp_path / 'object'
+        assert store.download_to('big', target)
+        assert target.read_bytes() == body
+        assert not store.download_to('missing', target)
+        with pytest.raises(OSError):
+            store.download_to('broken', target)
+    finally:
+        server.shutdown()
+        server.server_close()

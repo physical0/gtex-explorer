@@ -11,7 +11,7 @@ from gtex_explorer.cloud.media import download_button
 
 from gtex_explorer.training.config import training_presets, validate_training_config
 from gtex_explorer.training.data import load_training_data, make_cv_assignments
-from gtex_explorer.training.jobs import start_job, read_job, request_cancel, resume_job, pause_job, unpause_job, can_resume, FINALIZING_STAGES
+from gtex_explorer.training.jobs import start_job, read_job, request_cancel, resume_job, pause_job, unpause_job, can_resume, has_active_run, FINALIZING_STAGES
 from gtex_explorer.training.gallery import list_gallery
 from gtex_explorer.training.uploads import audit_uploads, read_upload_table, save_training_upload
 from gtex_explorer.error_messages import user_error
@@ -442,8 +442,14 @@ def _render_training_setup(data_root: Path, state_root: Path) -> None:
             st.caption('Model dan panel gen disimpan sebagai hasil pelatihan baru.')
 
 
-@st.fragment(run_every=2)
-def _run_details(data_root: Path, state_root: Path):
+def _follow_active_run(state_root, polling):
+    """Redraw the page when a run starts or ends, so polling is on only while one is active."""
+    if has_active_run(state_root) != polling:
+        st.rerun(scope='app')
+
+
+def _run_details(data_root: Path, state_root: Path, polling: bool = False):
+    _follow_active_run(state_root, polling)
     gallery_only = st.session_state.get('training_results_view') == 'Gallery model'
     run_id = choose_run(state_root, 'training_run', gallery_only=gallery_only)
     if run_id is None:
@@ -610,8 +616,8 @@ def _select_gallery_run(run_id):
     st.session_state.training_selected_run = run_id
 
 
-@st.fragment(run_every=2)
-def _gallery_results(state_root):
+def _gallery_results(state_root, polling: bool = False):
+    _follow_active_run(state_root, polling)
     issues = []
     entries = list_gallery(state_root, issues=issues)
     for issue in issues:
@@ -708,10 +714,13 @@ def render_training_results_page(data_root: Path, state_root: Path):
         if 'training_results_view' not in st.session_state:
             st.session_state.training_results_view = 'Gallery model' if list_gallery(state_root) else 'Status proses'
         gallery, process = st.tabs(['Gallery model', 'Status proses'], key='training_results_view', on_change='rerun')
+        # Saved results do not change, so these panels poll only while a run is active.
+        polling = has_active_run(state_root)
+        run_every = 2 if polling else None
         if gallery.open:
             with gallery:
-                _gallery_results(state_root)
+                st.fragment(_gallery_results, run_every=run_every)(state_root, polling)
         if process.open:
             with process:
-                _run_details(data_root, state_root)
+                st.fragment(_run_details, run_every=run_every)(data_root, state_root, polling)
 

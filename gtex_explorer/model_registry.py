@@ -12,7 +12,7 @@ from xgboost import XGBClassifier
 from xgboost.core import XGBoostError
 from gtex_explorer.training.config import TrainingConfig
 from gtex_explorer.training.core import FitResult, runtime_versions
-from gtex_explorer.training.data import file_hash, stable_hash, unique_ids, verify_files, atomic_publish_directory
+from gtex_explorer.training.data import cached_file_hash, file_hash, stable_hash, unique_ids, verify_files, atomic_publish_directory
 
 
 @dataclass(frozen=True)
@@ -159,6 +159,19 @@ def publish_model(result: FitResult, config: TrainingConfig, provenance: dict,
     return _entry(output_dir)
 
 
+_validated_bundles = {}
+
+
+def _validate_once(entry: ModelEntry) -> None:
+    """Fully load a bundle only when its files change. The loaded model is not kept."""
+    root = entry.bundle_dir
+    signature = (entry.manifest_hash, tuple(sorted(
+        (path.name, path.stat().st_mtime_ns, path.stat().st_size) for path in root.iterdir() if path.is_file())))
+    if _validated_bundles.get(str(root)) != signature:
+        load_saved_model(entry)
+        _validated_bundles[str(root)] = signature
+
+
 def list_models(resource_root: Path, state_root: Path, *, issues: list | None = None) -> list[ModelEntry]:
     from gtex_explorer.workspaces import bundled_models_enabled
     include_originals = bundled_models_enabled(state_root)
@@ -172,10 +185,10 @@ def list_models(resource_root: Path, state_root: Path, *, issues: list | None = 
             meta = json.loads((original / names[0]).read_text(encoding='utf-8'))
             if not isinstance(meta, dict) or meta.get('status') != 'validated':
                 raise ValueError('Manifest model asli tidak valid. Pulihkan folder model_bundle dari paket aplikasi.')
-            if file_hash(original / names[2]) != meta.get('xgboost_model_sha256'):
+            if cached_file_hash(original / names[2]) != meta.get('xgboost_model_sha256'):
                 raise ValueError('Original model hash mismatch')
             entries.append(ModelEntry('original_l1_c_1_1000', 'Original - L1, C = 1 - 1.000 gen', original,
-                                      stable_hash({name: file_hash(original / name) for name in names}),
+                                      stable_hash({name: cached_file_hash(original / name) for name in names}),
                                       Path(resource_root) / 'data' / 'demo_tpm.csv'))
         except (ValueError, KeyError, OSError, TypeError) as error:
             if issues is not None:
@@ -195,7 +208,7 @@ def list_models(resource_root: Path, state_root: Path, *, issues: list | None = 
             continue
         try:
             entry = _entry(path)
-            load_saved_model(entry)
+            _validate_once(entry)
             entries.append(entry)
         except (ValueError, KeyError, OSError, TypeError, XGBoostError) as error:
             if issues is not None:

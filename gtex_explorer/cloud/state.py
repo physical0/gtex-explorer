@@ -54,6 +54,21 @@ def part_key(key, index):
     return f'{key}.part{index:03d}'
 
 
+def _file_digest(path):
+    hasher = hashlib.sha256()
+    with Path(path).open('rb') as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b''):
+            hasher.update(block)
+    return hasher.hexdigest()
+
+
+def _deferred(name):
+    # Only the training worker reads uploaded matrices, each up to 200 MB. Web
+    # instances fetch one through ensure() when a run starts from that dataset.
+    parts = PurePosixPath(name).parts
+    return remote_client() and parts[-1] == 'raw_tpm.npy' and 'datasets' in parts
+
+
 class SupabaseStore:
     """Manifests are versioned Postgres rows; every other key is a private Storage object.
 
@@ -153,6 +168,44 @@ class SupabaseStore:
         if status in {400, 404} and b'not' in body.lower() and b'found' in body.lower():
             return None
         raise OSError(UNAVAILABLE)
+
+    def _stream(self, key, write):
+        request = urllib.request.Request(
+            self.url + f'/storage/v1/object/authenticated/{self.bucket}/' + urllib.parse.quote(key),
+            headers={'apikey': self.key, 'Authorization': 'Bearer ' + self.key})
+        try:
+            with urllib.request.urlopen(request, timeout=300) as response:
+                for block in iter(lambda: response.read(1024 * 1024), b''):
+                    write(block)
+            return True
+        except urllib.error.HTTPError as error:
+            body = error.read()
+            if error.code in {400, 404} and b'not' in body.lower() and b'found' in body.lower():
+                return False
+            raise OSError(UNAVAILABLE) from error
+        except OSError as error:
+            raise OSError(UNAVAILABLE) from error
+
+    def download_to(self, key, path):
+        """Write an object to disk block by block, so its size never reaches memory."""
+        if not self.url or not self.key:
+            raise OSError(UNAVAILABLE)
+        path = Path(path)
+        with path.open('wb') as handle:
+            if not self._stream(key, handle.write):
+                return False
+        if path.stat().st_size > 4096:
+            return True
+        head = path.read_bytes()
+        if head.startswith(PARTS_MAGIC):
+            index = json.loads(head[len(PARTS_MAGIC):])
+            with path.open('wb') as handle:
+                for number in range(index['parts']):
+                    if not self._stream(part_key(key, number), handle.write):
+                        return False
+            if path.stat().st_size != index['size']:
+                raise CloudIntegrityError('Incomplete multipart object: ' + key)
+        return True
 
     def _upload(self, key, data, create):
         status, body = self._request('POST', self._object_path(key), data, {
@@ -280,13 +333,19 @@ class CloudState:
 
     def _install(self, name, digest):
         target = _safe(self.root, name)
-        found = self.store.get(self.prefix + '/objects/' + digest)
-        if found is None or hashlib.sha256(found[0]).hexdigest() != digest:
-            raise CloudIntegrityError('Durable artifact checksum mismatch: ' + name)
+        key = self.prefix + '/objects/' + digest
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.with_name(target.name + '.cloud.part')
         try:
-            temporary.write_bytes(found[0])
+            if hasattr(self.store, 'download_to'):
+                found = self.store.download_to(key, temporary) and _file_digest(temporary) == digest
+            else:
+                data = self.store.get(key)
+                found = data is not None and hashlib.sha256(data[0]).hexdigest() == digest
+                if found:
+                    temporary.write_bytes(data[0])
+            if not found:
+                raise CloudIntegrityError('Durable artifact checksum mismatch: ' + name)
             os.replace(temporary, target)
         finally:
             temporary.unlink(missing_ok=True)
@@ -302,15 +361,32 @@ class CloudState:
             # Validate every remote path before touching the local working copy.
             for name in files:
                 _safe(self.root, name)
+            baseline = {}
             for name, digest in files.items():
                 target = _safe(self.root, name)
+                # Left out of the baseline too, or publish would read it as a local deletion.
+                if _deferred(name) and not target.is_file():
+                    continue
                 if self.baseline.get(name) != digest or not target.is_file():
                     self._install(name, digest)
+                baseline[name] = digest
             for name in self.baseline.keys() - files.keys():
                 _safe(self.root, name).unlink(missing_ok=True)
-            self.baseline = dict(files)
+            self.baseline = baseline
             self.loaded = True
             return manifest
+
+    def ensure(self, directory):
+        """Fetch the deferred files of one directory before a web instance reads them."""
+        directory = Path(directory).resolve()
+        if not directory.is_relative_to(self.root):
+            return
+        prefix = directory.relative_to(self.root).as_posix() + '/'
+        with self.lock:
+            manifest, _ = self._manifest()
+            for name, digest in manifest['files'].items():
+                if name.startswith(prefix) and not _safe(self.root, name).is_file():
+                    self._install(name, digest)
 
     def _durable(self, path):
         relative = path.relative_to(self.root)

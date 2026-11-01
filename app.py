@@ -11,11 +11,8 @@ from gtex_explorer.cloud.media import image, download_button
 from gtex_explorer.analysis.core import (
     APP_DIR,
     DATA_DIR,
-    MODEL_DIR,
     audit_and_align_input,
-    load_model_bundle,
     load_reference_tables,
-    model_bundle_available,
     parse_expression_file,
     predict_tissues,
 )
@@ -29,7 +26,6 @@ from gtex_explorer.ui.training_gene_page import render_training_gene_page
 from gtex_explorer.desktop_runtime import state_directory
 from gtex_explorer.ui.workspace_ui import (render_workspace_controls, current_workspace_root, render_workspace_launcher,
                                            restore_location, remember_location)
-from gtex_explorer.workspaces import bundled_models_enabled
 
 
 st.set_page_config(
@@ -695,12 +691,6 @@ st.markdown(
 def reference_tables(snapshot_version: tuple) -> dict:
     del snapshot_version
     return load_reference_tables()
-
-
-@st.cache_resource(show_spinner="Memuat model bawaan...")
-def prediction_bundle(bundle_version: tuple):
-    del bundle_version
-    return load_model_bundle()
 
 
 def file_version(directory) -> tuple:
@@ -1449,14 +1439,6 @@ page = navigation()
 remember_location()
 active_state_root = current_workspace_root(state_directory())
 
-preprocessor = None
-classifier = None
-if bundled_models_enabled(active_state_root) and model_bundle_available():
-    try:
-        preprocessor, classifier = prediction_bundle(file_version(MODEL_DIR))
-    except Exception as bundle_error:
-        st.sidebar.error(f"Bundle model gagal dimuat: {bundle_error}")
-
 if page == "Pelatihan Model":
     render_training_page(APP_DIR / 'training_data', active_state_root)
 elif page == "Hasil Pelatihan":
@@ -1472,5 +1454,6 @@ elif page == "Panel Gen":
 elif page in {"Kamus Biologi", "Kamus Istilah"}:
     render_glossary_page()
 else:
-    render_offline_prediction_page(preprocessor, classifier, tables)
+    # The page loads the model chosen in its own selector.
+    render_offline_prediction_page(None, None, tables)
 

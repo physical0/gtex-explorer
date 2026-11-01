@@ -70,6 +70,28 @@ def verify_files(root: Path, files: dict) -> None:
             raise ValueError(f'Artifact hash mismatch: {path.name}')
 
 
+_known_hashes = {}
+
+
+def cached_file_hash(path: Path) -> str:
+    """For paths that run on every rerun or poll: rehash only after a file's time or size changes."""
+    stat = path.stat()
+    signature = (stat.st_mtime_ns, stat.st_size)
+    known = _known_hashes.get(str(path))
+    if known and known[0] == signature:
+        return known[1]
+    digest = file_hash(path)
+    _known_hashes[str(path)] = (signature, digest)
+    return digest
+
+
+def verify_files_cached(root: Path, files: dict) -> None:
+    paths = [(safe_path(root, name), expected) for name, expected in files.items()]
+    for path, expected in paths:
+        if not path.is_file() or cached_file_hash(path) != expected:
+            raise ValueError(f'Artifact hash mismatch: {path.name}')
+
+
 def unique_ids(values: list, *, genes: bool = False) -> tuple[str, ...]:
     ids = tuple(str(x) for x in values)
     normalized = [x.split('.')[0].upper() if genes else x for x in ids]

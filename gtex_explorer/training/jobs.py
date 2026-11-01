@@ -11,7 +11,7 @@ import sys
 import time
 import uuid
 import psutil
-from gtex_explorer.cloud.state import operation, remote_client
+from gtex_explorer.cloud.state import operation, remote_client, state
 from gtex_explorer.workspaces import coordination_directory, workspace_roots
 from gtex_explorer.training.config import TrainingConfig, configuration_fingerprint
 from gtex_explorer.training.data import load_training_data, make_cv_assignments, stable_hash, atomic_replace_file
@@ -28,6 +28,7 @@ class JobRecord:
 
 
 FINALIZING_STAGES = {'saving_results', 'verifying_results'}
+ACTIVE_STATUSES = {'queued', 'running', 'paused', 'cancelling'}
 # Data and configuration errors fail the same way on every retry.
 DETERMINISTIC_ERRORS = {'SelectorEligibilityError', 'ValueError', 'TypeError', 'KeyError'}
 
@@ -87,6 +88,17 @@ def process_lock(path: Path):
         yield
     finally:
         handle.close()  # OS releases ownership even if a worker crashes.
+
+
+@operation
+def has_active_run(state_root: Path) -> bool:
+    for path in (Path(state_root) / 'runs').glob('run_*/status.json'):
+        try:
+            if json.loads(path.read_text(encoding='utf-8')).get('status') in ACTIVE_STATUSES:
+                return True
+        except (OSError, ValueError):
+            continue
+    return False
 
 
 @operation
@@ -170,6 +182,8 @@ def _assert_idle(state_root):
 @operation
 def start_job(config: TrainingConfig, data_root: Path, state_root: Path) -> JobRecord:
     data_root, state_root = Path(data_root).resolve(), Path(state_root).resolve()
+    if remote_client():
+        state().ensure(data_root)
     data = load_training_data(data_root)
     assignments = make_cv_assignments(data, config.cv_folds) if config.evaluate_cv else []
     split = stable_hash([a.split_hash for a in assignments]) if assignments else None

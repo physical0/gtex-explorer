@@ -154,3 +154,21 @@ def test_saving_stage_explains_gallery_delay_and_disables_controls_in_ui(tmp_pat
         app.run()
         assert not any(button.key == 'training_open_prediction' for button in app.button)
         assert any('Belum ada model terverifikasi' in info.value for info in app.info)
+
+
+def test_cached_verification_skips_rehash_until_a_file_changes(tmp_path, monkeypatch):
+    import pytest
+    import gtex_explorer.training.data as data
+    target = tmp_path / 'artifact.txt'
+    target.write_bytes(b'one')
+    expected = data.file_hash(target)
+    data.verify_files_cached(tmp_path, {'artifact.txt': expected})
+    calls = []
+    real = data.file_hash
+    monkeypatch.setattr(data, 'file_hash', lambda path: calls.append(path) or real(path))
+    data.verify_files_cached(tmp_path, {'artifact.txt': expected})
+    assert not calls
+    target.write_bytes(b'changed')
+    with pytest.raises(ValueError, match='hash mismatch'):
+        data.verify_files_cached(tmp_path, {'artifact.txt': expected})
+    assert calls

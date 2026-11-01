@@ -7,7 +7,7 @@ import pandas as pd
 from gtex_explorer.cloud.state import operation
 from xgboost.core import XGBoostError
 
-from gtex_explorer.training.data import file_hash, stable_hash, verify_files
+from gtex_explorer.training.data import file_hash, stable_hash, verify_files_cached
 from gtex_explorer.training.jobs import atomic_json, job_path
 
 
@@ -88,8 +88,8 @@ def list_gallery(state_root, *, issues=None):
                        else finalize_gallery(run_id, state_root))
             if receipt['schema_version'] != 1 or receipt['run_id'] != run_id:
                 raise ValueError('Invalid gallery record')
-            verify_files(root, receipt['run_files'])
-            verify_files(Path(state_root) / 'models' / run_id, receipt['model_files'])
+            verify_files_cached(root, receipt['run_files'])
+            verify_files_cached(Path(state_root) / 'models' / run_id, receipt['model_files'])
             entries.append(receipt)
         except (OSError, ValueError, KeyError, TypeError, XGBoostError) as error:
             if issues is not None:

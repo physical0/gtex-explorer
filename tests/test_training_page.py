@@ -150,3 +150,15 @@ def test_run_time_uses_saved_start_not_restored_file_time(tmp_path):
     assert run_created(run) == 1_000_000.0
     (run / 'config.json').write_text(json.dumps({}), encoding='utf-8')
     assert abs(run_created(run) - (run / 'config.json').stat().st_mtime) < 1e-6
+
+
+def test_finished_runs_do_not_count_as_active(tmp_path):
+    import json
+    from gtex_explorer.training.jobs import has_active_run
+    assert not has_active_run(tmp_path)
+    status = tmp_path / 'runs' / ('run_' + 'c' * 32) / 'status.json'
+    status.parent.mkdir(parents=True)
+    for value, active in [('completed', False), ('failed', False), ('cancelled', False),
+                          ('queued', True), ('running', True), ('paused', True), ('cancelling', True)]:
+        status.write_text(json.dumps({'status': value}), encoding='utf-8')
+        assert has_active_run(tmp_path) is active
