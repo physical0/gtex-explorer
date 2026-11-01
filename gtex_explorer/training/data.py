@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import shutil
+import uuid
 import hashlib
 import json
 from pathlib import Path
@@ -34,6 +36,19 @@ def atomic_publish_directory(source: Path, target: Path) -> None:
             if getattr(error, 'winerror', None) not in (5, 32) or attempt == 5:
                 raise
             time.sleep(.05 * (attempt + 1))
+
+
+def discard_directory(path: Path, root: Path) -> None:
+    """Remove a directory in one step. Hidden names are never published as durable state.
+
+    A failed rename leaves everything in place. A file still locked during cleanup
+    only leaves a hidden leftover, which the next removal clears.
+    """
+    trash = Path(root) / '.trash'
+    trash.mkdir(parents=True, exist_ok=True)
+    atomic_publish_directory(Path(path), trash / uuid.uuid4().hex)
+    for leftover in trash.iterdir():
+        shutil.rmtree(leftover, ignore_errors=True)
 
 
 def atomic_replace_file(source: Path, target: Path) -> None:

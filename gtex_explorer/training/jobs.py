@@ -14,7 +14,7 @@ import psutil
 from gtex_explorer.cloud.state import operation, remote_client, state
 from gtex_explorer.workspaces import coordination_directory, workspace_roots
 from gtex_explorer.training.config import TrainingConfig, configuration_fingerprint
-from gtex_explorer.training.data import load_training_data, make_cv_assignments, stable_hash, atomic_replace_file
+from gtex_explorer.training.data import discard_directory, load_training_data, make_cv_assignments, stable_hash, atomic_replace_file
 from gtex_explorer.training.data import safe_path
 from gtex_explorer.training.core import runtime_versions
 
@@ -220,6 +220,29 @@ def start_job(config: TrainingConfig, data_root: Path, state_root: Path) -> JobR
                                              'error': {'type': type(error).__name__, 'message': str(error)}})
             raise
     return read_job(run_id, state_root)
+
+
+@operation
+def delete_run(run_id: str, state_root: Path) -> None:
+    """Permanently remove a finished run with its model and gene panels.
+
+    Its dataset stays, because other runs in the workspace may share it.
+    """
+    root = job_path(run_id, state_root)
+    # Outside the lock first, because read_job needs it to recover a dead worker's status.
+    read_job(run_id, state_root)
+    coordinator = coordination_directory(state_root)
+    try:
+        with process_lock(coordinator / 'launch.lock'):
+            if read_job(run_id, state_root).status in ACTIVE_STATUSES:
+                raise ValueError('Pelatihan masih berjalan. Hentikan pelatihan sebelum menghapus.')
+            # The run goes first: a model without its run is already hidden from the gallery.
+            discard_directory(root, coordinator)
+            model = Path(state_root) / 'models' / run_id
+            if model.is_dir():
+                discard_directory(model, coordinator)
+    except OSError as error:
+        raise ValueError('Hasil pelatihan sedang digunakan proses lain. Coba kembali beberapa saat lagi.') from error
 
 
 @operation

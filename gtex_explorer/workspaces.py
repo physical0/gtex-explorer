@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import time
 import uuid
-from gtex_explorer.cloud.state import operation
+from gtex_explorer.cloud.state import operation, remote_client, state
 
 
 def _registry(root):
@@ -87,6 +87,40 @@ def rename_workspace(root, workspace_id, name):
             raise ValueError('Nama workspace sudah digunakan.')
         entry['name'] = name
         atomic_json(root / 'workspaces.json', registry)
+
+
+@operation
+def delete_workspace(root, workspace_id):
+    """Permanently remove a workspace with its runs, models and datasets."""
+    from gtex_explorer.training.data import discard_directory
+    from gtex_explorer.training.jobs import ACTIVE_STATUSES, atomic_json, process_lock, read_job
+    root = Path(root).resolve()
+    if workspace_id == 'default':
+        raise ValueError('Workspace Default tidak dapat dihapus.')
+    directory = workspace_directory(root, workspace_id)
+    runs = [path.parent.name for path in (directory / 'runs').glob('run_*/status.json')]
+    # Outside the locks first, because read_job needs them to recover a dead worker's status.
+    for run_id in runs:
+        read_job(run_id, directory)
+    try:
+        with process_lock(root / 'launch.lock'), process_lock(root / 'gtex_explorer.workspaces.lock'):
+            if any(read_job(run_id, directory).status in ACTIVE_STATUSES for run_id in runs):
+                raise ValueError('Workspace masih memiliki pelatihan aktif. Hentikan pelatihan sebelum menghapus.')
+            registry = _registry(root)
+            remaining = [entry for entry in registry['workspaces'] if entry['id'] != workspace_id]
+            atomic_json(root / 'workspaces.json', {
+                **registry, 'workspaces': remaining,
+                'last_workspace_id': 'default' if registry['last_workspace_id'] == workspace_id
+                else registry['last_workspace_id']})
+            try:
+                discard_directory(directory, root)
+            except OSError:
+                atomic_json(root / 'workspaces.json', registry)
+                raise
+    except OSError as error:
+        raise ValueError('Workspace sedang digunakan proses lain. Coba kembali beberapa saat lagi.') from error
+    if remote_client():
+        state().forget(directory)
 
 
 @operation

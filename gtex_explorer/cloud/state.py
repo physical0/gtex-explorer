@@ -388,6 +388,15 @@ class CloudState:
                 if name.startswith(prefix) and not _safe(self.root, name).is_file():
                     self._install(name, digest)
 
+    def forget(self, directory):
+        """Include files this instance never downloaded when a removed directory is published."""
+        prefix = Path(directory).resolve().relative_to(self.root).as_posix() + '/'
+        with self.lock:
+            manifest, _ = self._manifest()
+            for name, digest in manifest['files'].items():
+                if name.startswith(prefix):
+                    self.baseline.setdefault(name, digest)
+
     def _durable(self, path):
         relative = path.relative_to(self.root)
         parts = relative.parts

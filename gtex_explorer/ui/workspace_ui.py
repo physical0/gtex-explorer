@@ -6,7 +6,7 @@ from pathlib import Path
 import streamlit as st
 from gtex_explorer.cloud.media import image
 
-from gtex_explorer.workspaces import (create_workspace, last_workspace, list_workspaces,
+from gtex_explorer.workspaces import (create_workspace, delete_workspace, last_workspace, list_workspaces,
                         remember_workspace, rename_workspace, workspace_directory, workspace_roots)
 
 
@@ -99,6 +99,30 @@ def _new_workspace(root):
             st.error(str(error))
 
 
+@st.dialog('Hapus workspace', on_dismiss=_dismiss_dialog)
+def _delete_workspace(root, entry):
+    directory = workspace_directory(root, entry['id'])
+    runs = len(list((directory / 'runs').glob('run_*/status.json')))
+    st.warning(f"**{entry['name']}** akan dihapus permanen, termasuk {runs} hasil pelatihan beserta modelnya "
+               'dan semua dataset unggahannya. Tindakan ini tidak dapat dibatalkan.')
+    with st.form('workspace_delete_form'):
+        typed = st.text_input('Ketik nama workspace untuk mengonfirmasi', max_chars=80,
+                              key='workspace_delete_name_' + entry['id'])
+        submitted = st.form_submit_button('Hapus permanen', key='workspace_delete_confirm', type='primary',
+                                          icon=':material/delete:')
+    if submitted:
+        if typed.strip() != entry['name']:
+            st.error('Nama yang diketik tidak sama. Workspace tidak dihapus.')
+            return
+        try:
+            delete_workspace(root, entry['id'])
+            st.session_state.workspace_notice = f"Workspace {entry['name']} telah dihapus."
+            _dismiss_dialog()
+            st.rerun()
+        except (ValueError, OSError) as error:
+            st.error(str(error))
+
+
 @st.dialog('Ubah nama workspace', on_dismiss=_dismiss_dialog)
 def _rename_workspace(root, entry):
     with st.form('workspace_rename_form'):
@@ -166,6 +190,22 @@ def _request_rename(workspace_id):
     st.session_state.workspace_dialog = 'rename'
 
 
+def _request_delete(workspace_id):
+    st.session_state.workspace_delete_target = workspace_id
+    st.session_state.workspace_dialog = 'delete'
+
+
+def leave_removed_workspace(root):
+    """Send a session back to the launcher when another session removed its workspace."""
+    state = st.session_state
+    if state.get('workspace_entered') and state.get('active_workspace_id') not in {
+            entry['id'] for entry in list_workspaces(root)}:
+        state.workspace_entered = False
+        state.pop('active_workspace_id', None)
+        state.workspace_notice = 'Workspace yang sedang dibuka telah dihapus.'
+        st.query_params.clear()
+
+
 def render_workspace_launcher(root, brand_path):
     """Choose a project before rendering or loading the main application."""
     root = Path(root).resolve()
@@ -216,6 +256,9 @@ def render_workspace_launcher(root, brand_path):
             with title:
                 st.title('Pilih workspace')
                 st.caption('Buka workspace yang tersedia atau buat workspace baru.')
+                notice = st.session_state.pop('workspace_notice', None)
+                if notice:
+                    st.success(notice)
             with create:
                 if st.button('Buat workspace', icon=':material/add:', key='workspace_new', width='stretch'):
                     st.session_state.workspace_dialog = 'new'
@@ -227,7 +270,7 @@ def render_workspace_launcher(root, brand_path):
         with count:
             st.caption(f'{len(matching)} dari {len(entries)} workspace')
         with st.container(key='workspace_table_header'):
-            name, policy, actions = st.columns([3.3, 2.7, 1.4])
+            name, policy, actions = st.columns([3, 1.8, 2.6])
             name.caption('Workspace')
             policy.caption('Model bawaan')
             actions.caption('Tindakan')
@@ -240,15 +283,18 @@ def render_workspace_launcher(root, brand_path):
                 short_name = full_name if len(full_name) <= 42 else full_name[:41].rstrip() + '…'
                 row_key = 'workspace_row_selected' if identity == selected else 'workspace_row_' + identity
                 with st.container(key=row_key):
-                    name, policy, actions = st.columns([3.3, 2.7, 1.4], vertical_alignment='center')
+                    name, policy, actions = st.columns([3, 1.8, 2.6], vertical_alignment='center')
                     with name:
                         st.button(short_name, icon=':material/check_circle:' if identity == selected else ':material/folder:',
                                   type='tertiary', help=full_name, width='stretch',
                                   key='workspace_select_' + identity, on_click=_select_workspace, args=(identity,))
                     policy.caption('Disertakan' if entry['include_bundled_models'] else 'Tidak disertakan')
-                    with actions:
+                    with actions, st.container(horizontal=True, gap='small'):
                         st.button('Ubah nama', icon=':material/edit:', type='tertiary',
                                   key='workspace_rename_' + identity, on_click=_request_rename, args=(identity,))
+                        if identity != 'default':
+                            st.button('Hapus', icon=':material/delete:', type='tertiary',
+                                      key='workspace_delete_' + identity, on_click=_request_delete, args=(identity,))
         with st.container(key='workspace_footer'):
             summary, enter = st.columns([3, 1], vertical_alignment='center')
             with summary:
@@ -262,7 +308,16 @@ def render_workspace_launcher(root, brand_path):
     if st.session_state.get('workspace_dialog') == 'new':
         _new_workspace(root)
     elif st.session_state.get('workspace_dialog') == 'rename':
-        _rename_workspace(root, entries[st.session_state.workspace_rename_target])
+        # Another session may have removed the workspace while this dialog was open.
+        if st.session_state.workspace_rename_target in entries:
+            _rename_workspace(root, entries[st.session_state.workspace_rename_target])
+        else:
+            _dismiss_dialog()
+    elif st.session_state.get('workspace_dialog') == 'delete':
+        if st.session_state.workspace_delete_target in entries:
+            _delete_workspace(root, entries[st.session_state.workspace_delete_target])
+        else:
+            _dismiss_dialog()
 
 
 def render_workspace_controls(root):

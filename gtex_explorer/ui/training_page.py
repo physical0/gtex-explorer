@@ -11,7 +11,7 @@ from gtex_explorer.cloud.media import download_button
 
 from gtex_explorer.training.config import training_presets, validate_training_config
 from gtex_explorer.training.data import load_training_data, make_cv_assignments
-from gtex_explorer.training.jobs import start_job, read_job, request_cancel, resume_job, pause_job, unpause_job, can_resume, has_active_run, FINALIZING_STAGES
+from gtex_explorer.training.jobs import start_job, read_job, request_cancel, resume_job, pause_job, unpause_job, can_resume, delete_run, has_active_run, ACTIVE_STATUSES, FINALIZING_STAGES
 from gtex_explorer.training.gallery import list_gallery
 from gtex_explorer.training.uploads import audit_uploads, read_upload_table, save_training_upload
 from gtex_explorer.error_messages import user_error
@@ -551,6 +551,8 @@ def _run_details(data_root: Path, state_root: Path, polling: bool = False):
         ready = record.status == 'completed' and any(entry['run_id'] == run_id for entry in list_gallery(state_root))
         if record.status == 'completed' and not ready:
             st.warning('Hasil belum lolos verifikasi gallery. Periksa berkas model, metrik, dan panel gen yang tersimpan.')
+        if not ready and record.status not in ACTIVE_STATUSES:
+            _delete_button(run_id, 'Hapus hasil pelatihan')
         if ready:
             st.divider()
             st.subheader('Model final tersimpan')
@@ -560,6 +562,36 @@ def _run_details(data_root: Path, state_root: Path, polling: bool = False):
             _show_model_actions(run_id)
     except (ValueError, OSError, KeyError, TypeError) as error:
         st.error(f'Hasil pelatihan tidak dapat dibaca: {user_error(error)}')
+
+
+def _delete_button(run_id, label):
+    if st.button(label, key='training_delete_run', icon=':material/delete:', wrap=True):
+        st.session_state.training_delete_target = run_id
+        # Dialogs open from a full page run, not from inside these panels.
+        st.rerun(scope='app')
+
+
+def _dismiss_delete():
+    st.session_state.pop('training_delete_target', None)
+
+
+@st.dialog('Hapus hasil pelatihan', on_dismiss=_dismiss_delete)
+def _delete_run_dialog(state_root, run_id):
+    st.write(run_label(Path(state_root) / 'runs' / run_id))
+    st.warning('Hasil pelatihan, model, dan panel gennya akan dihapus permanen. Tindakan ini tidak dapat dibatalkan. '
+               'Dataset unggahan tetap tersimpan sampai workspace dihapus.')
+    confirm, cancel = st.columns(2)
+    if confirm.button('Hapus permanen', key='training_delete_confirm', type='primary',
+                      icon=':material/delete:', width='stretch'):
+        try:
+            delete_run(run_id, state_root)
+            _dismiss_delete()
+            st.rerun()
+        except (ValueError, OSError) as error:
+            st.error(user_error(error))
+    if cancel.button('Batal', key='training_delete_cancel', width='stretch'):
+        _dismiss_delete()
+        st.rerun()
 
 
 def _show_saved_parameters(saved):
@@ -587,6 +619,7 @@ def _show_model_actions(run_id):
             st.session_state.training_panel_run = run_id
             st.session_state.page = 'Panel Gen Pelatihan'
             st.rerun()
+        _delete_button(run_id, 'Hapus model')
 
 
 def _show_cv_results(summary, config):
@@ -723,4 +756,10 @@ def render_training_results_page(data_root: Path, state_root: Path):
         if process.open:
             with process:
                 st.fragment(_run_details, run_every=run_every)(data_root, state_root, polling)
+        target = st.session_state.get('training_delete_target')
+        if target:
+            if (Path(state_root) / 'runs' / target).is_dir():
+                _delete_run_dialog(state_root, target)
+            else:
+                _dismiss_delete()
 

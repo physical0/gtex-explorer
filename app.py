@@ -25,7 +25,7 @@ from gtex_explorer.ui.training_page import render_training_page, render_training
 from gtex_explorer.ui.training_gene_page import render_training_gene_page
 from gtex_explorer.desktop_runtime import state_directory
 from gtex_explorer.ui.workspace_ui import (render_workspace_controls, current_workspace_root, render_workspace_launcher,
-                                           restore_location, remember_location)
+                                           restore_location, remember_location, leave_removed_workspace)
 
 
 st.set_page_config(
@@ -1419,6 +1419,7 @@ def render_comparison_page(tables: dict) -> None:
 
 
 restore_location(state_directory())
+leave_removed_workspace(state_directory())
 if not st.session_state.get('workspace_entered', False):
     render_workspace_launcher(state_directory(), APP_DIR / 'assets' / 'brand_dna.png')
     st.stop()
