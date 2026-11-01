@@ -24,7 +24,7 @@ from gtex_explorer.ui.overview_page import render_overview_page
 from gtex_explorer.ui.gene_page import render_gene_page
 from gtex_explorer.analysis.gene_panels import clarify_eligibility_reasons
 from gtex_explorer.ui.glossary import render_glossary_page
-from gtex_explorer.ui.training_page import render_training_page, render_training_results_page
+from gtex_explorer.ui.training_page import render_training_page, render_training_results_page, TRAINING_FORM_KEYS
 from gtex_explorer.ui.training_gene_page import render_training_gene_page
 from gtex_explorer.desktop_runtime import state_directory
 from gtex_explorer.ui.workspace_ui import (render_workspace_controls, current_workspace_root, render_workspace_launcher,
@@ -36,7 +36,7 @@ st.set_page_config(
     page_title="GTEx Tissue Classifier",
     page_icon=str(APP_DIR / "assets" / "brand_dna.png"),
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 
@@ -1441,6 +1441,11 @@ except (ValueError, FileNotFoundError) as data_error:
     st.stop()
 page = navigation()
 remember_location()
+# Streamlit drops widget values for widgets not drawn in a run; re-assigning keeps the training form
+# intact while the user visits other pages. Workspace switches clear these keys separately.
+for key in TRAINING_FORM_KEYS:
+    if key in st.session_state:
+        st.session_state[key] = st.session_state[key]
 active_state_root = current_workspace_root(state_directory())
 
 preprocessor = None

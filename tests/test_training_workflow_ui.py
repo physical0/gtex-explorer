@@ -119,9 +119,8 @@ def test_panel_preserves_tabs_diagnostics_scientific_values_and_fold_context(tmp
     assert any('49' in m.value and 'training' in m.value for m in app.markdown)
     assert any('51' in m.value and 'validation' in m.value for m in app.markdown)
     pairs=next(frame for frame in frames if 'Jaccard' in frame.columns)
-    assert pairs.loc[0,'Jaccard']==.25
-    pair_table=next(item for item in app.dataframe if 'Jaccard' in item.value.columns)
-    assert json.loads(pair_table.proto.columns)['Jaccard']['type_config']['format'] == 'percent'
+    assert pairs.loc[0,'Jaccard']=='25,00%'  # Same decimal comma as the results page.
+    assert any(m.value == '25,00%' for m in app.metric)
     assert app.button(key='training_panel_back').label=='Kembali ke hasil'
     assert any('Solver konvergen' in str(frame) for frame in frames)
 
@@ -132,3 +131,13 @@ def test_upload_change_clears_the_stored_audit_before_files_can_be_removed():
     assert 'training_upload_audit' not in app.session_state
     assert 'training_upload_signature' not in app.session_state
     assert app.session_state.training_data_ready is False
+
+
+def test_deterministic_failures_do_not_offer_checkpoint_resume():
+    from gtex_explorer.training.jobs import JobRecord, can_resume
+    def record(status, error=None):
+        return JobRecord('run_x', status, error, {})
+    assert can_resume(record('cancelled'))
+    assert can_resume(record('failed', {'type': 'WorkerStopped'}))
+    assert not can_resume(record('failed', {'type': 'SelectorEligibilityError'}))
+    assert not can_resume(record('completed'))

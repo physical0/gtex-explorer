@@ -198,7 +198,7 @@ def parse_expression_file(file_object: BinaryIO, filename: str, *, model_genes=N
     matrix.columns = pd.Index([str(column).strip() for column in matrix.columns])
     if matrix.index.has_duplicates:
         duplicate_samples = matrix.index[matrix.index.duplicated()].unique().tolist()
-        raise ValueError(f"SAMPID duplikat ditemukan: {duplicate_samples[:5]}")
+        raise ValueError(f"SAMPID duplikat ditemukan: {', '.join(duplicate_samples[:5])}")
 
     matrix, invalid_count = _numeric_expression(matrix)
     if invalid_count:

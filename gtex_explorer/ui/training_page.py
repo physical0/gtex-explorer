@@ -12,7 +12,7 @@ from gtex_explorer.cloud.media import download_button
 
 from gtex_explorer.training.config import training_presets, validate_training_config
 from gtex_explorer.training.data import load_training_data, make_cv_assignments
-from gtex_explorer.training.jobs import start_job, read_job, request_cancel, resume_job, pause_job, unpause_job, FINALIZING_STAGES
+from gtex_explorer.training.jobs import start_job, read_job, request_cancel, resume_job, pause_job, unpause_job, can_resume, FINALIZING_STAGES
 from gtex_explorer.training.gallery import list_gallery
 from gtex_explorer.training.uploads import audit_uploads, read_upload_table, save_training_upload
 from gtex_explorer.error_messages import user_error
@@ -43,6 +43,19 @@ def _preset_changed():
         st.session_state.training_selector = preset['selector']
         st.session_state.training_top_k = preset['top_k']
         st.session_state.training_l1_c = float(preset.get('l1_c', 1))
+
+
+TRAINING_FORM_KEYS = ('training_preset', 'training_selector', 'training_candidates', 'training_top_k', 'training_l1_c',
+                      'training_l1_iterations', 'training_l1_tol', 'training_l1_weight', 'training_mi_neighbors',
+                      'training_cv', 'training_folds', 'training_xgb_threads',
+                      *('training_xgb_' + name for name in ('n_estimators', 'learning_rate', 'max_depth', 'min_child_weight',
+                                                            'subsample', 'colsample_bytree', 'reg_lambda', 'reg_alpha', 'gamma')))
+
+
+def _range_help(low, high):
+    def number(value):
+        return f'{value:,}'.replace(',', '.') if isinstance(value, int) else f'{value:g}'.replace('.', ',')
+    return f'Rentang {number(low)}–{number(high)}.'
 
 
 def _selection_changed():
@@ -291,22 +304,24 @@ def _render_training_setup(data_root: Path, state_root: Path) -> None:
             st.session_state.training_top_k = count
         st.session_state.setdefault('training_top_k', min(1000, count))
         with selector_left:
-            k = st.number_input('Top-k gen', min_value=1, max_value=count, value=None, step=1,
+            k = st.number_input('Top-k gen', value=None, step=1, help=_range_help(1, count),
                 key='training_top_k', disabled=method == 'baseline', on_change=_selection_changed)
         values = {'selector': method, 'top_k': k}
         if method == 'l1':
             with selector_right:
                 st.session_state.setdefault('training_l1_c', 1.)
-                values['l1_c'] = st.number_input('C (regularisasi)', .0001, 1000., value=None,
-                    format='%.4f', key='training_l1_c', on_change=_selection_changed)
+                values['l1_c'] = st.number_input('C (regularisasi)', value=None, step=.1,
+                    format='%.4f', help=_range_help(.0001, 1000), key='training_l1_c', on_change=_selection_changed)
             with st.expander('Opsi selector'):
-                values['l1_max_iter'] = st.number_input('Maksimum iterasi', 100, 50000, 20000, key='training_l1_iterations')
-                values['l1_tol'] = st.number_input('Toleransi', .000001, .01, .001, format='%.6f', key='training_l1_tol')
+                values['l1_max_iter'] = st.number_input('Maksimum iterasi', value=20000, step=1, help=_range_help(100, 50000),
+                                                     key='training_l1_iterations')
+                values['l1_tol'] = st.number_input('Toleransi', value=.001, step=.0001, format='%.6f',
+                                                help=_range_help(.000001, .01), key='training_l1_tol')
                 values['l1_class_weight'] = st.selectbox('Bobot kelas', ['balanced', None],
                     format_func=lambda x: x or 'None', key='training_l1_weight')
         elif method == 'mutual_information':
             with selector_right:
-                values['mi_neighbors'] = st.number_input('n_neighbors', 1, 20, 3, key='training_mi_neighbors')
+                values['mi_neighbors'] = st.number_input('n_neighbors', value=3, step=1, help=_range_help(1, 20), key='training_mi_neighbors')
         st.divider()
         st.subheader('Evaluasi')
         cv_left, cv_right = st.columns([2, 1])
@@ -321,20 +336,25 @@ def _render_training_setup(data_root: Path, state_root: Path) -> None:
         st.subheader('Parameter XGBoost')
         columns = st.columns(3)
         xgb = {}
-        specs = [('n_estimators', 'Putaran boosting', 1, 1000, 300),
-                 ('learning_rate', 'Learning rate', .001, 1., .05), ('max_depth', 'Max depth', 1, 12, 6),
-                 ('min_child_weight', 'Min child weight', 0., 100., 1.), ('subsample', 'Subsample', .1, 1., .8),
-                 ('colsample_bytree', 'Colsample (bytree)', .1, 1., .8)]
-        for i, (name, label, low, high, default) in enumerate(specs):
+        # Bounds are checked by validate_training_config so an out-of-range entry stays visible as an error
+        # instead of the widget silently keeping the previous value.
+        specs = [('n_estimators', 'Putaran boosting', 1, 1000, 300, 1, None),
+                 ('learning_rate', 'Learning rate', .001, 1, .05, .01, '%.3f'), ('max_depth', 'Max depth', 1, 12, 6, 1, None),
+                 ('min_child_weight', 'Min child weight', 0, 100, 1., .1, '%.2f'),
+                 ('subsample', 'Subsample', .1, 1, .8, .05, '%.2f'),
+                 ('colsample_bytree', 'Colsample (bytree)', .1, 1, .8, .05, '%.2f')]
+        for i, (name, label, low, high, default, step, number_format) in enumerate(specs):
             with columns[i % 3]:
-                xgb[name] = st.number_input(label, low, high, default, key='training_xgb_' + name)
+                xgb[name] = st.number_input(label, value=default, step=step, format=number_format,
+                                            help=_range_help(low, high), key='training_xgb_' + name)
         with st.expander('Parameter lanjutan'):
             advanced = st.columns(2)
             for i, (name, label, high, default) in enumerate([
                 ('reg_lambda', 'L2 XGBoost (lambda)', 10000., 1.),
                 ('reg_alpha', 'L1 XGBoost (alpha)', 10000., 0.), ('gamma', 'Gamma', 1000., 0.)]):
                 with advanced[i % 2]:
-                    xgb[name] = st.number_input(label, 0., high, default, key='training_xgb_' + name)
+                    xgb[name] = st.number_input(label, value=default, step=.1, format='%.2f',
+                                                help=_range_help(0, high), key='training_xgb_' + name)
             with advanced[1]:
                 xgb['n_jobs'] = st.number_input('Thread CPU', 1, max(1, os.cpu_count() or 1),
                                                min(4, os.cpu_count() or 1), key='training_xgb_threads')
@@ -446,9 +466,10 @@ def _run_details(data_root: Path, state_root: Path):
                   'final_xgboost': 'Pelatihan model final', 'completed': 'Selesai',
                   'saving_results': 'Menyimpan model dan hasil',
                   'verifying_results': 'Memverifikasi model, metrik, dan panel gen',
-                  'cancelled': 'Stopped', 'paused': 'Paused',
+                  'cancelled': 'Dihentikan', 'paused': 'Dijeda',
                   'cancelling': 'Menghentikan pelatihan', 'failed': 'Gagal'}
-        display_stage = record.status if record.status in {'paused', 'cancelling'} else record.details.get('stage')
+        # A resumed run keeps the stage it stopped at until the worker reports a new one.
+        display_stage = record.status if record.status in {'paused', 'cancelling', 'queued', 'cancelled'} else record.details.get('stage')
         elapsed = record.details.get('elapsed_seconds', 0)
         if record.status in {'running', 'queued'}:
             elapsed += max(0, time.time() - record.details['updated'])
@@ -505,7 +526,9 @@ def _run_details(data_root: Path, state_root: Path):
             st.error(user_error(record.error['message']))
             if record.error.get('diagnostics'):
                 show_diagnostics(record.error['diagnostics'])
-        if record.status in {'failed', 'cancelled'}:
+        if record.status == 'failed' and not can_resume(record):
+            st.caption('Kegagalan ini berasal dari data atau konfigurasi. Ubah pengaturan lalu latih run baru.')
+        if can_resume(record):
             if st.button('Continue from checkpoint', key='training_resume', icon=':material/restart_alt:'):
                 try:
                     resume_job(run_id, data_root, state_root)

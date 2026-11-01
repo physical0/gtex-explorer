@@ -169,8 +169,10 @@ def render_gene_page(tables: dict) -> None:
         if dominant != "Semua":
             filtered = filtered.loc[filtered["dominant_tissue"].isna() if dominant == "Tanpa koefisien nonzero" else filtered["dominant_tissue"].eq(dominant)]
         status = f"Menampilkan {len(filtered):,} dari {len(genes):,} gen"
-        if not baseline:
+        if not baseline and not query and dominant == "Semua":
             status += f" - Peringkat 1–{int(max_rank):,}"
+        elif not baseline:
+            status += f" dalam peringkat 1–{int(max_rank):,}"
         st.caption(status.replace(",", "."))
         columns = ["gene"] if baseline else ["selection_rank", "gene", "selection_score"]
         if is_l1:

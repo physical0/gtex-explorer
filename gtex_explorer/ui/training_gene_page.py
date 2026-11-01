@@ -86,12 +86,12 @@ def render_training_gene_page(state_root):
             status = json.loads((root / 'status.json').read_text(encoding='utf-8'))
             summary = status.get('cv_summary')
             if summary and summary.get('mean_jaccard') is not None:
-                st.metric('Rerata Jaccard antar-fold', f"{summary['mean_jaccard']:.2%}")
+                st.metric('Rerata Jaccard antar-fold', f"{summary['mean_jaccard']:.2%}".replace('.', ','))
                 pairs = pd.DataFrame(summary['jaccard_pairs']).rename(columns={
                     'fold_a': 'Fold A', 'fold_b': 'Fold B', 'jaccard': 'Jaccard'})
+                pairs['Jaccard'] = pairs['Jaccard'].map(lambda value: f'{value:.2%}'.replace('.', ','))
                 st.caption('Perbandingan gen terpilih antar-fold pada seluruh run ini.')
-                st.dataframe(pairs, hide_index=True, width='stretch', column_config={
-                    'Jaccard': st.column_config.NumberColumn(format='percent')})
+                st.dataframe(pairs, hide_index=True, width='stretch')
             elif config['selector'] == 'baseline':
                 st.info('Baseline menggunakan seluruh gen kandidat. Jaccard seleksi supervised tidak dihitung.')
             elif not config['evaluate_cv']:

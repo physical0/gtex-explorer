@@ -248,8 +248,6 @@ def _render_audit_details(audit: InputAudit, feature_count: int) -> None:
     )
     st.caption("Kelengkapan dan ekspresi nonzero dihitung sebelum imputasi untuk setiap sampel.")
     st.dataframe(audit.sample_quality, hide_index=True, width="stretch")
-    if audit.appears_log_transformed:
-        st.caption("Rentang nilai menyerupai data yang sudah ditransformasi. Pastikan berkas memuat TPM mentah.")
 
 
 def _render_reminder_controls(audit: InputAudit | None) -> None:
@@ -399,6 +397,8 @@ def _render_input_panel(preprocessor: dict | None) -> None:
         if fully_imputed and fully_imputed < audit.sample_count:
             notice += f" Seluruh nilai gen model diimputasi pada {fully_imputed} sampel."
         st.info(notice)
+    if audit.appears_log_transformed:
+        st.warning("**Periksa satuan data**\n\nRentang nilai menyerupai data yang sudah ditransformasi. Pastikan berkas memuat TPM mentah.")
     with st.expander("Detail pemeriksaan input"):
         _render_audit_details(audit, int(preprocessor["feature_count"]))
 

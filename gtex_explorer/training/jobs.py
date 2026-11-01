@@ -28,6 +28,14 @@ class JobRecord:
 
 
 FINALIZING_STAGES = {'saving_results', 'verifying_results'}
+# Data and configuration errors fail the same way on every retry.
+DETERMINISTIC_ERRORS = {'SelectorEligibilityError', 'ValueError', 'TypeError', 'KeyError'}
+
+
+def can_resume(record: 'JobRecord') -> bool:
+    if record.status == 'cancelled':
+        return True
+    return record.status == 'failed' and (record.error or {}).get('type') not in DETERMINISTIC_ERRORS
 
 
 def resolve_job_data(saved, state_root, fallback):
