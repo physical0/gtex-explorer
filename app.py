@@ -1,31 +1,14 @@
 from __future__ import annotations
 
 import html
+import sys
 
-import altair as alt
-import numpy as np
-import pandas as pd
 import streamlit as st
 from gtex_explorer.cloud.media import image, download_button
-
-from gtex_explorer.analysis.core import (
-    APP_DIR,
-    DATA_DIR,
-    audit_and_align_input,
-    load_reference_tables,
-    parse_expression_file,
-    predict_tissues,
-)
-from gtex_explorer.ui.prediction_page import render_prediction_page as render_offline_prediction_page
-from gtex_explorer.ui.overview_page import render_overview_page
-from gtex_explorer.ui.gene_page import render_gene_page
-from gtex_explorer.analysis.gene_panels import clarify_eligibility_reasons
-from gtex_explorer.ui.glossary import render_glossary_page
-from gtex_explorer.ui.training_page import render_training_page, render_training_results_page, TRAINING_FORM_KEYS
-from gtex_explorer.ui.training_gene_page import render_training_gene_page
+from gtex_explorer.paths import APP_ROOT as APP_DIR
 from gtex_explorer.desktop_runtime import state_directory
 from gtex_explorer.ui.workspace_ui import (render_workspace_controls, current_workspace_root, render_workspace_launcher,
-                                           restore_location, remember_location, leave_removed_workspace)
+                                           restore_location, remember_location, leave_removed_workspace, preload_libraries)
 
 
 st.set_page_config(
@@ -1421,8 +1404,34 @@ def render_comparison_page(tables: dict) -> None:
 restore_location(state_directory())
 leave_removed_workspace(state_directory())
 if not st.session_state.get('workspace_entered', False):
+    # The chooser needs none of the heavy libraries, so it appears while they load behind it.
+    preload_libraries()
     render_workspace_launcher(state_directory(), APP_DIR / 'assets' / 'brand_dna.png')
     st.stop()
+
+# A session restored from its URL skips the chooser and can arrive before the libraries are ready.
+if 'xgboost' not in sys.modules:
+    with st.spinner('Memuat aplikasi...'):
+        import gtex_explorer.analysis.core
+
+import altair as alt
+import numpy as np
+import pandas as pd
+
+from gtex_explorer.analysis.core import (
+    DATA_DIR,
+    audit_and_align_input,
+    load_reference_tables,
+    parse_expression_file,
+    predict_tissues,
+)
+from gtex_explorer.analysis.gene_panels import clarify_eligibility_reasons
+from gtex_explorer.ui.gene_page import render_gene_page
+from gtex_explorer.ui.glossary import render_glossary_page
+from gtex_explorer.ui.overview_page import render_overview_page
+from gtex_explorer.ui.prediction_page import render_prediction_page as render_offline_prediction_page
+from gtex_explorer.ui.training_gene_page import render_training_gene_page
+from gtex_explorer.ui.training_page import render_training_page, render_training_results_page, TRAINING_FORM_KEYS
 
 try:
     tables = reference_tables(file_version(DATA_DIR))

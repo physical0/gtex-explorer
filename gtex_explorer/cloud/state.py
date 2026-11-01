@@ -1,5 +1,6 @@
 """Versioned private artifact storage. Local disk is only a disposable working copy."""
 import collections
+from concurrent.futures import ThreadPoolExecutor
 import contextlib
 from contextlib import contextmanager
 import functools
@@ -47,6 +48,8 @@ UNAVAILABLE = 'Penyimpanan cloud tidak tersedia. Perubahan belum dikonfirmasi.'
 # Supabase Free rejects objects above 50 MB; larger bodies are stored as parts
 # behind a small index object so callers still see one key.
 PART_SIZE = 45 * 1024 * 1024
+# A new instance downloads every saved file, and each download waits on the network.
+INSTALL_WORKERS = 8
 PARTS_MAGIC = b'GTEX-PARTS-1\n'
 
 
@@ -331,8 +334,9 @@ class CloudState:
                               json.dumps(manifest, sort_keys=True, allow_nan=False).encode(),
                               expected=etag, create=etag is None)
 
-    def _install(self, name, digest):
-        target = _safe(self.root, name)
+    def _install(self, name, digest, target=None):
+        # pull() validates first: resolve() is unreliable while other threads create files.
+        target = target or _safe(self.root, name)
         key = self.prefix + '/objects/' + digest
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.with_name(target.name + '.cloud.part')
@@ -361,15 +365,20 @@ class CloudState:
             # Validate every remote path before touching the local working copy.
             for name in files:
                 _safe(self.root, name)
-            baseline = {}
+            baseline, stale = {}, []
             for name, digest in files.items():
                 target = _safe(self.root, name)
                 # Left out of the baseline too, or publish would read it as a local deletion.
                 if _deferred(name) and not target.is_file():
                     continue
                 if self.baseline.get(name) != digest or not target.is_file():
-                    self._install(name, digest)
+                    stale.append((name, digest, target))
                 baseline[name] = digest
+            if len(stale) > 1:
+                with ThreadPoolExecutor(INSTALL_WORKERS) as pool:
+                    list(pool.map(lambda item: self._install(*item), stale))
+            elif stale:
+                self._install(*stale[0])
             for name in self.baseline.keys() - files.keys():
                 _safe(self.root, name).unlink(missing_ok=True)
             self.baseline = baseline

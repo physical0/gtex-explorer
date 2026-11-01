@@ -1,13 +1,36 @@
 """Workspace selection and session boundaries for the local application."""
+import importlib
 import json
 import html
 from pathlib import Path
+import threading
 
 import streamlit as st
 from gtex_explorer.cloud.media import image
 
 from gtex_explorer.workspaces import (create_workspace, delete_workspace, last_workspace, list_workspaces,
                         remember_workspace, rename_workspace, workspace_directory, workspace_roots)
+
+
+_preload_started = False
+
+
+def preload_libraries():
+    """Load the heavy libraries in the background, so opening a workspace does not wait for them."""
+    global _preload_started
+    if _preload_started:
+        return
+    _preload_started = True
+
+    def load():
+        for name in ['numpy', 'pandas', 'altair', 'sklearn.linear_model', 'sklearn.feature_selection',
+                     'sklearn.metrics', 'xgboost']:
+            try:
+                importlib.import_module(name)
+            except ImportError:
+                pass  # The page that needs the library reports the failure.
+
+    threading.Thread(target=load, name='library-preload', daemon=True).start()
 
 
 def upload_widget_key(name, state=None):
@@ -150,13 +173,14 @@ def _open_process(root, workspace_id, run_id):
 
 @st.fragment(run_every=3)
 def _training_notice(root):
-    from gtex_explorer.training.jobs import read_job
     for workspace, directory in workspace_roots(root):
         for path in (directory / 'runs').glob('run_*/status.json'):
             try:
                 value = json.loads(path.read_text(encoding='utf-8'))
                 if value.get('status') not in {'running', 'queued', 'paused', 'cancelling'}:
                     continue
+                # Imported here because it loads the training libraries.
+                from gtex_explorer.training.jobs import read_job
                 record = read_job(path.parent.name, directory)
                 if record.status in {'running', 'queued', 'paused', 'cancelling'}:
                     st.caption(f"Proses training: {workspace['name']}")
