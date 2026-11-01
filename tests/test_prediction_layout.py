@@ -16,6 +16,8 @@ APP = Path(__file__).resolve().parents[1] / "app.py"
 
 class Upload(io.BytesIO):
     name = "two_samples.csv"
+    # Streamlit's UploadedFile gets a new file_id for every upload.
+    file_id = "two-samples"
 
     @property
     def size(self):

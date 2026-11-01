@@ -280,3 +280,13 @@ def test_reference_tables_include_validated_all_gene_baseline() -> None:
     assert set(baseline["fold"].astype(int)) == {1, 2, 3, 4, 5}
     assert baseline["genes"].eq(5000).all()
     assert (~baseline["uses_feature_selection"].astype(bool)).all()
+
+
+def test_parse_keeps_sample_ids_as_written_and_reads_text_cells_slowly() -> None:
+    # IDs such as 001 must not be read as numbers, and one text column must still be reported.
+    raw = b"SAMPID,ENSG000001,ENSG000002\n001,1.5, \n002,2,3\n"
+    matrix = parse_expression_file(io.BytesIO(raw), "sample.csv")
+    assert matrix.index.tolist() == ["001", "002"]
+    assert np.isnan(matrix.loc["001", "ENSG000002"])
+    with pytest.raises(ValueError, match="1 nilai ekspresi non-numerik"):
+        parse_expression_file(io.BytesIO(b"SAMPID,ENSG000001\nS1,abc\nS2,2\n"), "sample.csv")

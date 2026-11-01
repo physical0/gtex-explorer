@@ -1,6 +1,5 @@
 """Training setup and recorded results for the user-training workspace."""
 from pathlib import Path
-import hashlib
 import json
 import os
 import time
@@ -208,7 +207,8 @@ def _render_training_setup(data_root: Path, state_root: Path) -> None:
                 metadata = file_uploader('Metadata sampel', type=['csv', 'tsv', 'txt'],
                     key=upload_widget_key('training_metadata_upload'), on_change=_invalidate_training_upload)
             if expression is not None and metadata is not None:
-                signature = hashlib.sha256(expression.getvalue() + metadata.getvalue()).hexdigest()
+                # Upload IDs change with every new file; hashing both files each rerun copied them.
+                signature = f'{expression.file_id}:{metadata.file_id}'
                 try:
                     columns = list(read_upload_table(metadata.getvalue(), metadata.name).columns)
                     mapping = st.columns(3)

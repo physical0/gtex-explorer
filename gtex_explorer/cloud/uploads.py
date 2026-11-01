@@ -50,7 +50,9 @@ def _issue_target():
             'parts': [store.signed_upload_url(part_key(key, i)) for i in range(MAX_PARTS)]}
 
 
-@st.cache_data(max_entries=4, show_spinner='Membaca berkas dari penyimpanan privat...')
+# One shared, read-only copy per upload: cache_data would hand every caller a fresh
+# copy of up to 200 MB. Two entries and an hour bound the instance's memory.
+@st.cache_resource(max_entries=2, ttl=60 * 60, show_spinner='Membaca berkas dari penyimpanan privat...')
 def _download(upload_id, size):
     found = state().store.get(upload_key(upload_id))
     if found is None or len(found[0]) != size:
@@ -63,6 +65,8 @@ class CloudUpload:
         self.reference = validate_reference(value)
         self.name = value['name']
         self.size = value['size']
+        # Same role as Streamlit's UploadedFile.file_id: identifies the upload without reading it.
+        self.file_id = value['id']
 
     def getvalue(self):
         return _download(self.reference['id'], self.size)

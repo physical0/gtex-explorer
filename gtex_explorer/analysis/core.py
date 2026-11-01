@@ -149,7 +149,8 @@ def _read_delimited_bytes(raw_bytes: bytes, filename: str) -> pd.DataFrame:
         io.BytesIO(raw_bytes),
         sep=separator,
         skiprows=skiprows,
-        dtype_backend="numpy_nullable",
+        # Identifiers stay text; value columns use the fast C float parser.
+        dtype={0: str}, low_memory=False,
     )
 
 
@@ -186,11 +187,13 @@ def parse_expression_file(file_object: BinaryIO, filename: str, *, model_genes=N
         expression_columns = [
             column for column in table.columns if column not in non_expression_columns
         ]
-        matrix = table.set_index(first_column)[expression_columns].T
+        # Convert before transposing: one text column would make the transposed frame all-object.
+        matrix, invalid_count = _numeric_expression(table.set_index(first_column)[expression_columns])
+        matrix = matrix.T
         matrix.index.name = "SAMPID"
         source_orientation = "gen × sampel"
     else:
-        matrix = table.set_index(first_column)
+        matrix, invalid_count = _numeric_expression(table.set_index(first_column))
         matrix.index.name = "SAMPID"
         source_orientation = "sampel × gen"
 
@@ -200,7 +203,6 @@ def parse_expression_file(file_object: BinaryIO, filename: str, *, model_genes=N
         duplicate_samples = matrix.index[matrix.index.duplicated()].unique().tolist()
         raise ValueError(f"SAMPID duplikat ditemukan: {', '.join(duplicate_samples[:5])}")
 
-    matrix, invalid_count = _numeric_expression(matrix)
     if invalid_count:
         raise ValueError(f"Ditemukan {invalid_count:,} nilai ekspresi non-numerik. Gunakan angka TPM atau nilai kosong, bukan teks.")
     matrix.attrs["source_orientation"] = source_orientation
@@ -208,12 +210,24 @@ def parse_expression_file(file_object: BinaryIO, filename: str, *, model_genes=N
 
 
 def _numeric_expression(matrix):
-    # One vectorized conversion avoids a Python conversion for every gene column.
-    original = pd.Series(matrix.to_numpy(dtype=object).reshape(-1))
-    original = original.mask(original.astype('string').str.fullmatch(r'\s*', na=False))
-    numeric = pd.to_numeric(original, errors='coerce')
-    invalid = int((original.notna() & numeric.isna()).sum())
-    values = numeric.to_numpy(dtype=float, na_value=np.nan).reshape(matrix.shape)
+    """Return a float matrix and the number of non-numeric cells.
+
+    Columns the C parser already read as numbers are copied directly. Only text
+    columns take the per-cell path, which costs roughly 30x the file size in memory.
+    """
+    kinds = np.array([dtype.kind for dtype in matrix.dtypes])
+    numeric_columns = np.isin(kinds, list('fiu'))
+    values = np.empty(matrix.shape, dtype=float)
+    if numeric_columns.any():
+        values[:, numeric_columns] = matrix.iloc[:, numeric_columns].to_numpy(dtype=float, na_value=np.nan)
+    invalid = 0
+    if not numeric_columns.all():
+        text = matrix.iloc[:, ~numeric_columns]
+        original = pd.Series(text.to_numpy(dtype=object).reshape(-1))
+        original = original.mask(original.astype('string').str.fullmatch(r'\s*', na=False))
+        numeric = pd.to_numeric(original, errors='coerce')
+        invalid = int((original.notna() & numeric.isna()).sum())
+        values[:, ~numeric_columns] = numeric.to_numpy(dtype=float, na_value=np.nan).reshape(text.shape)
     return pd.DataFrame(values, index=matrix.index, columns=matrix.columns), invalid
 
 
@@ -237,14 +251,15 @@ def audit_and_align_input(
     required_genes = [str(gene) for gene in preprocessor["selected_genes"]]
     required_base_ids = [strip_ensembl_version(gene) for gene in required_genes]
 
-    supplied_by_base: dict[str, str] = {}
+    # Column positions, not labels: a frame passed in directly may repeat a label.
+    supplied_by_base: dict[str, int] = {}
     duplicate_base_ids: set[str] = set()
-    for supplied_gene in input_matrix.columns:
+    for column_position, supplied_gene in enumerate(input_matrix.columns):
         base_id = strip_ensembl_version(supplied_gene)
         if base_id in supplied_by_base:
             duplicate_base_ids.add(base_id)
         else:
-            supplied_by_base[base_id] = str(supplied_gene)
+            supplied_by_base[base_id] = column_position
 
     numeric_matrix, invalid_count = _numeric_expression(input_matrix)
     raw_values = numeric_matrix.to_numpy(dtype=float, na_value=np.nan)
@@ -253,35 +268,25 @@ def audit_and_align_input(
     infinite_value_count = int(np.isinf(raw_values).sum())
     nonfinite_count = int((~np.isfinite(raw_values)).sum())
 
-    aligned = pd.DataFrame(
-        np.tile(
-            np.asarray(preprocessor["raw_tpm_medians"], dtype=float),
-            (len(input_matrix), 1),
-        ),
-        index=input_matrix.index,
-        columns=required_genes,
-    )
-
-    matched_count = 0
+    medians = np.asarray(preprocessor["raw_tpm_medians"], dtype=float)
+    aligned_values = np.tile(medians, (len(input_matrix), 1))
+    matches = [
+        (gene_position, supplied_by_base[base_id])
+        for gene_position, base_id in enumerate(required_base_ids)
+        if base_id in supplied_by_base and base_id not in duplicate_base_ids
+    ]
+    matched_count = len(matches)
     observed_count = np.zeros(len(input_matrix), dtype=int)
     expressed_count = np.zeros(len(input_matrix), dtype=int)
-    for gene_position, (required_gene, base_id) in enumerate(
-        zip(required_genes, required_base_ids)
-    ):
-        supplied_gene = supplied_by_base.get(base_id)
-        if supplied_gene is None or base_id in duplicate_base_ids:
-            continue
-        # Nullable integer columns must become float before a fractional median
-        # is inserted (e.g. an integer-valued column containing missing values).
-        values = numeric_matrix[supplied_gene].astype(float).replace(
-            [np.inf, -np.inf], np.nan
-        )
-        median_value = float(preprocessor["raw_tpm_medians"][gene_position])
-        aligned[required_gene] = values.fillna(median_value).astype(float)
-        observed = values.notna().to_numpy()
-        observed_count += observed
-        expressed_count += values.gt(0).fillna(False).to_numpy(dtype=bool)
-        matched_count += 1
+    if matches:
+        model_positions = np.array([gene_position for gene_position, _ in matches])
+        block = raw_values[:, [column_position for _, column_position in matches]]
+        block[np.isinf(block)] = np.nan  # Infinite values count as unavailable, like missing ones.
+        observed = ~np.isnan(block)
+        observed_count = observed.sum(axis=1)
+        expressed_count = (block > 0).sum(axis=1)
+        aligned_values[:, model_positions] = np.where(observed, block, medians[model_positions])
+    aligned = pd.DataFrame(aligned_values, index=input_matrix.index, columns=required_genes)
 
     missing_count = len(required_genes) - matched_count
     matched_fraction = matched_count / max(len(required_genes), 1)

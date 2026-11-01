@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import io
 import json
+import uuid
 from unittest.mock import patch
 
 import pandas as pd
@@ -98,6 +99,8 @@ class Upload(io.BytesIO):
         super().__init__(content)
         self.name = name
         self.size = len(content)
+        # Streamlit's UploadedFile gets a new file_id for every upload.
+        self.file_id = uuid.uuid4().hex
 
 
 def demo_bytes() -> bytes:

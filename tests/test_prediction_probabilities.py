@@ -69,3 +69,19 @@ def test_real_demo_summary_matches_chart_and_sample_selection_changes_both():
         assert [row["tissue"] for row in rows] == values.index.tolist()
         np.testing.assert_allclose([row["probability"] for row in rows], values.values)
         assert len(app.dataframe[-1].value) == 5
+
+
+def test_pending_upload_signature_does_not_read_the_file():
+    # Reading and hashing a 200 MB upload on every rerun copied it each time.
+    import streamlit as st
+    from gtex_explorer.ui.prediction_page import _sync_uploaded_input
+
+    class Upload:
+        name, file_id, size = 'big.csv', 'id-1', 10
+
+        def getvalue(self):
+            raise AssertionError('upload content read during rerun')
+
+    st.session_state.clear()
+    _sync_uploaded_input(Upload())
+    assert st.session_state.pending_upload_signature == ('big.csv', 'id-1', 10)

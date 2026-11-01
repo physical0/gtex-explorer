@@ -468,6 +468,20 @@ class CloudState:
                 if outer:
                     self.publish()
 
+    @contextmanager
+    def script(self):
+        """Sync around one page run without serializing every session on the instance.
+
+        The lock is held only while pulling and publishing. Writes happen inside
+        @operation, which takes its own short transaction, so rendering, parsing and
+        prediction in one session no longer delay other sessions.
+        """
+        self.pull()
+        try:
+            yield self
+        finally:
+            self.publish()
+
 
 _instance = None
 

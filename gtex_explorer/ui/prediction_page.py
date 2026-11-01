@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import html
-import hashlib
 import io
 from pathlib import Path
 
@@ -114,16 +113,17 @@ def _clear_prediction_results() -> None:
     st.session_state.pop("probabilities", None)
 
 
-def _sync_uploaded_input(uploaded_file) -> bytes | None:
-    """Invalidate audited data/results whenever the pending input changes."""
-    content = None if uploaded_file is None else uploaded_file.getvalue()
-    signature = None if content is None else (
-        uploaded_file.name, hashlib.sha256(content).hexdigest()
+def _sync_uploaded_input(uploaded_file) -> None:
+    """Invalidate audited data/results whenever the pending input changes.
+
+    Every upload gets a new file_id, so the file is not read or hashed on each rerun.
+    """
+    signature = None if uploaded_file is None else (
+        uploaded_file.name, uploaded_file.file_id, int(uploaded_file.size)
     )
     if signature != st.session_state.get("pending_upload_signature"):
         _clear_analysis_state()
         st.session_state.pending_upload_signature = signature
-    return content
 
 
 def _reminder_percentages() -> tuple[int, int]:
@@ -295,7 +295,7 @@ def _render_input_panel(preprocessor: dict | None) -> None:
         key=upload_widget_key("offline_tpm_upload"),
     )
 
-    uploaded_content = _sync_uploaded_input(uploaded_file)
+    _sync_uploaded_input(uploaded_file)
 
     positive_percent, completeness_percent = _reminder_percentages()
     original_matrix = st.session_state.get("input_matrix_before_imputation")
@@ -334,7 +334,7 @@ def _render_input_panel(preprocessor: dict | None) -> None:
         try:
             # A fresh stream makes repeated audits independent of file cursor state.
             with st.spinner("Membaca berkas dan memeriksa input..."):
-                matrix = parse_expression_file(io.BytesIO(uploaded_content), uploaded_file.name,
+                matrix = parse_expression_file(io.BytesIO(uploaded_file.getvalue()), uploaded_file.name,
                                                model_genes=preprocessor['selected_genes'])
                 _audit_matrix(
                     matrix=matrix,

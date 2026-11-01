@@ -12,7 +12,7 @@ os.environ.setdefault('GTEX_DESKTOP_STATE_DIR', '/tmp/gtex-cloud-state')
 os.environ.setdefault('GTEX_CLOUD_PREFIX', 'gtex-' + os.environ.get('VERCEL_ENV', 'development'))
 
 try:
-    with state().transaction():
+    with state().script():
         filename = Path(__file__).with_name('app.py')
         exec(compile(filename.read_text(encoding='utf-8'), str(filename), 'exec'),
              {'__name__': '__main__', '__file__': str(filename)})

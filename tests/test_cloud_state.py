@@ -274,3 +274,30 @@ def test_individually_installed_file_is_removed_when_deleted_remotely(tmp_path):
     web.publish()
     daemon.pull()
     assert not (daemon.root / 'runs/run_test/cloud_control.json').exists()
+
+
+def test_page_run_does_not_block_other_sessions(tmp_path):
+    # One session parsing a large upload must not freeze every other session on the instance.
+    import threading
+    store = MemoryStore()
+    current = CloudState(tmp_path / 'local', store)
+    rendering, release, finished = threading.Event(), threading.Event(), threading.Event()
+
+    def slow_page():
+        with current.script():
+            rendering.set()
+            release.wait(10)
+
+    def other_session():
+        with current.transaction():
+            write(current.root, 'other.json', b'{}')
+        finished.set()
+
+    page = threading.Thread(target=slow_page)
+    page.start()
+    assert rendering.wait(5)
+    threading.Thread(target=other_session).start()
+    assert finished.wait(5), 'operation waited for another session to finish rendering'
+    release.set()
+    page.join(5)
+    assert json.loads(store.objects['gtex/state.json'][0])['files']['other.json']

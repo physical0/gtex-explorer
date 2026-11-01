@@ -26,7 +26,15 @@ class UploadAudit:
     source: dict
 
 
-def read_upload_table(content: bytes, filename: str) -> pd.DataFrame:
+BLANK_VALUES = ['', 'NA', 'NaN', 'nan', 'N/A']
+
+
+def read_upload_table(content: bytes, filename: str, *, numeric: bool = False) -> pd.DataFrame:
+    """Read metadata as text, or an expression matrix with text IDs and numeric values.
+
+    numeric=True lets the C parser read value columns as floats. Reading every cell
+    as a Python string costs roughly 15x the file size in memory.
+    """
     if not content.strip():
         raise ValueError('Berkas kosong. Unggah matriks TPM atau metadata yang berisi data.')
     stream = io.BytesIO(content)
@@ -35,14 +43,25 @@ def read_upload_table(content: bytes, filename: str) -> pd.DataFrame:
     stream.seek(0)
     sep = '\t' if skip or '\t' in first else ','
     # pandas renames duplicate column labels, so inspect the actual header first.
-    lines = content.decode('utf-8-sig').splitlines()
+    # Only the first lines are read; decoding the whole file here doubled its memory.
+    lines = []
+    for _ in range(skip + 1):
+        line = stream.readline()
+        if not line:
+            break
+        lines.append(line)
+    stream.seek(0)
     if len(lines) <= skip:
         raise ValueError('Header GCT tidak lengkap. Berkas harus memuat versi, dimensi, header, dan data.')
-    header = lines[skip]
+    header = lines[skip].decode('utf-8-sig').rstrip('\r\n')
     columns = next(csv.reader([header], delimiter=sep))
     if len(set(columns)) != len(columns):
         raise ValueError('ID atau nama kolom duplikat pada header berkas.')
-    frame = pd.read_csv(stream, sep=sep, skiprows=skip, dtype=str, keep_default_na=False)
+    if numeric:
+        frame = pd.read_csv(stream, sep=sep, skiprows=skip, low_memory=False, keep_default_na=False,
+                            dtype={0: str}, na_values={column: BLANK_VALUES for column in columns[1:]})
+    else:
+        frame = pd.read_csv(stream, sep=sep, skiprows=skip, dtype=str, keep_default_na=False)
     if frame.empty or len(frame.columns) < 2:
         raise ValueError('Berkas harus memiliki baris data dan sedikitnya dua kolom.')
     return frame
@@ -61,7 +80,7 @@ def audit_uploads(expression: bytes, expression_name: str, metadata: bytes, meta
             raise ValueError(f'ID atau label {label} kosong pada metadata.')
     if meta[sample_column].duplicated().any():
         raise ValueError('ID sampel duplikat pada metadata.')
-    frame = read_upload_table(expression, expression_name)
+    frame = read_upload_table(expression, expression_name, numeric=True)
     ids = set(meta[sample_column])
     first_values = frame.iloc[:, 0].str.strip()
     row_matches = first_values.isin(ids).any()
@@ -73,26 +92,24 @@ def audit_uploads(expression: bytes, expression_name: str, metadata: bytes, meta
     if col_matches:
         if 'Description' in frame.columns:
             frame = frame.drop(columns='Description')
-        matrix = frame.set_index(frame.columns[0]).T
+        body = frame.set_index(frame.columns[0])
+        sample_axis, gene_axis = body.columns, body.index
         orientation = 'gen x sampel'
     else:
-        matrix = frame.set_index(frame.columns[0])
+        body = frame.set_index(frame.columns[0])
+        sample_axis, gene_axis = body.index, body.columns
         orientation = 'sampel x gen'
     try:
-        samples = unique_ids(matrix.index.tolist())
-        genes = unique_ids(matrix.columns.tolist(), genes=True)
+        samples = unique_ids(sample_axis.tolist())
+        genes = unique_ids(gene_axis.tolist(), genes=True)
     except ValueError as error:
         raise ValueError('ID sampel atau ID gen kosong/duplikat setelah suffix versi dihapus.') from error
     missing = set(samples) - ids
     if missing:
         raise ValueError(f'{len(missing)} ID sampel tidak memiliki metadata: {", ".join(sorted(missing)[:3])}.')
-    # Convert on the short (sample) axis. This avoids 74,628 Python column conversions.
-    flat = pd.Series(matrix.to_numpy().reshape(-1))
-    blank = flat.astype(str).str.strip().isin(['', 'NA', 'NaN', 'nan', 'N/A'])
-    numeric = pd.to_numeric(flat.mask(blank), errors='coerce')
-    if (numeric.isna() & ~blank).any():
-        raise ValueError('Nilai ekspresi nonnumerik ditemukan. Gunakan angka TPM atau sel kosong.')
-    values = numeric.to_numpy(dtype=np.float32).reshape(matrix.shape)
+    values = _expression_values(body)
+    if col_matches:
+        values = np.ascontiguousarray(values.T)
     if np.isinf(values).any():
         raise ValueError('Nilai tak hingga ditemukan pada ekspresi TPM.')
     if (values < 0).any():
@@ -110,8 +127,26 @@ def audit_uploads(expression: bytes, expression_name: str, metadata: bytes, meta
               'metadata_sha256': hashlib.sha256(metadata).hexdigest(),
               'sample_column': sample_column, 'donor_column': donor_column, 'tissue_column': tissue_column,
               'extra_metadata_rows': len(meta) - len(samples)}
-    return UploadAudit(values, tuple(matrix.columns.astype(str)), samples,
+    return UploadAudit(values, tuple(gene_axis.astype(str)), samples,
                        tuple(aligned[donor_column]), classes, labels, source)
+
+
+def _expression_values(body: pd.DataFrame) -> np.ndarray:
+    """Float32 values in the file's own orientation; only text columns take the slow path."""
+    kinds = np.array([dtype.kind for dtype in body.dtypes])
+    numeric_columns = np.isin(kinds, list('fiu'))
+    values = np.empty(body.shape, dtype=np.float32)
+    if numeric_columns.any():
+        values[:, numeric_columns] = body.iloc[:, numeric_columns].to_numpy(dtype=np.float32, na_value=np.nan)
+    if not numeric_columns.all():
+        text = body.iloc[:, ~numeric_columns]
+        flat = pd.Series(text.to_numpy(dtype=object).reshape(-1))
+        blank = flat.isna() | flat.astype(str).str.strip().isin(BLANK_VALUES)
+        numeric = pd.to_numeric(flat.mask(blank), errors='coerce')
+        if (numeric.isna() & ~blank).any():
+            raise ValueError('Nilai ekspresi nonnumerik ditemukan. Gunakan angka TPM atau sel kosong.')
+        values[:, ~numeric_columns] = numeric.to_numpy(dtype=np.float32).reshape(text.shape)
+    return values
 
 
 @operation
