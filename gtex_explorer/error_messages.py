@@ -38,6 +38,9 @@ def user_error(error) -> str:
         fold, side, tissues = missing.groups()
         return (f'Data {side} pada fold {fold} tidak mencakup jaringan: {tissues}. '
                 'Pilih jumlah fold lain. Pembagian donor dan kelas jaringan tidak diubah otomatis.')
+    if re.fullmatch(r'Fold \d+ is empty', message) or 'n_splits=' in message:
+        return ('Sampel atau donor pada data development terlalu sedikit untuk jumlah fold ini. '
+                'Kurangi jumlah fold, kurangi porsi data holdout, atau nonaktifkan cross-validation.')
     if 'hash' in message.lower():
         return ('Pemeriksaan integritas berkas model gagal karena hash tidak cocok. '
                 'Pulihkan berkas asli atau latih dan simpan model baru. Model ini tidak digunakan.')

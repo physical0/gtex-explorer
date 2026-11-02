@@ -78,7 +78,7 @@ def fit_selector(prepared: PreparedData, config: TrainingConfig,
         raise ValueError('Requested genes exceed candidate count')
     if config.selector == 'anova' and len(prepared.y_train) <= len(np.unique(prepared.y_train)):
         raise ValueError('ANOVA memerlukan jumlah sampel training lebih besar daripada jumlah kelas. '
-                         'Tambahkan sampel/donor atau pilih pembagian fold lain.')
+                         'Tambahkan sampel/donor, kurangi porsi data holdout, atau pilih jumlah fold lain.')
     key = stable_hash({'partition': prepared.fingerprint, 'genes': list(prepared.gene_names),
                        'settings': config.selector_settings(), 'versions': runtime_versions()})
     target = Path(ranking_cache) / key if ranking_cache else None

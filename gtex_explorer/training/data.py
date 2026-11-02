@@ -343,6 +343,35 @@ def _cached_assignment_matches(data, assignments):
                for spec, assignment in zip(specs, assignments))
 
 
+def _impute_missing(train):
+    """Fill missing TPM with medians of the training part. A gene with no values at all is dropped."""
+    if not train.isna().to_numpy().any():
+        return train, None
+    medians = train.median(axis=0)
+    valid = medians.notna()
+    return train.loc[:, valid].fillna(medians[valid]), medians
+
+
+def _technical_filter(train):
+    return ((train >= 1).mean(axis=0) >= .2) & (train.var(axis=0, ddof=0) > 0)
+
+
+def usable_candidate_genes(data: TrainingData, holdout_percent: int | None = None, cv_folds: int | None = None) -> int:
+    """How many genes pass the technical filter on every part a run would train on."""
+    import pandas as pd
+    parts = [np.arange(len(data.labels))]
+    # A refused split is reported by its own check, so count what can still be formed.
+    try:
+        if holdout_percent:
+            parts = [make_holdout_assignment(data, holdout_percent).train_indices]
+        if cv_folds:
+            parts += [fold.train_indices for fold in make_cv_assignments(data, cv_folds, parts[0])]
+    except ValueError:
+        pass
+    return min(int(_technical_filter(_impute_missing(pd.DataFrame(np.array(data.raw_tpm[part], copy=True), columns=data.raw_gene_names))[0]).sum())
+               for part in parts)
+
+
 def prepare_partition(data: TrainingData, assignment: FoldAssignment, cache_dir: Path) -> PreparedData:
     import pandas as pd
     from sklearn.preprocessing import StandardScaler
@@ -362,13 +391,10 @@ def prepare_partition(data: TrainingData, assignment: FoldAssignment, cache_dir:
         return _read_partition(target, fingerprint)
     train = pd.DataFrame(np.array(data.raw_tpm[assignment.train_indices], copy=True), columns=data.raw_gene_names)
     val = pd.DataFrame(np.array(data.raw_tpm[assignment.validation_indices], copy=True), columns=data.raw_gene_names)
-    medians = None
-    if train.isna().to_numpy().any():
-        medians = train.median(axis=0)
-        valid = medians.notna()
-        train = train.loc[:, valid].fillna(medians[valid])
-        val = val.loc[:, valid]
-    technical = ((train >= 1).mean(axis=0) >= .2) & (train.var(axis=0, ddof=0) > 0)
+    train, medians = _impute_missing(train)
+    if medians is not None:
+        val = val.loc[:, medians.notna()]
+    technical = _technical_filter(train)
     count = int(data.manifest['candidate_count'])
     if technical.sum() < count:
         raise ValueError(f'Hanya {technical.sum()} gen lolos filter teknis pada data training partisi ini, '

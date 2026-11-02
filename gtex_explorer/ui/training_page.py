@@ -11,7 +11,7 @@ import streamlit as st
 from gtex_explorer.cloud.media import download_button
 
 from gtex_explorer.training.config import training_presets, validate_training_config
-from gtex_explorer.training.data import load_training_data, make_cv_assignments, make_holdout_assignment
+from gtex_explorer.training.data import TrainingData, load_training_data, make_cv_assignments, make_holdout_assignment, usable_candidate_genes
 from gtex_explorer.training.jobs import start_job, read_job, request_cancel, resume_job, pause_job, unpause_job, can_resume, delete_run, has_active_run, ACTIVE_STATUSES, FINALIZING_STAGES
 from gtex_explorer.training.gallery import list_gallery
 from gtex_explorer.training.uploads import audit_uploads, read_upload_table, save_training_upload
@@ -28,6 +28,17 @@ METRICS = {'macro_f1': 'Macro-F1', 'macro_precision': 'Macro-precision',
 @st.cache_resource
 def _data(root: str, version: tuple):
     return load_training_data(Path(root))
+
+
+def _upload_preview(audit):
+    # Splitting requires only sample/label/donor axes, never fitted gene values.
+    return TrainingData(Path('.'), {'cached_folds': []}, audit.sample_ids, audit.donor_ids,
+                        audit.classes, audit.labels, audit.gene_names, audit.raw_tpm)
+
+
+@st.cache_data(max_entries=16, show_spinner=False)
+def _usable_genes(_audit, source: tuple, holdout_percent: int, cv_folds: int | None) -> int:
+    return usable_candidate_genes(_upload_preview(_audit), holdout_percent, cv_folds)
 
 
 def cached_data(root):
@@ -288,6 +299,11 @@ def _render_training_setup(data_root: Path, state_root: Path) -> None:
                             help='Dipisahkan lebih dulu untuk menguji model. Sisanya menjadi data development untuk melatih model.')
         evaluation_note = st.container()
         st.divider()
+        usable = None
+        if audit is not None and data is None:
+            usable = _usable_genes(audit, tuple(sorted(audit.source.items())), holdout,
+                                   st.session_state.get('training_folds', 5) if st.session_state.get('training_cv') else None)
+            available = max(1, min(available, usable))
         st.subheader('Seleksi fitur')
         selector_left, selector_right = st.columns(2)
         with selector_left:
@@ -307,6 +323,9 @@ def _render_training_setup(data_root: Path, state_root: Path) -> None:
                 key='training_candidates', disabled=data is not None,
                 on_change=_selection_changed,
                 help='Jumlah gen setelah filter teknis dan pemeringkatan varians. Dipelajari dari data training setiap fold.')
+            if usable is not None and usable < min(5000, dataset['genes']):
+                st.caption(f"Maksimum {usable} dari {dataset['genes']} gen. Gen lain tidak lolos filter teknis pada pembagian data ini: "
+                           'bernilai sedikitnya 1 TPM pada 20% sampel dan bervariasi antarsampel.')
         candidate_blank = count is None
         if candidate_blank:
             count = available
@@ -379,14 +398,11 @@ def _render_training_setup(data_root: Path, state_root: Path) -> None:
         try:
             if candidate_blank:
                 raise ValueError('Isi jumlah gen kandidat sebelum memulai training.')
+            if usable == 0:
+                raise ValueError('Tidak ada gen yang lolos filter teknis pada pembagian data ini. Periksa nilai TPM atau ubah pembagian data.')
             config = validate_training_config(values, candidate_count=count)
             if dataset and (values['evaluate_cv'] or values.get('holdout_percent')):
-                preview = data
-                if data is None:
-                    # Splitting requires only sample/label/donor axes, never fitted gene values.
-                    from gtex_explorer.training.data import TrainingData
-                    preview = TrainingData(Path('.'), {'cached_folds': []}, audit.sample_ids,
-                        audit.donor_ids, audit.classes, audit.labels, audit.gene_names, audit.raw_tpm)
+                preview = data if data is not None else _upload_preview(audit)
                 # The main split is settled first, so its counts stay visible even if the folds are refused.
                 split = make_holdout_assignment(preview, config.holdout_percent) if config.holdout_percent else None
                 if split:
