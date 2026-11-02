@@ -162,3 +162,27 @@ def test_finished_runs_do_not_count_as_active(tmp_path):
                           ('queued', True), ('running', True), ('paused', True), ('cancelling', True)]:
         status.write_text(json.dumps({'status': value}), encoding='utf-8')
         assert has_active_run(tmp_path) is active
+
+
+def test_metadata_column_choices_explain_what_each_column_is_for(tmp_path, monkeypatch):
+    import io
+    from unittest.mock import patch
+
+    class Upload(io.BytesIO):
+        def __init__(self, content, name):
+            super().__init__(content)
+            self.name, self.size, self.file_id = name, len(content), name
+
+    expression = Upload(b'SAMPID,ENSG1,ENSG2\nS1,1,2\nS2,3,4\n', 'tpm.csv')
+    metadata = Upload(b'SAMPID,SUBJID,SMTSD\nS1,D1,Lung\nS2,D2,Liver\n', 'meta.csv')
+    monkeypatch.setenv('GTEX_DESKTOP_STATE_DIR', str(tmp_path))
+    app = enter_application(AppTest.from_file(str(APP), default_timeout=60).run(), 'Pelatihan Model')
+    with patch('streamlit.file_uploader', side_effect=lambda label, **_: expression if 'ekspresi' in label else metadata):
+        app.run()
+    assert not app.exception
+    captions = ' '.join(item.value for item in app.caption)
+    for phrase in ['diambil dari judul kolom pada berkas metadata', 'ID Sampel menghubungkan metadata', 'ID harus sama persis',
+                   'donor yang sama tidak dipisah antara data pelatihan dan validasi.', 'dipelajari dan diprediksi model',
+                   'Periksa kembali kolom donor dan jaringan']:
+        assert phrase in captions
+    assert 'agar skor tidak terlalu tinggi' not in captions

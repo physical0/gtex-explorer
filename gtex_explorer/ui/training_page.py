@@ -211,13 +211,18 @@ def _render_training_setup(data_root: Path, state_root: Path) -> None:
                 signature = f'{expression.file_id}:{metadata.file_id}'
                 try:
                     columns = list(read_upload_table(metadata.getvalue(), metadata.name).columns)
+                    st.caption('Pilihan pada setiap kolom di bawah diambil dari judul kolom pada berkas metadata.')
                     mapping = st.columns(3)
                     sample = mapping[0].selectbox('Kolom ID sampel', columns,
                         index=columns.index('SAMPID') if 'SAMPID' in columns else 0, key='training_sample_column')
+                    mapping[0].caption('ID Sampel menghubungkan metadata dengan matriks TPM. ID harus sama persis.')
                     donor = mapping[1].selectbox('Kolom donor', columns,
                         index=columns.index('SUBJID') if 'SUBJID' in columns else min(1, len(columns)-1), key='training_donor_column')
+                    mapping[1].caption('Sampel dari donor yang sama tidak dipisah antara data pelatihan dan validasi.')
                     tissue = mapping[2].selectbox('Kolom jaringan', columns,
                         index=columns.index('SMTSD') if 'SMTSD' in columns else min(2, len(columns)-1), key='training_tissue_column')
+                    mapping[2].caption('Label jaringan yang dipelajari dan diprediksi model.')
+                    st.caption('Periksa kembali kolom donor dan jaringan. Pilihan yang keliru tidak selalu terdeteksi aplikasi.')
                     signature += f':{sample}:{donor}:{tissue}'
                     if st.session_state.get('training_upload_signature') != signature:
                         audit = None
