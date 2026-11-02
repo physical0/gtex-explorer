@@ -126,3 +126,17 @@ def test_gallery_shows_holdout_scores_for_a_run_without_folds(tmp_path, monkeypa
     assert 'F1-score per jaringan' in [item.value for item in app.subheader]
     assert any(item.label == 'Macro-F1' for item in app.metric)
     assert any('Holdout 50%' in item.value for item in app.markdown)
+
+
+def test_gallery_shows_holdout_and_fold_results_together(tmp_path, monkeypatch):
+    from test_training_gallery import holdout_run
+    from gtex_explorer.training.worker import run_job
+    data, state, run_id = holdout_run(tmp_path, monkeypatch, evaluate_cv=True, cv_folds=2)
+    assert run_job(run_id, data, state) == 0
+    app = AppTest.from_string('from pathlib import Path\n'
+        'from gtex_explorer.ui.training_page import render_training_results_page\n'
+        f'render_training_results_page(Path({str(data)!r}), Path({str(state)!r}))', default_timeout=60).run()
+    assert not app.exception
+    headings = [item.value for item in app.subheader]
+    assert headings.index('Evaluasi holdout') < headings.index('Evaluasi CV') and headings.count('F1-score per jaringan') == 2
+    assert any('Holdout 50% dan 2 fold' in item.value for item in app.markdown)

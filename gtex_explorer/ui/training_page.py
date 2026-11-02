@@ -282,6 +282,12 @@ def _render_training_setup(data_root: Path, state_root: Path) -> None:
         if st.session_state.get('training_top_k', 0) is not None and st.session_state.get('training_top_k', 0) > available:
             st.session_state.training_top_k = available
             st.session_state.training_preset = 'Custom'
+        st.subheader('Pembagian data utama')
+        st.session_state.setdefault('training_holdout', 20)
+        holdout = st.slider('Porsi data holdout', 0, 50, step=5, format='%d%%', key='training_holdout',
+                            help='Dipisahkan lebih dulu untuk menguji model. Sisanya menjadi data development untuk melatih model.')
+        evaluation_note = st.container()
+        st.divider()
         st.subheader('Seleksi fitur')
         selector_left, selector_right = st.columns(2)
         with selector_left:
@@ -329,23 +335,18 @@ def _render_training_setup(data_root: Path, state_root: Path) -> None:
             with selector_right:
                 values['mi_neighbors'] = st.number_input('n_neighbors', value=3, step=1, help=_range_help(1, 20), key='training_mi_neighbors')
         st.divider()
-        st.subheader('Evaluasi')
-        cv_left, cv_right = st.columns([2, 1])
-        with cv_left:
-            values['evaluate_cv'] = st.checkbox('Evaluasi dengan cross-validation', key='training_cv')
-        with cv_right:
-            values['cv_folds'] = st.selectbox('Jumlah fold', [5, 3, 2, 4, 6, 7, 8, 9, 10],
-                key='training_folds', disabled=not values['evaluate_cv'])
-        holdout = st.slider('Porsi data holdout', 0, 50, 20, step=5, format='%d%%', key='training_holdout',
-                            disabled=values['evaluate_cv'],
-                            help='Berlaku saat cross-validation tidak aktif. Sisanya menjadi data development untuk melatih model.')
-        evaluation_note = st.container()
-        if values['evaluate_cv']:
-            evaluation_note.caption('Donor data training dan data validation dipisahkan pada setiap fold.')
-        elif holdout:
+        st.subheader('Evaluasi tambahan')
+        values['evaluate_cv'] = st.checkbox('Evaluasi dengan cross-validation', key='training_cv')
+        st.session_state.setdefault('training_folds', 5)
+        values['cv_folds'] = st.slider('Jumlah fold', 2, 10, key='training_folds', disabled=not values['evaluate_cv'],
+                                       help='Setiap fold memakai 1 bagian untuk validasi dan sisanya untuk pelatihan.')
+        fold_note = st.container()
+        if not values['evaluate_cv']:
+            fold_note.caption('Opsional. Cross-validation hanya memakai data development.')
+        if holdout:
             values['holdout_percent'] = holdout
         else:
-            evaluation_note.caption('Dengan 0%, semua sampel melatih model dan model disimpan tanpa skor validation baru.')
+            evaluation_note.caption('Dengan 0%, semua sampel menjadi data development dan model disimpan tanpa skor holdout.')
         st.subheader('Parameter XGBoost')
         columns = st.columns(3)
         xgb = {}
@@ -386,16 +387,23 @@ def _render_training_setup(data_root: Path, state_root: Path) -> None:
                     from gtex_explorer.training.data import TrainingData
                     preview = TrainingData(Path('.'), {'cached_folds': []}, audit.sample_ids,
                         audit.donor_ids, audit.classes, audit.labels, audit.gene_names, audit.raw_tpm)
-                if values['evaluate_cv']:
-                    make_cv_assignments(preview, values['cv_folds'])
-                else:
-                    split = make_holdout_assignment(preview, values['holdout_percent'])
+                # The main split is settled first, so its counts stay visible even if the folds are refused.
+                split = make_holdout_assignment(preview, config.holdout_percent) if config.holdout_percent else None
+                if split:
                     evaluation_note.caption(f'Data development: {len(split.train_indices)} sampel, untuk melatih model yang disimpan. '
                                             f'Data holdout: {len(split.validation_indices)} sampel, untuk menguji model. '
                                             'Donor tidak terbagi di antara keduanya.')
                     if data is not None:
                         evaluation_note.caption('Kedua bagian ini berasal dari subset development eksperimen. '
                                                 'Data holdout eksperimen notebook tetap tidak dipakai.')
+                if config.evaluate_cv:
+                    folds = make_cv_assignments(preview, config.cv_folds, split.train_indices if split else None)
+                    train, validation = len(folds[0].train_indices), len(folds[0].validation_indices)
+                    fold_count = len(folds)
+                    fold_note.caption(f'{train + validation} sampel data development dibagi menjadi {fold_count} fold. '
+                                      f'Setiap fold memakai sekitar {train} sampel ({round(100 * (fold_count - 1) / fold_count)}%) untuk pelatihan '
+                                      f'dan {validation} sampel ({round(100 / fold_count)}%) untuk validasi. Donor tidak terbagi pada setiap fold.'
+                                      + (' Data holdout tidak ikut.' if split else ''))
         except (ValueError, OSError, TypeError) as error:
             validation_error = str(error)
             st.error(user_error(error))
@@ -428,13 +436,11 @@ def _render_training_setup(data_root: Path, state_root: Path) -> None:
         with model:
             st.subheader('Model dan evaluasi')
             rows = [('Classifier', 'XGBoost'), ('Putaran boosting', str(xgb['n_estimators'])),
-                    ('Evaluasi', 'Cross-validation' if values['evaluate_cv'] else
-                     'Data holdout' if values.get('holdout_percent') else 'Tanpa evaluasi')]
-            if values['evaluate_cv']:
-                rows += [('Jumlah fold', str(values['cv_folds'])), ('Pembagian', 'Donor terpisah')]
-            elif values.get('holdout_percent'):
-                rows += [('Data development', f"{100 - values['holdout_percent']}%"),
-                         ('Data holdout', f"{values['holdout_percent']}%"), ('Pembagian', 'Donor terpisah')]
+                    ('Data development', f"{100 - values.get('holdout_percent', 0)}%"),
+                    ('Data holdout', f"{values['holdout_percent']}%" if values.get('holdout_percent') else 'Tidak ada'),
+                    ('Evaluasi tambahan', f"Cross-validation {values['cv_folds']} fold" if values['evaluate_cv'] else 'Tidak ada')]
+            if values['evaluate_cv'] or values.get('holdout_percent'):
+                rows.append(('Pembagian', 'Donor terpisah'))
             st.table(pd.DataFrame(rows, columns=['Pengaturan', 'Nilai']).set_index('Pengaturan'))
         with st.expander('Parameter XGBoost dan opsi selector'):
             st.dataframe(pd.DataFrame([{'Parameter': name, 'Nilai': str(value)}
@@ -447,7 +453,7 @@ def _render_training_setup(data_root: Path, state_root: Path) -> None:
         if values.get('holdout_percent'):
             st.caption('Model yang disimpan hanya dilatih pada data development. Data holdout dipakai untuk menguji model.')
         elif not values['evaluate_cv']:
-            st.caption('Tanpa CV dan data holdout, model disimpan tanpa skor validation baru.')
+            st.caption('Tanpa data holdout dan CV, model disimpan tanpa skor validation baru.')
         st.divider()
         back, action = st.columns(2)
         back.button('Kembali ke konfigurasi', key='training_review_back', icon=':material/arrow_back:',
@@ -572,11 +578,11 @@ def _run_details(data_root: Path, state_root: Path, polling: bool = False):
         _show_saved_parameters(saved)
         summary = record.details.get('cv_summary')
         st.divider()
+        if record.details.get('holdout_summary'):
+            _show_holdout_results(record.details['holdout_summary'])
         if summary:
             _show_cv_results(summary, config)
-        elif record.details.get('holdout_summary'):
-            _show_holdout_results(record.details['holdout_summary'])
-        elif record.status == 'completed':
+        elif not record.details.get('holdout_summary') and record.status == 'completed':
             st.info('Training selesai tanpa CV. Tidak ada skor validation atau holdout baru.')
         ready = record.status == 'completed' and any(entry['run_id'] == run_id for entry in list_gallery(state_root))
         if record.status == 'completed' and not ready:
@@ -655,7 +661,8 @@ def _show_model_actions(run_id):
 
 def _show_cv_results(summary, config):
     st.subheader('Evaluasi CV')
-    st.caption(f"Rerata dan simpangan baku dari {summary.get('fold_count', config['cv_folds'])} fold validation.")
+    st.caption(f"Rerata dan simpangan baku dari {summary.get('fold_count', config['cv_folds'])} fold validation."
+               + (' Fold hanya dibentuk dari data development.' if config.get('holdout_percent') else ''))
     with st.container(key='training_cv_results'):
         metrics_column, summary_column = st.columns([3, 1], gap='medium')
         metrics_column.dataframe(pd.DataFrame({
@@ -727,7 +734,7 @@ def _show_holdout_results(summary):
     st.caption(f"Model yang disimpan dilatih pada {summary['training_samples']} sampel data development "
                f"({summary['training_donors']} donor) dan diuji pada {summary['validation_samples']} sampel data holdout "
                f"({summary['validation_donors']} donor). Donor tidak terbagi di antara keduanya.")
-    with st.container(key='training_cv_results'):
+    with st.container(key='training_holdout_results'):
         metrics_column, summary_column = st.columns([3, 1], gap='medium')
         metrics_column.dataframe(pd.DataFrame({'Metrik': list(METRICS.values()),
                                                'Nilai': [percent(summary[key]) for key in METRICS]}),
@@ -741,13 +748,14 @@ def _show_holdout_results(summary):
     _tissue_chart(tissues, [alt.Tooltip('score:Q', title='F1-score', format='.2%'),
                             alt.Tooltip('samples:Q', title='Sampel holdout', format='.0f')])
     download_button('Unduh F1 per jaringan', tissues[['tissue', 'score', 'samples']].rename(columns={'score': 'f1'}).to_csv(index=False),
-                    'holdout_tissue_f1.csv', key='training_download_tissue_f1', icon=':material/download:')
+                    'holdout_tissue_f1.csv', key='training_download_holdout_f1', icon=':material/download:')
 
 
 def _evaluation_label(config):
+    parts = [f"Holdout {config['holdout_percent']}%"] if config.get('holdout_percent') else []
     if config['evaluate_cv']:
-        return f"{config['cv_folds']} fold"
-    return f"Holdout {config['holdout_percent']}%" if config.get('holdout_percent') else 'Tanpa CV'
+        parts.append(f"{config['cv_folds']} fold")
+    return ' dan '.join(parts) or 'Tanpa CV'
 
 
 def _select_gallery_run(run_id):
@@ -808,11 +816,11 @@ def _gallery_results(state_root, polling: bool = False):
             st.caption('Dataset: ' + record['filename'])
             _show_model_actions(selected)
             st.divider()
+            if record.get('holdout_summary'):
+                _show_holdout_results(record['holdout_summary'])
             if record['cv_summary']:
                 _show_cv_results(record['cv_summary'], config)
-            elif record.get('holdout_summary'):
-                _show_holdout_results(record['holdout_summary'])
-            else:
+            elif not record.get('holdout_summary'):
                 st.caption('Tanpa CV. Tidak ada skor validation atau holdout baru.')
             _show_saved_parameters(saved)
     except (OSError, ValueError, KeyError, TypeError) as error:
@@ -842,8 +850,8 @@ def render_training_results_page(data_root: Path, state_root: Path):
     .st-key-gallery_detail [data-testid="stMetric"] {padding:.7rem;}
     .st-key-gallery_detail [data-testid="stMetricValue"] {font-size:2rem;}
     @media(max-width:1000px) {
-        .st-key-training_cv_results [data-testid="stHorizontalBlock"] {flex-wrap:wrap;}
-        .st-key-training_cv_results [data-testid="stColumn"] {width:100%; flex:1 1 100%;}
+        .st-key-training_cv_results [data-testid="stHorizontalBlock"], .st-key-training_holdout_results [data-testid="stHorizontalBlock"] {flex-wrap:wrap;}
+        .st-key-training_cv_results [data-testid="stColumn"], .st-key-training_holdout_results [data-testid="stColumn"] {width:100%; flex:1 1 100%;}
         .st-key-training_results [data-testid="stHorizontalBlock"]:has(> div .st-key-gallery_models) {flex-wrap:wrap;}
         .st-key-training_results [data-testid="stHorizontalBlock"]:has(> div .st-key-gallery_models) > [data-testid="stColumn"] {width:100%; flex:1 1 100%;}
         .st-key-gallery_models {border-right:0; border-bottom:1px solid #dce3e7; padding-right:0; padding-bottom:1rem; min-height:0;}

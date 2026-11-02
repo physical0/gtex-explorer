@@ -174,3 +174,24 @@ def test_holdout_refuses_a_tissue_that_cannot_be_on_both_sides():
     data.donor_ids = tuple('Only' if label == 0 else f'D{i}' for i, label in enumerate(data.labels))
     with pytest.raises(ValueError, match='T0'):
         make_holdout_assignment(data, 20)
+
+
+def test_folds_use_only_the_development_part_of_the_main_split():
+    from types import SimpleNamespace
+    from gtex_explorer.training.config import validate_training_config
+    from gtex_explorer.training.data import make_cv_assignments, run_split
+    data = holdout_fixture()
+    data.raw_tpm = np.zeros((80, 1))
+    data.manifest = {'cached_folds': []}
+    config = validate_training_config({'selector': 'anova', 'holdout_percent': 25, 'evaluate_cv': True, 'cv_folds': 4})
+    folds, holdout, split = run_split(data, config)
+    development, kept = set(holdout.train_indices.tolist()), set(holdout.validation_indices.tolist())
+    assert len(folds) == 4 and len(development) == 60 and len(kept) == 20
+    assert sorted(i for fold in folds for i in fold.validation_indices.tolist()) == sorted(development)
+    for fold in folds:
+        assert set(fold.train_indices.tolist()) | set(fold.validation_indices.tolist()) == development
+        assert not (set(fold.train_indices.tolist()) | set(fold.validation_indices.tolist())) & kept
+    # Folds over every sample stay exactly as older runs recorded them.
+    assert [fold.split_hash for fold in make_cv_assignments(data, 4)] != [fold.split_hash for fold in folds]
+    plain = validate_training_config({'selector': 'anova', 'evaluate_cv': True, 'cv_folds': 4})
+    assert run_split(data, plain)[2] != split and run_split(data, plain)[1] is None

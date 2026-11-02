@@ -204,7 +204,7 @@ def test_cv_run_saves_tissue_scores_and_older_runs_still_verify(tmp_path, monkey
     assert 'tissue_f1' not in finalize_gallery(run_id, state)['cv_summary']
 
 
-def holdout_run(tmp_path, monkeypatch):
+def holdout_run(tmp_path, monkeypatch, **extra):
     from test_training_data import checkpoint_sources
     from scripts.export_training_data import export_training_data
     from gtex_explorer.training.config import validate_training_config
@@ -213,7 +213,7 @@ def holdout_run(tmp_path, monkeypatch):
     export_training_data(*checkpoint_sources(tmp_path), data)
     monkeypatch.setattr('gtex_explorer.training.jobs._launch', lambda *args: None)
     config = validate_training_config({'selector': 'anova', 'top_k': 2, 'holdout_percent': 50,
-                                       'xgboost': {'n_estimators': 2}}, candidate_count=6)
+                                       'xgboost': {'n_estimators': 2}, **extra}, candidate_count=6)
     return data, state, start_job(config, data, state).run_id
 
 
@@ -247,3 +247,15 @@ def test_resumed_holdout_run_keeps_its_score(tmp_path, monkeypatch):
     assert worker.run_job(run_id, data, state) == 0
     status = json.loads((state / 'runs' / run_id / 'status.json').read_text(encoding='utf-8'))
     assert status['holdout_summary']['macro_f1'] is not None
+
+
+def test_folds_and_holdout_run_together_without_sharing_samples(tmp_path, monkeypatch):
+    from gtex_explorer.training.gallery import list_gallery
+    from gtex_explorer.training.worker import run_job
+    data, state, run_id = holdout_run(tmp_path, monkeypatch, evaluate_cv=True, cv_folds=2)
+    assert run_job(run_id, data, state) == 0
+    receipt = list_gallery(state)[0]
+    holdout, folds = receipt['holdout_summary'], receipt['cv_summary']
+    assert folds['fold_count'] == 2
+    for row in folds['fold_results']:
+        assert row['training_samples'] + row['validation_samples'] == holdout['training_samples']

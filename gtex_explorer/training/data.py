@@ -249,15 +249,19 @@ def load_final_prepared(data: TrainingData) -> PreparedData:
     return _load_prepared(data, data.manifest['final'])
 
 
-def make_cv_assignments(data: TrainingData, fold_count: int) -> list[FoldAssignment]:
+def make_cv_assignments(data: TrainingData, fold_count: int, within: np.ndarray | None = None) -> list[FoldAssignment]:
+    """Folds over all samples, or only over the positions in `within` when a hold-out was set aside first."""
     from sklearn.model_selection import StratifiedGroupKFold
     if isinstance(fold_count, bool) or not isinstance(fold_count, int) or not 2 <= fold_count <= 10:
         raise ValueError('Fold count must be an integer from 2 to 10')
     splitter = StratifiedGroupKFold(n_splits=fold_count, shuffle=True, random_state=42)
+    samples = np.arange(len(data.labels)) if within is None else np.asarray(within)
     assignments = []
     observed = np.zeros(len(data.labels), dtype=int)
     donor_fold = {}
-    for number, (train, val) in enumerate(splitter.split(np.zeros(len(data.labels)), data.labels, data.donor_ids), 1):
+    for number, (train, val) in enumerate(splitter.split(np.zeros(len(samples)), np.asarray(data.labels)[samples],
+                                                         [data.donor_ids[i] for i in samples]), 1):
+        train, val = samples[train], samples[val]
         if not len(train) or not len(val):
             raise ValueError(f'Fold {number} is empty')
         for side, positions in [('training', train), ('validation', val)]:
@@ -278,7 +282,7 @@ def make_cv_assignments(data: TrainingData, fold_count: int) -> list[FoldAssignm
                                 'validation': [data.sample_ids[i] for i in val],
                                 'fold_count': fold_count, 'seed': 42})
         assignments.append(FoldAssignment(number, train, val, identity))
-    if not np.all(observed == 1) or set(donor_fold) != set(data.donor_ids):
+    if not np.all(observed[samples] == 1) or observed.sum() != len(samples) or set(donor_fold) != {data.donor_ids[i] for i in samples}:
         raise ValueError('Incomplete validation assignment')
     if data.raw_tpm is None and not _cached_assignment_matches(data, assignments):
         raise ValueError('Raw development data required for non-cached assignments')
@@ -322,8 +326,10 @@ def make_holdout_assignment(data: TrainingData, percent: int) -> FoldAssignment:
 
 def run_split(data: TrainingData, config) -> tuple[list[FoldAssignment], FoldAssignment | None, str | None]:
     """The CV folds and hold-out of a run, with the hash that identifies them."""
-    assignments = make_cv_assignments(data, config.cv_folds) if config.evaluate_cv else []
+    # The hold-out is fixed first, so its donors can never enter a fold.
     holdout = make_holdout_assignment(data, config.holdout_percent) if config.holdout_percent else None
+    assignments = (make_cv_assignments(data, config.cv_folds, holdout.train_indices if holdout else None)
+                   if config.evaluate_cv else [])
     parts = assignments + ([holdout] if holdout else [])
     return assignments, holdout, stable_hash([a.split_hash for a in parts]) if parts else None
 

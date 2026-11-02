@@ -83,8 +83,6 @@ def validate_training_config(values: dict, *, candidate_count: int = 5000,
     holdout = values.get('holdout_percent')
     if holdout is not None:
         holdout = _number(holdout, 5, 50, 'holdout_percent', True)
-        if evaluate:
-            raise ValueError('Cross-validation dan data holdout tidak dapat digunakan bersamaan.')
     custom = values.get('xgboost', {})
     if not isinstance(custom, dict) or set(custom) - set(XGB_DEFAULTS):
         raise ValueError('Unknown or fixed XGBoost parameter')

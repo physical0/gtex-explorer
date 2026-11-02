@@ -48,5 +48,5 @@ def test_holdout_is_optional_and_leaves_older_runs_unchanged():
     for bad in [0, 4, 51, 20.5, True]:
         with pytest.raises(ValueError):
             validate_training_config({'selector': 'anova', 'holdout_percent': bad})
-    with pytest.raises(ValueError):
-        validate_training_config({'selector': 'anova', 'holdout_percent': 20, 'evaluate_cv': True})
+    both = validate_training_config({'selector': 'anova', 'holdout_percent': 20, 'evaluate_cv': True})
+    assert both.holdout_percent == 20 and both.evaluate_cv

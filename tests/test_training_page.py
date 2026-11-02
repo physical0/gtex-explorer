@@ -19,7 +19,7 @@ def test_training_controls_are_method_specific_and_cv_is_optional(tmp_path, monk
     app.radio(key='training_source').set_value('Data eksperimen notebook').run()
     assert not app.exception
     assert app.checkbox(key='training_cv').value is False
-    assert app.selectbox(key='training_folds').disabled
+    assert app.slider(key='training_folds').disabled and app.slider(key='training_folds').value == 5
     app.selectbox(key='training_selector').set_value('baseline').run()
     assert app.selectbox(key='training_preset').value == 'Custom'
     assert app.number_input(key='training_top_k').disabled
@@ -35,8 +35,23 @@ def test_training_controls_are_method_specific_and_cv_is_optional(tmp_path, monk
     assert 'Dengan 0%' in captions() and 'Data development:' not in captions()
     app.slider(key='training_holdout').set_value(20).run()
     app.checkbox(key='training_cv').check().run()
-    assert app.slider(key='training_holdout').disabled
-    assert not app.selectbox(key='training_folds').disabled
+    assert not app.slider(key='training_holdout').disabled and not app.slider(key='training_folds').disabled
+    assert '645 sampel data development dibagi menjadi 5 fold' in captions() and 'Data holdout tidak ikut' in captions()
+    app.slider(key='training_folds').set_value(4).run()
+    assert not app.exception and '(75%) untuk pelatihan' in captions() and '(25%) untuk validasi' in captions()
+    app.slider(key='training_holdout').set_value(0).run()
+    assert not app.exception and '807 sampel data development dibagi menjadi 4 fold' in captions()
+    # A fold that would miss a tissue is refused instead of training on it.
+    app.slider(key='training_folds').set_value(10).run()
+    assert not app.exception and any('Pilih jumlah fold lain' in item.value for item in app.error)
+    app.slider(key='training_holdout').set_value(20).run()
+    assert any('Pilih jumlah fold lain' in item.value for item in app.error) and 'Data development: 645 sampel' in captions()
+    assert app.button(key='training_start').disabled
+    app.slider(key='training_holdout').set_value(20).run()
+    app.slider(key='training_folds').set_value(5).run()
+    headings = [item.value for item in app.subheader]
+    assert headings.index('Pembagian data utama') < headings.index('Seleksi fitur') < headings.index('Evaluasi tambahan')
+    assert not app.slider(key='training_folds').disabled
     app.number_input(key='training_top_k').set_value(None).run()
     assert not app.exception
     assert app.button(key='training_start').disabled
