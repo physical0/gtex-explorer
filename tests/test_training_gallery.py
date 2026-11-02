@@ -172,3 +172,78 @@ def test_cached_verification_skips_rehash_until_a_file_changes(tmp_path, monkeyp
     with pytest.raises(ValueError, match='hash mismatch'):
         data.verify_files_cached(tmp_path, {'artifact.txt': expected})
     assert calls
+
+
+def test_cv_run_saves_tissue_scores_and_older_runs_still_verify(tmp_path, monkeypatch):
+    from gtex_explorer.training.data import file_hash, stable_hash
+    from gtex_explorer.training.gallery import finalize_gallery
+    from gtex_explorer.training.worker import run_job
+    data, state, run_id = make_run(tmp_path, monkeypatch, cv=True)
+    assert run_job(run_id, data, state) == 0
+    root, bundle = state / 'runs' / run_id, state / 'models' / run_id
+    summary = json.loads((bundle / 'cv_summary.json').read_text(encoding='utf-8'))
+    for row in summary['fold_results']:
+        assert row['tissue_f1'].keys() == {item['tissue'] for item in summary['tissue_f1']}
+        assert sum(row['tissue_f1'].values()) / len(row['tissue_f1']) == pytest.approx(row['macro_f1'])
+
+    # A run from before this field existed has neither the fold scores nor the summary entry.
+    for fold in range(1, 4):
+        path = root / f'fold_{fold}.json'
+        payload = json.loads(path.read_text(encoding='utf-8'))
+        del payload['result']['tissue_f1']
+        payload['checksum'] = stable_hash(payload['result'])
+        path.write_text(json.dumps(payload), encoding='utf-8')
+    del summary['tissue_f1']
+    for row in summary['fold_results']:
+        del row['tissue_f1']
+    (bundle / 'cv_summary.json').write_text(json.dumps(summary), encoding='utf-8')
+    manifest = json.loads((bundle / 'bundle_manifest.json').read_text(encoding='utf-8'))
+    if 'cv_summary.json' in manifest['files']:
+        manifest['files']['cv_summary.json'] = file_hash(bundle / 'cv_summary.json')
+        (bundle / 'bundle_manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
+    assert 'tissue_f1' not in finalize_gallery(run_id, state)['cv_summary']
+
+
+def holdout_run(tmp_path, monkeypatch):
+    from test_training_data import checkpoint_sources
+    from scripts.export_training_data import export_training_data
+    from gtex_explorer.training.config import validate_training_config
+    from gtex_explorer.training.jobs import start_job
+    data, state = tmp_path / 'data', tmp_path / 'state'
+    export_training_data(*checkpoint_sources(tmp_path), data)
+    monkeypatch.setattr('gtex_explorer.training.jobs._launch', lambda *args: None)
+    config = validate_training_config({'selector': 'anova', 'top_k': 2, 'holdout_percent': 50,
+                                       'xgboost': {'n_estimators': 2}}, candidate_count=6)
+    return data, state, start_job(config, data, state).run_id
+
+
+def test_holdout_run_scores_the_saved_model_on_samples_it_never_saw(tmp_path, monkeypatch):
+    from gtex_explorer.model_registry import list_models, load_saved_model
+    from gtex_explorer.training.gallery import list_gallery
+    from gtex_explorer.training.worker import run_job
+    data, state, run_id = holdout_run(tmp_path, monkeypatch)
+    assert run_job(run_id, data, state) == 0
+    receipt = list_gallery(state)[0]
+    summary = receipt['holdout_summary']
+    assert receipt['cv_summary'] is None
+    assert summary['holdout_percent'] == 50 and summary['training_samples'] and summary['validation_samples']
+    assert sum(summary['tissue_f1'].values()) / len(summary['tissue_f1']) == pytest.approx(summary['macro_f1'])
+    assert sum(summary['tissue_support'].values()) == summary['validation_samples']
+    status = json.loads((state / 'runs' / run_id / 'status.json').read_text(encoding='utf-8'))
+    assert status['holdout_summary'] == summary
+    entry = [model for model in list_models(tmp_path / 'resources', state) if model.model_id == run_id][0]
+    assert load_saved_model(entry)[0]['run_id'] == run_id
+
+
+def test_resumed_holdout_run_keeps_its_score(tmp_path, monkeypatch):
+    import gtex_explorer.training.worker as worker
+    data, state, run_id = holdout_run(tmp_path, monkeypatch)
+    publish = worker.publish_model
+    monkeypatch.setattr(worker, 'publish_model', lambda *args, **kwargs: (_ for _ in ()).throw(OSError('stopped')))
+    assert worker.run_job(run_id, data, state) == 1
+    assert (state / 'runs' / run_id / 'final_fit').exists()
+    monkeypatch.setattr(worker, 'publish_model', publish)
+    monkeypatch.setattr(worker, 'fit_classifier', lambda *args: pytest.fail('Resume must reuse the saved fit'))
+    assert worker.run_job(run_id, data, state) == 0
+    status = json.loads((state / 'runs' / run_id / 'status.json').read_text(encoding='utf-8'))
+    assert status['holdout_summary']['macro_f1'] is not None

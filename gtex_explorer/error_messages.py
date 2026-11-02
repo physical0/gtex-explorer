@@ -5,7 +5,7 @@ import re
 FIELD_NAMES = {
     'top_k': 'jumlah gen (top-k)', 'C': 'C regularisasi L1',
     'max_iter': 'maksimum iterasi L1', 'tol': 'toleransi L1',
-    'n_neighbors': 'jumlah tetangga MI', 'folds': 'jumlah fold',
+    'n_neighbors': 'jumlah tetangga MI', 'folds': 'jumlah fold', 'holdout_percent': 'porsi data holdout',
     'n_estimators': 'putaran boosting', 'learning_rate': 'learning rate',
     'max_depth': 'max depth', 'min_child_weight': 'min child weight',
     'subsample': 'subsample', 'colsample_bytree': 'colsample bytree',

@@ -139,3 +139,38 @@ def test_missing_class_fold_and_missing_raw_data_are_not_silently_used(tmp_path)
     data.donor_ids = tuple('onlyA' if y == 0 else 'onlyB' for y in data.labels)
     with pytest.raises(ValueError, match='class|tissue'):
         make_cv_assignments(data, 2)
+
+
+def holdout_fixture(donors_per_tissue=20, tissues=4):
+    from types import SimpleNamespace
+    labels = np.repeat(np.arange(tissues), donors_per_tissue)
+    return SimpleNamespace(labels=labels, classes=tuple(f'T{i}' for i in range(tissues)),
+                           sample_ids=tuple(f'S{i}' for i in range(len(labels))),
+                           donor_ids=tuple(f'D{i}' for i in range(len(labels))))
+
+
+@pytest.mark.parametrize('percent', [10, 20, 35, 50])
+def test_holdout_follows_the_chosen_share_for_every_tissue(percent):
+    from gtex_explorer.training.data import make_holdout_assignment
+    data = holdout_fixture()
+    split = make_holdout_assignment(data, percent)
+    assert set(split.train_indices.tolist()) | set(split.validation_indices.tolist()) == set(range(80))
+    assert not set(split.train_indices.tolist()) & set(split.validation_indices.tolist())
+    assert np.bincount(data.labels[split.validation_indices]).tolist() == [round(20 * percent / 100)] * 4
+    assert split.split_hash == make_holdout_assignment(data, percent).split_hash
+
+
+def test_holdout_keeps_each_donor_on_one_side():
+    from gtex_explorer.training.data import make_holdout_assignment
+    data = holdout_fixture()
+    data.donor_ids = tuple(f'D{i % 25}' for i in range(80))
+    split = make_holdout_assignment(data, 25)
+    assert not {data.donor_ids[i] for i in split.train_indices} & {data.donor_ids[i] for i in split.validation_indices}
+
+
+def test_holdout_refuses_a_tissue_that_cannot_be_on_both_sides():
+    from gtex_explorer.training.data import make_holdout_assignment
+    data = holdout_fixture()
+    data.donor_ids = tuple('Only' if label == 0 else f'D{i}' for i, label in enumerate(data.labels))
+    with pytest.raises(ValueError, match='T0'):
+        make_holdout_assignment(data, 20)

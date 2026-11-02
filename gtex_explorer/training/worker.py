@@ -11,8 +11,8 @@ import psutil
 import numpy as np
 import pandas as pd
 from gtex_explorer.training.config import validate_training_config, configuration_fingerprint
-from gtex_explorer.training.core import fit_selector, fit_classifier, aggregate_cv, runtime_versions, FitResult, SelectorFit, TrainingCancelled
-from gtex_explorer.training.data import load_training_data, load_final_prepared, make_cv_assignments, prepare_partition, stable_hash, file_hash, verify_files, atomic_publish_directory
+from gtex_explorer.training.core import fit_selector, fit_classifier, aggregate_cv, summarize_holdout, runtime_versions, FitResult, SelectorFit, TrainingCancelled
+from gtex_explorer.training.data import load_training_data, load_final_prepared, run_split, prepare_partition, stable_hash, file_hash, verify_files, atomic_publish_directory
 from gtex_explorer.training.jobs import atomic_json, job_path, process_lock, resolve_job_data
 from gtex_explorer.model_registry import publish_model, ModelEntry, load_saved_model
 from gtex_explorer.training.gallery import finalize_gallery
@@ -31,6 +31,7 @@ def _save_final_fit(result, identity, target):
                     'diagnostics': result.selector.fit_diagnostics,
                     'selector_seconds': result.selector.selector_seconds,
                     'classifier_seconds': result.classifier_seconds,
+                    'validation_metrics': result.validation_metrics,
                     'files': {p.name: file_hash(p) for p in directory.iterdir()}}
         atomic_json(directory / 'manifest.json', manifest)
         atomic_publish_directory(directory, target)
@@ -52,7 +53,7 @@ def _load_final_fit(target, identity, prepared, config):
         raise ValueError('Final fit checkpoint binary mismatch')
     selector = SelectorFit(np.argsort(frame.selection_rank.to_numpy()), indices, frame,
                            manifest['diagnostics'], manifest['selector_seconds'])
-    return FitResult(classifier, prepared, selector, None, None, manifest['classifier_seconds'])
+    return FitResult(classifier, prepared, selector, manifest.get('validation_metrics'), None, manifest['classifier_seconds'])
 
 
 def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=False) -> int:
@@ -131,8 +132,7 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
                 raise ValueError('Run dataset path does not match saved data source')
             data = load_training_data(data_root)
             config = validate_training_config(saved['config'], candidate_count=data.manifest['candidate_count'])
-            assignments = make_cv_assignments(data, config.cv_folds) if config.evaluate_cv else []
-            split = stable_hash([a.split_hash for a in assignments]) if assignments else None
+            assignments, holdout, split = run_split(data, config)
             identity = configuration_fingerprint(config, data.fingerprint, split, runtime_versions())
             if identity != saved['identity'] or data.fingerprint != saved['data_fingerprint']:
                 raise ValueError('Run identity changed. Start a new run instead of resuming.')
@@ -145,9 +145,11 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
                     raise ValueError('Published model does not match run identity')
                 summary_path = published / 'cv_summary.json'
                 summary = json.loads(summary_path.read_text(encoding='utf-8')) if summary_path.exists() else None
+                holdout_path = published / 'holdout_summary.json'
+                holdout_result = json.loads(holdout_path.read_text(encoding='utf-8')) if holdout_path.exists() else None
                 status('verifying_results')
                 finalize_gallery(run_id, state_root)
-                status('completed', status='completed', cv_summary=summary)
+                status('completed', status='completed', cv_summary=summary, holdout_summary=holdout_result)
                 return 0
             rows, sets = [], []
             for assignment in assignments:
@@ -170,6 +172,7 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
                     result = fit_classifier(prepared, selector, config,
                                             progress_for('fitting_xgboost', config, assignment.fold))
                     row = {'fold': assignment.fold, **result.validation_metrics,
+                           'tissue_f1': dict(zip(data.classes, result.validation_metrics['tissue_f1'])),
                            'training_samples': len(prepared.y_train), 'validation_samples': len(prepared.y_validation),
                            'selector_seconds': selector.selector_seconds, 'classifier_seconds': result.classifier_seconds,
                            'selected_genes': [prepared.gene_names[i] for i in selector.selected_indices]}
@@ -189,7 +192,9 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
             summary = aggregate_cv(rows, sets, expected_folds=config.cv_folds,
                                    supervised_selector=config.selector != 'baseline') if assignments else None
             status('final_selector')
-            prepared = load_final_prepared(data)
+            # With a hold-out, the saved model learns from the development part only and is scored on the rest.
+            prepared = (prepare_partition(data, holdout, Path(state_root) / 'preprocessing_cache')
+                        if holdout else load_final_prepared(data))
             checkpoint = root / 'final_fit'
             if checkpoint.exists():
                 result = _load_final_fit(checkpoint, identity, prepared, config)
@@ -203,6 +208,7 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
                 _save_final_fit(result, identity, checkpoint)
             if cancelled():
                 return 0
+            holdout_result = summarize_holdout(result, list(data.classes), config.holdout_percent) if holdout else None
             genes = [prepared.gene_names[i] for i in selector.selected_indices]
             demo = pd.DataFrame(np.exp2(prepared.training_log[:3, selector.selected_indices]) - 1,
                                 index=prepared.train_sample_ids[:3], columns=genes)
@@ -214,10 +220,10 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
                 publish_model(result, config, {'classes': list(data.classes), 'run_id': run_id,
                               'data_fingerprint': data.fingerprint, 'identity': identity,
                               'dataset': saved.get('dataset')},
-                              Path(state_root) / 'models' / run_id, demo, summary)
+                              Path(state_root) / 'models' / run_id, demo, summary, holdout_result)
                 status('verifying_results')
                 finalize_gallery(run_id, state_root)
-                status('completed', status='completed', cv_summary=summary,
+                status('completed', status='completed', cv_summary=summary, holdout_summary=holdout_result,
                        rounds_completed=config.xgboost_parameters['n_estimators'],
                        rounds_total=config.xgboost_parameters['n_estimators'])
             return 0

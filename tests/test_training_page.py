@@ -27,7 +27,15 @@ def test_training_controls_are_method_specific_and_cv_is_optional(tmp_path, monk
     app.selectbox(key='training_selector').set_value('mutual_information').run()
     assert app.number_input(key='training_mi_neighbors').value == 3
     assert not any(item.key == 'training_l1_c' for item in app.number_input)
+    assert app.slider(key='training_holdout').value == 20 and not app.slider(key='training_holdout').disabled
+    captions = lambda: ' '.join(item.value for item in app.caption)
+    assert 'Data development:' in captions() and 'Data holdout eksperimen notebook tetap tidak dipakai' in captions()
+    app.slider(key='training_holdout').set_value(0).run()
+    assert not app.exception
+    assert 'Dengan 0%' in captions() and 'Data development:' not in captions()
+    app.slider(key='training_holdout').set_value(20).run()
     app.checkbox(key='training_cv').check().run()
+    assert app.slider(key='training_holdout').disabled
     assert not app.selectbox(key='training_folds').disabled
     app.number_input(key='training_top_k').set_value(None).run()
     assert not app.exception

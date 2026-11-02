@@ -36,3 +36,17 @@ def test_identity_tracks_effective_controls_and_versions():
     assert identity(a) == identity(b)
     assert identity(a) != identity(a, 'other_split')
     assert identity(a) != identity(validate_training_config({'selector': 'anova', 'top_k': 500}))
+
+
+def test_holdout_is_optional_and_leaves_older_runs_unchanged():
+    from gtex_explorer.training.config import validate_training_config
+    plain = validate_training_config({'selector': 'anova'})
+    assert plain.holdout_percent is None and 'holdout_percent' not in plain.to_dict()
+    chosen = validate_training_config({'selector': 'anova', 'holdout_percent': 20})
+    assert chosen.to_dict()['holdout_percent'] == 20
+    assert validate_training_config(chosen.to_dict()).holdout_percent == 20
+    for bad in [0, 4, 51, 20.5, True]:
+        with pytest.raises(ValueError):
+            validate_training_config({'selector': 'anova', 'holdout_percent': bad})
+    with pytest.raises(ValueError):
+        validate_training_config({'selector': 'anova', 'holdout_percent': 20, 'evaluate_cv': True})

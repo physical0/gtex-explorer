@@ -89,3 +89,40 @@ def test_removing_a_gallery_model_deletes_its_files_and_selects_the_next(gallery
     assert not any(button.key == f'gallery_select_{first}' for button in app.button)
     assert app.session_state.training_gallery_run == second
     assert list(tmp_path.rglob(second))
+
+
+def test_gallery_shows_macro_f1_and_scores_for_each_tissue(gallery_app):
+    app, first, _ = gallery_app
+    app.button(key=f'gallery_select_{first}').click().run()
+    assert any(item.label == 'Rerata Macro-F1' for item in app.metric)
+    assert 'F1-score per jaringan' in [item.value for item in app.subheader]
+    assert not [item for item in app.caption if 'Latih ulang model' in item.value]
+
+
+def test_gallery_explains_when_an_older_model_has_no_tissue_scores():
+    app = AppTest.from_string('''
+from gtex_explorer.ui.training_page import _show_cv_results
+row = {'fold': 1, 'macro_f1': .9, 'macro_precision': .9, 'macro_recall': .9, 'balanced_accuracy': .9, 'accuracy': .9, 'selected_genes': ['a']}
+summary = {'fold_count': 2, 'fold_results': [row, {**row, 'fold': 2}], 'mean_jaccard': None, 'jaccard_pairs': [],
+           **{prefix + key: .9 if prefix == 'mean_' else .01 for prefix in ['mean_', 'std_']
+              for key in ['macro_f1', 'macro_precision', 'macro_recall', 'balanced_accuracy', 'accuracy']}}
+_show_cv_results(summary, {'cv_folds': 2})
+''', default_timeout=30).run()
+    assert not app.exception
+    assert any(item.label == 'Rerata Macro-F1' for item in app.metric)
+    assert any('Latih ulang model' in item.value for item in app.caption)
+
+
+def test_gallery_shows_holdout_scores_for_a_run_without_folds(tmp_path, monkeypatch):
+    from test_training_gallery import holdout_run
+    from gtex_explorer.training.worker import run_job
+    data, state, run_id = holdout_run(tmp_path, monkeypatch)
+    assert run_job(run_id, data, state) == 0
+    app = AppTest.from_string('from pathlib import Path\n'
+        'from gtex_explorer.ui.training_page import render_training_results_page\n'
+        f'render_training_results_page(Path({str(data)!r}), Path({str(state)!r}))', default_timeout=60).run()
+    assert not app.exception
+    assert 'Evaluasi holdout' in [item.value for item in app.subheader]
+    assert 'F1-score per jaringan' in [item.value for item in app.subheader]
+    assert any(item.label == 'Macro-F1' for item in app.metric)
+    assert any('Holdout 50%' in item.value for item in app.markdown)

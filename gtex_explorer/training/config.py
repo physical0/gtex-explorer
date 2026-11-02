@@ -27,13 +27,16 @@ class TrainingConfig:
     evaluate_cv: bool
     cv_folds: int
     xgboost_parameters: Mapping
+    holdout_percent: int | None = None
 
     def to_dict(self) -> dict:
+        # Runs saved before hold-outs existed have no such entry, and their saved config must still match.
+        holdout = {'holdout_percent': self.holdout_percent} if self.holdout_percent else {}
         return {'selector': self.selector, 'top_k': self.top_k, 'l1_c': self.l1_c,
                 'l1_max_iter': self.l1_max_iter, 'l1_tol': self.l1_tol,
                 'l1_class_weight': self.l1_class_weight, 'mi_neighbors': self.mi_neighbors,
                 'evaluate_cv': self.evaluate_cv, 'cv_folds': self.cv_folds,
-                'xgboost': {k: v for k, v in self.xgboost_parameters.items() if k not in XGB_FIXED}}
+                'xgboost': {k: v for k, v in self.xgboost_parameters.items() if k not in XGB_FIXED}, **holdout}
 
     def selector_settings(self) -> dict:
         result = {'selector': self.selector}
@@ -59,7 +62,7 @@ def _number(value, low, high, name, integer=False):
 def validate_training_config(values: dict, *, candidate_count: int = 5000,
                              cpu_count: int | None = None) -> TrainingConfig:
     allowed = {'selector', 'top_k', 'l1_c', 'l1_max_iter', 'l1_tol', 'l1_class_weight',
-               'mi_neighbors', 'evaluate_cv', 'cv_folds', 'xgboost'}
+               'mi_neighbors', 'evaluate_cv', 'cv_folds', 'holdout_percent', 'xgboost'}
     if set(values) - allowed:
         raise ValueError('Unknown training controls')
     selector = values.get('selector', 'l1')
@@ -77,6 +80,11 @@ def validate_training_config(values: dict, *, candidate_count: int = 5000,
     evaluate = values.get('evaluate_cv', False)
     if not isinstance(evaluate, bool):
         raise ValueError('evaluate_cv must be boolean')
+    holdout = values.get('holdout_percent')
+    if holdout is not None:
+        holdout = _number(holdout, 5, 50, 'holdout_percent', True)
+        if evaluate:
+            raise ValueError('Cross-validation dan data holdout tidak dapat digunakan bersamaan.')
     custom = values.get('xgboost', {})
     if not isinstance(custom, dict) or set(custom) - set(XGB_DEFAULTS):
         raise ValueError('Unknown or fixed XGBoost parameter')
@@ -94,15 +102,16 @@ def validate_training_config(values: dict, *, candidate_count: int = 5000,
     parameters.update(XGB_FIXED)
     return TrainingConfig(selector, candidate_count if selector == 'baseline' else k,
                           c, iterations, tolerance, weight, neighbors, evaluate, folds,
-                          MappingProxyType(parameters))
+                          MappingProxyType(parameters), holdout)
 
 
 def configuration_fingerprint(config: TrainingConfig, data_fingerprint: str,
                               split_hash: str | None, versions: dict) -> str:
+    holdout = {'holdout': config.holdout_percent} if config.holdout_percent else {}
     return stable_hash({'selector': config.selector_settings(), 'k': config.top_k,
                         'xgboost': dict(config.xgboost_parameters), 'data': data_fingerprint,
-                        'split': split_hash if config.evaluate_cv else None,
-                        'folds': config.cv_folds if config.evaluate_cv else None, 'versions': versions})
+                        'split': split_hash if config.evaluate_cv or config.holdout_percent else None,
+                        'folds': config.cv_folds if config.evaluate_cv else None, 'versions': versions, **holdout})
 
 
 def training_presets() -> dict[str, dict]:

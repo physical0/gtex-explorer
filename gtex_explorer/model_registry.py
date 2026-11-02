@@ -92,11 +92,14 @@ def load_saved_model(entry: ModelEntry) -> tuple[dict, XGBClassifier]:
 
 
 def publish_model(result: FitResult, config: TrainingConfig, provenance: dict,
-                  output_dir: Path, demo_tpm: pd.DataFrame, cv_summary: dict | None) -> ModelEntry:
+                  output_dir: Path, demo_tpm: pd.DataFrame, cv_summary: dict | None,
+                  holdout_summary: dict | None = None) -> ModelEntry:
     from gtex_explorer.analysis.core import audit_and_align_input, predict_tissues
     prepared = result.prepared
-    if prepared.X_validation is not None:
+    if prepared.X_validation is not None and not holdout_summary:
         raise ValueError('A fold model cannot be published')
+    if bool(config.holdout_percent) != bool(holdout_summary):
+        raise ValueError('Hold-out score does not match the configuration')
     if config.evaluate_cv and (not cv_summary or cv_summary.get('fold_count') != config.cv_folds):
         raise ValueError('Complete CV required')
     if not config.evaluate_cv and cv_summary is not None:
@@ -139,6 +142,8 @@ def publish_model(result: FitResult, config: TrainingConfig, provenance: dict,
         (root / 'diagnostics.json').write_text(json.dumps(result.selector.fit_diagnostics, allow_nan=False), encoding='utf-8')
         if cv_summary:
             (root / 'cv_summary.json').write_text(json.dumps(cv_summary, allow_nan=False), encoding='utf-8')
+        if holdout_summary:
+            (root / 'holdout_summary.json').write_text(json.dumps(holdout_summary, allow_nan=False), encoding='utf-8')
         manifest = {'schema_version': 1, 'status': 'validated', 'model_id': model_id,
                     'display_name': provenance.get('display_name', f'{config.selector} - {len(genes):,} gen'),
                     'provenance': provenance, 'config': config.to_dict(), 'versions': runtime_versions(),

@@ -125,3 +125,38 @@ def test_cv_requires_complete_folds_and_jaccard_is_not_baseline_stability():
     assert baseline['mean_jaccard'] is None
     with pytest.raises(ValueError):
         aggregate_cv(rows[:2], [], expected_folds=3, supervised_selector=False)
+
+
+def test_tissue_scores_average_back_to_macro_f1():
+    from gtex_explorer.training.core import fit_selector, fit_classifier
+    from gtex_explorer.training.config import validate_training_config
+    data = prepared_fixture()
+    config = validate_training_config({'selector': 'anova', 'top_k': 3, 'xgboost': {'n_estimators': 2}}, candidate_count=6)
+    metrics = fit_classifier(data, fit_selector(data, config), config).validation_metrics
+    assert len(metrics['tissue_f1']) == 3
+    assert sum(metrics['tissue_f1']) / 3 == pytest.approx(metrics['macro_f1'])
+
+
+def tissue_rows(scores):
+    return [{'fold': i, 'macro_f1': .5, 'macro_precision': .5, 'macro_recall': .5, 'balanced_accuracy': .5,
+             'accuracy': .5, **({'tissue_f1': row} if row else {})} for i, row in enumerate(scores, 1)]
+
+
+def test_cv_summary_reports_each_tissue_across_folds():
+    from gtex_explorer.training.core import aggregate_cv
+    summary = aggregate_cv(tissue_rows([{'Liver': .6, 'Heart': 1.}, {'Liver': .8, 'Heart': 1.}, {'Liver': 1., 'Heart': 1.}]),
+                           [], expected_folds=3, supervised_selector=False)
+    assert summary['tissue_f1'] == [{'tissue': 'Liver', 'mean_f1': pytest.approx(.8), 'std_f1': pytest.approx(.2)},
+                                    {'tissue': 'Heart', 'mean_f1': 1., 'std_f1': 0.}]
+    with pytest.raises(ValueError):
+        aggregate_cv(tissue_rows([{'Liver': .6}, {'Heart': 1.}, {'Liver': 1.}]), [], expected_folds=3, supervised_selector=False)
+    with pytest.raises(ValueError):
+        aggregate_cv(tissue_rows([{'Liver': 1.2}, {'Liver': .8}, {'Liver': 1.}]), [], expected_folds=3, supervised_selector=False)
+
+
+def test_cv_summary_without_tissue_scores_is_unchanged_for_older_runs():
+    from gtex_explorer.training.core import aggregate_cv
+    old = aggregate_cv(tissue_rows([None, None, None]), [], expected_folds=3, supervised_selector=False)
+    assert 'tissue_f1' not in old
+    mixed = aggregate_cv(tissue_rows([{'Liver': 1.}, None, None]), [], expected_folds=3, supervised_selector=False)
+    assert 'tissue_f1' not in mixed

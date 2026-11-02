@@ -285,6 +285,49 @@ def make_cv_assignments(data: TrainingData, fold_count: int) -> list[FoldAssignm
     return assignments
 
 
+def make_holdout_assignment(data: TrainingData, percent: int) -> FoldAssignment:
+    """Set whole donors aside, keeping each tissue close to the chosen share."""
+    import pandas as pd
+    labels = np.asarray(data.labels)
+    donor_index, donors = pd.factorize(np.asarray(data.donor_ids), sort=True)
+    counts = np.zeros((len(donors), len(data.classes)), dtype=int)
+    np.add.at(counts, (donor_index, labels), 1)
+    targets = np.maximum(1, np.round(counts.sum(axis=0) * percent / 100)).astype(int)
+    order = np.random.default_rng(42).permutation(len(donors))
+    taken = np.zeros(len(data.classes), dtype=int)
+    chosen = set()
+    for donor in order:
+        gain = np.minimum(counts[donor], np.maximum(targets - taken, 0)).sum()
+        if gain > counts[donor].sum() - gain:
+            chosen.add(donor)
+            taken += counts[donor]
+    # A donor with many tissues may overshoot, but every tissue must still be tested.
+    for donor in order:
+        if donor not in chosen and counts[donor][taken == 0].any():
+            chosen.add(donor)
+            taken += counts[donor]
+    in_holdout = np.isin(donor_index, list(chosen))
+    train, validation = np.flatnonzero(~in_holdout), np.flatnonzero(in_holdout)
+    for side, positions in [('development', train), ('holdout', validation)]:
+        missing = set(range(len(data.classes))) - set(labels[positions].tolist())
+        if missing:
+            names = ', '.join(data.classes[x] for x in sorted(missing))
+            raise ValueError(f'Data {side} dengan porsi holdout {percent}% tidak mencakup jaringan: {names}. '
+                             'Ubah porsi holdout, atau pilih 0% untuk melatih dengan semua sampel tanpa skor.')
+    identity = stable_hash({'train': [data.sample_ids[i] for i in train],
+                            'validation': [data.sample_ids[i] for i in validation],
+                            'holdout_percent': percent, 'seed': 42})
+    return FoldAssignment(0, train, validation, identity)
+
+
+def run_split(data: TrainingData, config) -> tuple[list[FoldAssignment], FoldAssignment | None, str | None]:
+    """The CV folds and hold-out of a run, with the hash that identifies them."""
+    assignments = make_cv_assignments(data, config.cv_folds) if config.evaluate_cv else []
+    holdout = make_holdout_assignment(data, config.holdout_percent) if config.holdout_percent else None
+    parts = assignments + ([holdout] if holdout else [])
+    return assignments, holdout, stable_hash([a.split_hash for a in parts]) if parts else None
+
+
 def _cached_assignment_matches(data, assignments):
     specs = data.manifest['cached_folds']
     if len(specs) != len(assignments):
@@ -302,7 +345,7 @@ def prepare_partition(data: TrainingData, assignment: FoldAssignment, cache_dir:
     versions = {p: importlib.metadata.version(p) for p in ['numpy', 'pandas', 'scikit-learn']}
     compatible = all(data.manifest['versions'][p] == v for p, v in versions.items())
     for spec in specs:
-        if compatible and spec['train_samples'] == [data.sample_ids[i] for i in assignment.train_indices] and spec['validation_samples'] == [data.sample_ids[i] for i in assignment.validation_indices]:
+        if assignment.fold and compatible and spec['train_samples'] == [data.sample_ids[i] for i in assignment.train_indices] and spec['validation_samples'] == [data.sample_ids[i] for i in assignment.validation_indices]:
             return _load_prepared(data, spec)
     if data.raw_tpm is None:
         raise ValueError('Raw development data unavailable for this split')

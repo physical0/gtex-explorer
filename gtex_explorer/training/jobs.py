@@ -14,7 +14,7 @@ import psutil
 from gtex_explorer.cloud.state import operation, remote_client, state
 from gtex_explorer.workspaces import coordination_directory, workspace_roots
 from gtex_explorer.training.config import TrainingConfig, configuration_fingerprint
-from gtex_explorer.training.data import discard_directory, load_training_data, make_cv_assignments, stable_hash, atomic_replace_file
+from gtex_explorer.training.data import discard_directory, load_training_data, run_split, stable_hash, atomic_replace_file
 from gtex_explorer.training.data import safe_path
 from gtex_explorer.training.core import runtime_versions
 
@@ -185,8 +185,7 @@ def start_job(config: TrainingConfig, data_root: Path, state_root: Path) -> JobR
     if remote_client():
         state().ensure(data_root)
     data = load_training_data(data_root)
-    assignments = make_cv_assignments(data, config.cv_folds) if config.evaluate_cv else []
-    split = stable_hash([a.split_hash for a in assignments]) if assignments else None
+    _, _, split = run_split(data, config)
     identity = configuration_fingerprint(config, data.fingerprint, split, runtime_versions())
     coordinator = coordination_directory(state_root)
     with process_lock(coordinator / 'launch.lock'):

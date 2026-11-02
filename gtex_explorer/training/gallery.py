@@ -62,10 +62,18 @@ def finalize_gallery(run_id, state_root):
         if summary_path.exists():
             raise ValueError('Training-only run cannot claim CV results')
         summary = None
+    holdout_path = bundle / 'holdout_summary.json'
+    holdout = None
+    if config.get('holdout_percent'):
+        holdout = json.loads(holdout_path.read_text(encoding='utf-8'))
+        if holdout['holdout_percent'] != config['holdout_percent'] or not holdout['validation_samples']:
+            raise ValueError('Saved hold-out score does not match the configuration')
+    elif holdout_path.exists():
+        raise ValueError('Run without a hold-out cannot claim hold-out results')
 
     receipt = {'schema_version': 1, 'run_id': run_id, 'identity': saved['identity'],
                'saved_at': time.time(), 'feature_count': config['top_k'],
-               'cv_summary': summary,
+               'cv_summary': summary, 'holdout_summary': holdout,
                'run_files': {name: file_hash(root / name) for name in run_files},
                'model_files': {**manifest['files'],
                                'bundle_manifest.json': file_hash(bundle / 'bundle_manifest.json')}}

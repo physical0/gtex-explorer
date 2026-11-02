@@ -178,8 +178,19 @@ def fit_classifier(prepared: PreparedData, selector: SelectorFit, config: Traini
         metrics = {'macro_f1': float(f1_score(prepared.y_validation, predictions, labels=classes, average='macro', zero_division=0)),
                    'macro_precision': float(precision), 'macro_recall': float(recall),
                    'balanced_accuracy': float(recall),
-                   'accuracy': float(accuracy_score(prepared.y_validation, predictions))}
+                   'accuracy': float(accuracy_score(prepared.y_validation, predictions)),
+                   'tissue_f1': f1_score(prepared.y_validation, predictions, labels=classes, average=None, zero_division=0).tolist()}
     return FitResult(classifier, prepared, selector, metrics, predictions, elapsed)
+
+
+def summarize_holdout(result: FitResult, classes: list[str], percent: int) -> dict:
+    prepared = result.prepared
+    metrics = result.validation_metrics
+    return {**metrics, 'tissue_f1': dict(zip(classes, metrics['tissue_f1'])),
+            'tissue_support': dict(zip(classes, np.bincount(prepared.y_validation, minlength=len(classes)).tolist())),
+            'holdout_percent': percent,
+            'training_samples': len(prepared.y_train), 'validation_samples': len(prepared.y_validation),
+            'training_donors': len(set(prepared.train_donor_ids)), 'validation_donors': len(set(prepared.validation_donor_ids))}
 
 
 def aggregate_cv(results: list[dict], selected_sets: list[set[str]], *,
@@ -194,6 +205,16 @@ def aggregate_cv(results: list[dict], selected_sets: list[set[str]], *,
             raise ValueError('Invalid CV metrics')
         summary['mean_' + metric] = float(values.mean())
         summary['std_' + metric] = float(values.std(ddof=1))
+    # Folds saved before per-tissue scores existed leave this out, so their results still verify.
+    if all('tissue_f1' in row for row in results):
+        tissues = list(summary['fold_results'][0]['tissue_f1'])
+        if any(set(row['tissue_f1']) != set(tissues) for row in results):
+            raise ValueError('Invalid CV metrics')
+        values = np.array([[row['tissue_f1'][tissue] for tissue in tissues] for row in summary['fold_results']], dtype=float)
+        if not np.isfinite(values).all() or ((values < 0) | (values > 1)).any():
+            raise ValueError('Invalid CV metrics')
+        summary['tissue_f1'] = [{'tissue': tissue, 'mean_f1': float(mean), 'std_f1': float(std)}
+                                for tissue, mean, std in zip(tissues, values.mean(axis=0), values.std(axis=0, ddof=1))]
     if supervised_selector:
         if len(selected_sets) != expected_folds or any(not genes for genes in selected_sets):
             raise ValueError('Missing selected gene sets')
