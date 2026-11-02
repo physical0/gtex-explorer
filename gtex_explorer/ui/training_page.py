@@ -211,7 +211,7 @@ def _render_training_setup(data_root: Path, state_root: Path) -> None:
                 signature = f'{expression.file_id}:{metadata.file_id}'
                 try:
                     columns = list(read_upload_table(metadata.getvalue(), metadata.name).columns)
-                    st.caption('Pilihan pada setiap kolom di bawah diambil dari judul kolom pada berkas metadata.')
+                    st.caption(':primary[Pilihan pada setiap kolom di bawah diambil dari judul kolom pada berkas metadata.]')
                     mapping = st.columns(3)
                     sample = mapping[0].selectbox('Kolom ID sampel', columns,
                         index=columns.index('SAMPID') if 'SAMPID' in columns else 0, key='training_sample_column')
