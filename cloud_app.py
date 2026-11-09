@@ -1,4 +1,4 @@
-"""Hosted entry point. Desktop app.py continues to use local state unchanged."""
+"""Hosted entry point. Desktop main.py continues to use local state unchanged."""
 import os
 from pathlib import Path
 
@@ -13,7 +13,7 @@ os.environ.setdefault('GTEX_CLOUD_PREFIX', 'gtex-' + os.environ.get('VERCEL_ENV'
 
 try:
     with state().script():
-        filename = Path(__file__).with_name('app.py')
+        filename = Path(__file__).with_name('main.py')
         exec(compile(filename.read_text(encoding='utf-8'), str(filename), 'exec'),
              {'__name__': '__main__', '__file__': str(filename)})
 except (CloudConflict, CloudIntegrityError, OSError) as error:

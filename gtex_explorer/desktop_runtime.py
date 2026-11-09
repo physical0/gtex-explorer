@@ -123,7 +123,7 @@ def check_resources() -> dict:
 def serve(port: int, token: str) -> None:
     import streamlit as st
     from starlette.middleware import Middleware
-    app = st.App(str(APP_ROOT / "app.py"), middleware=[Middleware(OfflineHeaders, token=token, port=port)])
+    app = st.App(str(APP_ROOT / "main.py"), middleware=[Middleware(OfflineHeaders, token=token, port=port)])
     app.run(config={
         "global.developmentMode": False,
         "server.address": "127.0.0.1", "server.port": port,

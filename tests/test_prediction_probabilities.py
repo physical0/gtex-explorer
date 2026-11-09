@@ -40,7 +40,7 @@ def test_chart_retains_all_classes_sorted_with_zero_based_scale_and_visible_valu
 
 
 def test_real_demo_summary_matches_chart_and_sample_selection_changes_both():
-    app = AppTest.from_file(str(APP_DIR / "app.py"), default_timeout=60).run()
+    app = AppTest.from_file(str(APP_DIR / "main.py"), default_timeout=60).run()
     app = enter_application(app)
     app.button(key="load_local_demo").click().run()
     app.button(key="run_prediction").click().run()

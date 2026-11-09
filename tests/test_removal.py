@@ -11,7 +11,7 @@ from gtex_explorer.workspaces import create_workspace, delete_workspace, list_wo
 from test_black_box_regressions import saved_run
 from test_cloud_state import MemoryStore, write
 
-APP = Path(__file__).resolve().parents[1] / 'app.py'
+APP = Path(__file__).resolve().parents[1] / 'main.py'
 RUN = 'run_' + 'a' * 32
 
 

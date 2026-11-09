@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 from streamlit.testing.v1 import AppTest
 
-APP = Path(__file__).resolve().parents[1] / 'app.py'
+APP = Path(__file__).resolve().parents[1] / 'main.py'
 
 
 def launch(root, monkeypatch):

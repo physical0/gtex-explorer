@@ -13,7 +13,7 @@ from streamlit.testing.v1 import AppTest
 from ui_helpers import enter_application
 
 
-APP_FILE = Path(__file__).resolve().parents[1] / "app.py"
+APP_FILE = Path(__file__).resolve().parents[1] / "main.py"
 
 
 def load_app() -> AppTest:

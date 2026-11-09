@@ -11,7 +11,7 @@ from ui_helpers import enter_application
 
 from gtex_explorer.analysis.core import load_model_bundle
 
-APP = Path(__file__).resolve().parents[1] / "app.py"
+APP = Path(__file__).resolve().parents[1] / "main.py"
 
 
 class Upload(io.BytesIO):

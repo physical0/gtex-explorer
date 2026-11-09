@@ -3,10 +3,12 @@ import importlib
 import json
 import html
 from pathlib import Path
+import sys
 import threading
 
 import streamlit as st
 from gtex_explorer.cloud.media import image
+from gtex_explorer.paths import APP_ROOT
 
 from gtex_explorer.workspaces import (create_workspace, delete_workspace, last_workspace, list_workspaces,
                         remember_workspace, rename_workspace, workspace_directory, workspace_roots)
@@ -361,3 +363,20 @@ def render_workspace_controls(root):
             st.button('Ganti', icon=':material/swap_horiz:', key='workspace_change',
                       help='Kembali ke pemilihan workspace', on_click=_return_to_launcher, type='tertiary')
     _training_notice(root)
+
+
+def enter_workspace() -> None:
+    """Show the chooser until a workspace is open. The main app runs only after this returns."""
+    from gtex_explorer.desktop_runtime import state_directory
+    root = state_directory()
+    restore_location(root)
+    leave_removed_workspace(root)
+    if not st.session_state.get('workspace_entered', False):
+        # The chooser needs none of the heavy libraries, so it appears while they load behind it.
+        preload_libraries()
+        render_workspace_launcher(root, APP_ROOT / 'assets' / 'brand_dna.png')
+        st.stop()
+    # A session restored from its URL skips the chooser and can arrive before the libraries are ready.
+    if 'xgboost' not in sys.modules:
+        with st.spinner('Memuat aplikasi...'):
+            importlib.import_module('gtex_explorer.analysis.core')

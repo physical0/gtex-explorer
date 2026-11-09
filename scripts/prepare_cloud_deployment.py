@@ -10,7 +10,7 @@ from gtex_explorer.paths import APP_ROOT as ROOT
 def prepare():
     target = ROOT / '.cloud_deploy' / uuid.uuid4().hex
     target.mkdir(parents=True)
-    names = ['app.py', 'cloud_app.py', 'desktop.py',
+    names = ['main.py', 'cloud_app.py', 'desktop.py',
              'cloud-config.toml', 'requirements-cloud.txt',
              'Dockerfile.vercel', 'vercel.json', '.dockerignore']
     for name in names:

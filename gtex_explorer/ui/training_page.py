@@ -63,6 +63,14 @@ TRAINING_FORM_KEYS = ('training_preset', 'training_selector', 'training_candidat
                                                             'subsample', 'colsample_bytree', 'reg_lambda', 'reg_alpha', 'gamma')))
 
 
+def preserve_training_form() -> None:
+    # Streamlit drops widget values for widgets not drawn in a run; re-assigning keeps the training form
+    # intact while the user visits other pages. Workspace switches clear these keys separately.
+    for key in TRAINING_FORM_KEYS:
+        if key in st.session_state:
+            st.session_state[key] = st.session_state[key]
+
+
 def _range_help(low, high):
     def number(value):
         return f'{value:,}'.replace(',', '.') if isinstance(value, int) else f'{value:g}'.replace('.', ',')

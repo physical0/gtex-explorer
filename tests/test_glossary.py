@@ -132,7 +132,7 @@ def test_dictionary_download_contains_entire_filtered_index_and_source_addresses
 
 
 def test_comparison_retains_l1_reasons_and_navigates_to_biology_dictionary():
-    app = AppTest.from_file(str(APP_DIR / "app.py"), default_timeout=60).run()
+    app = AppTest.from_file(str(APP_DIR / "main.py"), default_timeout=60).run()
     app = enter_application(app)
     app.button(key="nav_Perbandingan Metode").click().run()
     assert not app.exception

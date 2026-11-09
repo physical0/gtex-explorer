@@ -3,7 +3,7 @@ import pandas as pd
 from streamlit.testing.v1 import AppTest
 from ui_helpers import enter_application
 
-APP = Path(__file__).resolve().parents[1] / 'app.py'
+APP = Path(__file__).resolve().parents[1] / 'main.py'
 
 
 def test_training_controls_are_method_specific_and_cv_is_optional(tmp_path, monkeypatch):

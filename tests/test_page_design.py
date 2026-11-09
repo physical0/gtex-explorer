@@ -13,7 +13,7 @@ APP_DIR = Path(__file__).resolve().parents[1]
 
 
 def comparison_app(changes=""):
-    text = (APP_DIR / "app.py").read_text(encoding="utf-8")
+    text = (APP_DIR / "gtex_explorer/ui/pages/comparison.py").read_text(encoding="utf-8")
     definition = next(node for node in ast.parse(text).body if isinstance(node, ast.FunctionDef) and node.name == "render_comparison_page")
     source = (
         'import streamlit as st\nimport altair as alt\nfrom gtex_explorer.analysis.core import load_reference_tables\nfrom gtex_explorer.analysis.gene_panels import clarify_eligibility_reasons\n'
@@ -72,7 +72,7 @@ def test_overview_chart_scores_and_denominators_equal_saved_tissue_results():
     ("overview_open_prediction", "Prediksi jaringan"),
 ])
 def test_overview_actions_open_existing_pages(key, title):
-    app = AppTest.from_file(str(APP_DIR / "app.py"), default_timeout=60).run()
+    app = AppTest.from_file(str(APP_DIR / "main.py"), default_timeout=60).run()
     app = enter_application(app)
     app.button(key="nav_Ringkasan").click().run()
     app.button(key=key).click().run()

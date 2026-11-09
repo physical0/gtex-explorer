@@ -21,7 +21,7 @@ os.environ['GTEX_DESKTOP_STATE_DIR'] = sys.argv[1]
 from unittest.mock import patch
 from streamlit.testing.v1 import AppTest
 with patch('gtex_explorer.ui.workspace_ui.preload_libraries'):
-    app = AppTest.from_file('app.py', default_timeout=120).run()
+    app = AppTest.from_file('main.py', default_timeout=120).run()
 print(json.dumps({'error': bool(app.exception), 'titles': [t.value for t in app.title],
                   'loaded': [m for m in ['xgboost', 'sklearn', 'altair'] if m in sys.modules]}))
 '''
