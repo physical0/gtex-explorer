@@ -4,7 +4,7 @@ import pytest
 def test_presets_control_bounds_and_normalization():
     from gtex_explorer.training.config import validate_training_config, training_presets
     presets = training_presets()
-    config = validate_training_config(presets['L1 - C = 1 - 1.000 gen'], cpu_count=2)
+    config = validate_training_config(presets['L1 - C = 1'], cpu_count=2)
     assert config.top_k == 1000 and config.l1_c == 1
     assert config.xgboost_parameters['n_jobs'] == 2
     assert not config.evaluate_cv and config.cv_folds == 5

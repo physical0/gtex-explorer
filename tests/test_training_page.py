@@ -85,6 +85,39 @@ def test_blank_candidate_count_blocks_training_with_recovery_message(tmp_path, m
     assert any('Isi jumlah gen kandidat' in item.value for item in app.error)
 
 
+def test_templates_stay_selected_and_take_their_gene_counts_from_the_data(tmp_path, monkeypatch):
+    from test_training_uploads import uploads
+    from gtex_explorer.training.uploads import audit_uploads
+    monkeypatch.setenv('GTEX_DESKTOP_STATE_DIR', str(tmp_path))
+    expression, metadata = uploads()
+    app = AppTest.from_file(str(APP), default_timeout=60).run()
+    app = enter_application(app)
+    app.session_state.training_upload_audit = audit_uploads(expression, 'own.csv', metadata, 'labels.csv')
+    app.button(key='nav_Pelatihan Model').click().run()
+    template = lambda: app.selectbox(key='training_preset')
+    top_k = lambda: app.number_input(key='training_top_k').value
+    assert template().options == ['L1 - C = 1', 'Baseline - semua gen', 'Custom']
+    # A small upload: the choice stays selected and every gene is used.
+    assert template().value == 'L1 - C = 1' and top_k() == 3
+    template().set_value('Baseline - semua gen').run()
+    assert not app.exception
+    assert template().value == 'Baseline - semua gen' and top_k() == 3
+    assert app.selectbox(key='training_selector').value == 'baseline'
+    template().set_value('L1 - C = 1').run()
+    assert template().value == 'L1 - C = 1' and top_k() == 3
+    assert app.selectbox(key='training_selector').value == 'l1'
+    # Larger data: the same template refits instead of keeping the small number.
+    app.radio(key='training_source').set_value('Data eksperimen notebook').run()
+    assert not app.exception
+    assert template().value == 'L1 - C = 1' and top_k() == 1000
+    template().set_value('Baseline - semua gen').run()
+    assert template().value == 'Baseline - semua gen' and top_k() == 5000
+    # A number the user types is theirs to keep.
+    template().set_value('L1 - C = 1').run()
+    app.number_input(key='training_top_k').set_value(250).run()
+    assert template().value == 'Custom' and top_k() == 250
+
+
 def test_missing_notebook_data_after_an_older_upload_shows_only_the_message(tmp_path, monkeypatch):
     from test_training_uploads import uploads
     from gtex_explorer.training.uploads import audit_uploads

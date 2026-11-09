@@ -62,7 +62,6 @@ def _preset_changed():
     preset = training_presets().get(st.session_state.training_preset)
     if preset:
         st.session_state.training_selector = preset["selector"]
-        st.session_state.training_top_k = preset["top_k"]
         st.session_state.training_l1_c = float(preset.get("l1_c", 1))
 
 
@@ -370,7 +369,6 @@ def _limit_gene_choices(dataset: dict | None) -> int:
     available = min(5000, dataset["genes"]) if dataset else 5000
     if st.session_state.get("training_top_k", 0) is not None and st.session_state.get("training_top_k", 0) > available:
         st.session_state.training_top_k = available
-        st.session_state.training_preset = "Custom"
     return available
 
 
@@ -429,8 +427,12 @@ def _method_and_genes_step(samples: TrainingSamples, available: int, usable: int
     candidate_blank = count is None
     if candidate_blank:
         count = available
+    # A template fits its gene count to the data. A number the user typed is only capped.
+    template = training_presets().get(st.session_state.training_preset, {})
     if method == "baseline":
         st.session_state.training_top_k = count
+    elif "top_k" in template:
+        st.session_state.training_top_k = min(template["top_k"], count)
     elif st.session_state.get("training_top_k") is not None and st.session_state.training_top_k > count:
         st.session_state.training_top_k = count
     st.session_state.setdefault("training_top_k", min(1000, count))

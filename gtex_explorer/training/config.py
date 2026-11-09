@@ -187,7 +187,9 @@ def configuration_fingerprint(
 
 def training_presets() -> dict[str, dict]:
     """Return the ready-made feature selection settings."""
+    # The number of genes depends on the data, so the names must not promise one.
+    # For L1, top_k is the most the form picks. Baseline always uses every candidate gene.
     return {
-        "L1 - C = 1 - 1.000 gen": {"selector": "l1", "l1_c": 1.0, "top_k": 1000},
-        "Baseline - 5.000 gen": {"selector": "baseline", "top_k": 5000},
+        "L1 - C = 1": {"selector": "l1", "l1_c": 1.0, "top_k": 1000},
+        "Baseline - semua gen": {"selector": "baseline"},
     }
