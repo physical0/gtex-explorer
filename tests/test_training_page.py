@@ -165,7 +165,7 @@ def test_paused_training_has_live_resume_and_separate_end_button(tmp_path, monke
 def test_run_time_uses_saved_start_not_restored_file_time(tmp_path):
     # Hosted instances rewrite files on restore, so file times are not the run's age.
     import json, os, time
-    from gtex_explorer.ui.training_page import run_created
+    from gtex_explorer.ui.pages.training import run_created
     run = tmp_path / 'run_x'
     run.mkdir()
     (run / 'config.json').write_text(json.dumps({'created': 1_000_000.0}), encoding='utf-8')

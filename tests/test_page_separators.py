@@ -3,7 +3,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 from ui_helpers import enter_application
 
-from gtex_explorer.analysis.core import APP_DIR
+from gtex_explorer.platform.paths import APP_ROOT as APP_DIR
 
 
 @pytest.mark.parametrize("page", ["Prediksi Jaringan", "Ringkasan", "Perbandingan Metode", "Panel Gen", "Kamus Biologi"])

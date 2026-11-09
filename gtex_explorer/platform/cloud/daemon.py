@@ -9,7 +9,7 @@ import threading
 import time
 import uuid
 
-from gtex_explorer.cloud.state import state, CloudConflict, CloudLeaseLost
+from gtex_explorer.platform.cloud.state import state, CloudConflict, CloudLeaseLost
 from gtex_explorer.training.jobs import atomic_json, pause_job, unpause_job, request_cancel, resolve_job_data
 
 # An idle poll is one small version query; queued jobs start within this delay.

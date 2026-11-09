@@ -4,15 +4,15 @@ from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
-from gtex_explorer.paths import APP_ROOT
+from gtex_explorer.platform.paths import APP_ROOT
 import re
 import subprocess
 import sys
 import time
 import uuid
 import psutil
-from gtex_explorer.cloud.state import operation, remote_client, state
-from gtex_explorer.workspaces import coordination_directory, workspace_roots
+from gtex_explorer.platform.cloud.state import operation, remote_client, state
+from gtex_explorer.platform.workspaces import coordination_directory, workspace_roots
 from gtex_explorer.training.config import TrainingConfig, configuration_fingerprint
 from gtex_explorer.training.data import discard_directory, load_training_data, run_split, stable_hash, atomic_replace_file
 from gtex_explorer.training.data import safe_path
@@ -104,7 +104,7 @@ def has_active_run(state_root: Path) -> bool:
 @operation
 def read_job(run_id: str, state_root: Path) -> JobRecord:
     if remote_client():
-        from gtex_explorer.cloud.jobs import record
+        from gtex_explorer.platform.cloud.jobs import record
         return record(run_id, state_root)
     path = job_path(run_id, state_root) / 'status.json'
     value = json.loads(path.read_text(encoding='utf-8'))
@@ -158,7 +158,7 @@ def _launch(run_id, data_root, state_root):
 
 def _assert_idle(state_root):
     if remote_client():
-        from gtex_explorer.cloud.jobs import assert_idle
+        from gtex_explorer.platform.cloud.jobs import assert_idle
         return assert_idle(state_root)
     coordinator = coordination_directory(state_root)
     try:
@@ -247,7 +247,7 @@ def delete_run(run_id: str, state_root: Path) -> None:
 @operation
 def request_cancel(run_id: str, state_root: Path) -> JobRecord:
     if remote_client():
-        from gtex_explorer.cloud.jobs import command
+        from gtex_explorer.platform.cloud.jobs import command
         return command(run_id, state_root, 'stop')
     with process_lock(job_path(run_id, state_root) / 'control.lock'):
         record = read_job(run_id, state_root)
@@ -283,7 +283,7 @@ def _verified_worker(run_id: str, state_root: Path):
 @operation
 def pause_job(run_id: str, state_root: Path) -> JobRecord:
     if remote_client():
-        from gtex_explorer.cloud.jobs import command
+        from gtex_explorer.platform.cloud.jobs import command
         return command(run_id, state_root, 'pause')
     root = job_path(run_id, state_root)
     with process_lock(root / 'control.lock'):
@@ -336,7 +336,7 @@ def _unpause(run_id, state_root, record):
 @operation
 def unpause_job(run_id: str, state_root: Path) -> JobRecord:
     if remote_client():
-        from gtex_explorer.cloud.jobs import command
+        from gtex_explorer.platform.cloud.jobs import command
         return command(run_id, state_root, 'resume')
     with process_lock(job_path(run_id, state_root) / 'control.lock'):
         record = read_job(run_id, state_root)

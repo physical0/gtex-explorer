@@ -23,7 +23,7 @@ def test_shared_example_is_union_without_fabricated_measurements():
 
 
 def test_loader_ignores_model_specific_demo_path(monkeypatch):
-    import gtex_explorer.ui.prediction_page as prediction_page
+    import gtex_explorer.ui.pages.prediction as prediction_page
     seen = []
     monkeypatch.setattr(prediction_page, '_audit_matrix', lambda **kwargs: seen.append(kwargs))
     for genes in [['ENSG00000170549.4'], ['ENSG_OTHER']]:

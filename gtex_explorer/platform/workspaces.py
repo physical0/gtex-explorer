@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import time
 import uuid
-from gtex_explorer.cloud.state import operation, remote_client, state
+from gtex_explorer.platform.cloud.state import operation, remote_client, state
 
 
 def _registry(root):

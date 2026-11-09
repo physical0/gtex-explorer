@@ -11,7 +11,7 @@ import pandas as pd
 from xgboost import XGBClassifier
 
 
-from gtex_explorer.paths import APP_ROOT as APP_DIR
+from gtex_explorer.platform.paths import APP_ROOT as APP_DIR
 DEFAULT_CACHE = APP_DIR.parent / 'results/notebook_run_500_1000_2000_l1_grid/part_a_cache.joblib'
 
 

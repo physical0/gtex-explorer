@@ -4,7 +4,7 @@ from __future__ import annotations
 import altair as alt
 import streamlit as st
 
-from gtex_explorer.analysis.gene_panels import clarify_eligibility_reasons
+from gtex_explorer.experiments.gene_panels import clarify_eligibility_reasons
 
 
 def render_comparison_page(tables: dict) -> None:

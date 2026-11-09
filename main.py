@@ -1,14 +1,14 @@
 """Application skeleton: joins the parts in the order the user meets them.
 
 1. Page setup and theme
-2. Workspace step (gtex_explorer.ui.workspace_ui)
+2. Workspace step (gtex_explorer.ui.workspace)
 3. Main app (gtex_explorer.ui.app)
 """
 import streamlit as st
 
-from gtex_explorer.paths import APP_ROOT
+from gtex_explorer.platform.paths import APP_ROOT
 from gtex_explorer.ui.shell.theme import apply_theme
-from gtex_explorer.ui.workspace_ui import enter_workspace
+from gtex_explorer.ui.workspace import enter_workspace
 
 st.set_page_config(
     page_title="GTEx Tissue Classifier",

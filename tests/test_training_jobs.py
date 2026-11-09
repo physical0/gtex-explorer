@@ -27,7 +27,7 @@ def test_background_job_publishes_model_and_survives_repeated_status_reads(tmp_p
     from scripts.export_training_data import export_training_data
     from gtex_explorer.training.config import validate_training_config
     from gtex_explorer.training.jobs import start_job, read_job
-    from gtex_explorer.model_registry import list_models, load_saved_model
+    from gtex_explorer.platform.model_registry import list_models, load_saved_model
     export_training_data(*checkpoint_sources(tmp_path), tmp_path / 'data')
     config = validate_training_config({'selector': 'anova', 'top_k': 2,
                                      'xgboost': {'n_estimators': 2}}, candidate_count=6)

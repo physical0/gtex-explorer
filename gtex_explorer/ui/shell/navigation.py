@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import streamlit as st
 
-from gtex_explorer.cloud.media import image
-from gtex_explorer.desktop_runtime import state_directory
-from gtex_explorer.paths import APP_ROOT as APP_DIR
-from gtex_explorer.ui.workspace_ui import render_workspace_controls
+from gtex_explorer.platform.cloud.media import image
+from gtex_explorer.platform.desktop_runtime import state_directory
+from gtex_explorer.platform.paths import APP_ROOT as APP_DIR
+from gtex_explorer.ui.workspace import render_workspace_controls
 
 
 def navigation() -> str:

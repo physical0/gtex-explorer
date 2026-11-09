@@ -100,7 +100,7 @@ def export_baseline(data_root: Path, output_dir: Path):
     from gtex_explorer.training.config import validate_training_config
     from gtex_explorer.training.core import fit_selector, fit_classifier
     from gtex_explorer.training.data import load_final_prepared
-    from gtex_explorer.model_registry import publish_model
+    from gtex_explorer.platform.model_registry import publish_model
     data = load_training_data(data_root)
     prepared = load_final_prepared(data)
     config = validate_training_config({'selector': 'baseline'}, candidate_count=len(prepared.gene_names))

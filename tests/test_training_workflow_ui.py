@@ -86,7 +86,7 @@ def test_process_controls_keep_pause_resume_and_full_stop(tmp_path, monkeypatch,
 def test_panel_preserves_tabs_diagnostics_scientific_values_and_fold_context(tmp_path, monkeypatch, method, score_label):
     from gtex_explorer.training.jobs import atomic_json
     from gtex_explorer.training.config import validate_training_config
-    import gtex_explorer.ui.training_gene_page as training_gene_page
+    import gtex_explorer.ui.pages.training_genes as training_gene_page
     run_id='run_'+'c'*32
     root=tmp_path/'runs'/run_id
     atomic_json(root/'config.json',{'config':validate_training_config({'selector':method,'top_k':2,
@@ -104,7 +104,7 @@ def test_panel_preserves_tabs_diagnostics_scientific_values_and_fold_context(tmp
     # This is a display-format fixture. Publication is covered with real artifacts separately.
     monkeypatch.setattr(training_gene_page,'choose_run',lambda *args, **kwargs:run_id)
     app=AppTest.from_string('import streamlit as st\nfrom pathlib import Path\n'
-        'from gtex_explorer.ui.training_gene_page import render_training_gene_page\n'
+        'from gtex_explorer.ui.pages.training_genes import render_training_gene_page\n'
         f'render_training_gene_page(Path({str(tmp_path)!r}))',default_timeout=60).run()
     assert not app.exception
     assert [tab.label for tab in app.tabs] == ['Daftar gen','Diagnostik metode','Stabilitas antar-fold']
@@ -126,7 +126,7 @@ def test_panel_preserves_tabs_diagnostics_scientific_values_and_fold_context(tmp
 
 
 def test_upload_change_clears_the_stored_audit_before_files_can_be_removed():
-    app=AppTest.from_string("\nimport streamlit as st\nimport gtex_explorer.ui.training_page as training_page\nif not st.session_state.get('initialized'):\n    st.session_state.initialized=True\n    st.session_state.training_upload_audit={'old':'dataset'}\n    st.session_state.training_upload_signature='old-file-signature'\n    st.session_state.training_data_ready=True\nst.button('Change uploaded file', key='change_file',\n          on_click=getattr(training_page,'_invalidate_training_upload',lambda:None))\n",default_timeout=60).run()
+    app=AppTest.from_string("\nimport streamlit as st\nimport gtex_explorer.ui.pages.training as training_page\nif not st.session_state.get('initialized'):\n    st.session_state.initialized=True\n    st.session_state.training_upload_audit={'old':'dataset'}\n    st.session_state.training_upload_signature='old-file-signature'\n    st.session_state.training_data_ready=True\nst.button('Change uploaded file', key='change_file',\n          on_click=getattr(training_page,'_invalidate_training_upload',lambda:None))\n",default_timeout=60).run()
     app.button(key='change_file').click().run()
     assert 'training_upload_audit' not in app.session_state
     assert 'training_upload_signature' not in app.session_state

@@ -9,7 +9,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 from ui_helpers import enter_application
 
-from gtex_explorer.analysis.core import load_model_bundle
+from gtex_explorer.inference.model_bundle import load_model_bundle
 
 APP = Path(__file__).resolve().parents[1] / "main.py"
 

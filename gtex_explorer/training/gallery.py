@@ -4,7 +4,7 @@ from pathlib import Path
 import time
 
 import pandas as pd
-from gtex_explorer.cloud.state import operation
+from gtex_explorer.platform.cloud.state import operation
 from xgboost.core import XGBoostError
 
 from gtex_explorer.training.data import file_hash, stable_hash, verify_files_cached
@@ -13,7 +13,7 @@ from gtex_explorer.training.jobs import atomic_json, job_path
 
 def finalize_gallery(run_id, state_root):
     """Verify disk artifacts, then atomically index them. Never fit a model here."""
-    from gtex_explorer.model_registry import _entry, load_saved_model
+    from gtex_explorer.platform.model_registry import _entry, load_saved_model
     from gtex_explorer.training.core import aggregate_cv
     from gtex_explorer.training.panels import load_run_panel
 

@@ -91,18 +91,25 @@ untuk memeriksa worker dengan fit ANOVA singkat, bukan mengubah model asli.
 ## Struktur
 
 ```text
-app.py                    Antarmuka utama Streamlit
+main.py                   Kerangka aplikasi: pengaturan halaman, workspace, aplikasi utama
 desktop.py                Launcher desktop
 cloud_app.py              Launcher hosted
 gtex_explorer/
-  analysis/               Parsing, inferensi, panel gen, diagnostik
-  ui/                     Halaman aplikasi
+  ui/
+    app.py                Aplikasi utama setelah workspace dibuka
+    workspace.py          Pemilihan dan pengelolaan workspace
+    pages/                Satu berkas untuk setiap halaman
+    shell/                Tema, navigasi, dan data bersama antarhalaman
+    styles/               CSS aplikasi
+  inference/              Parsing, audit input, dan prediksi jaringan
+  experiments/            Tabel hasil, panel gen, dan diagnostik notebook
   training/               Data, konfigurasi, worker, checkpoint, gallery
-  cloud/                  Penyimpanan privat, unggahan, daemon, ekspor
-  paths.py                Lokasi resource aplikasi
-  desktop_runtime.py      Server dan jendela desktop
-  model_registry.py       Publikasi dan pemilihan model
-  workspaces.py           Penyimpanan workspace
+  platform/
+    cloud/                Penyimpanan privat, unggahan, daemon, ekspor
+    paths.py              Lokasi resource aplikasi
+    desktop_runtime.py    Server dan jendela desktop
+    model_registry.py     Publikasi dan pemilihan model
+    workspaces.py         Penyimpanan workspace
 scripts/                  Ekspor notebook dan persiapan deployment
 tests/                    Pengujian otomatis
 resources/                Data notebook terkompresi untuk distribusi
@@ -218,7 +225,7 @@ perubahan metrik, aturan eligibility, hasil fit, atau checkpoint notebook.
 Versi **desktop Windows offline** tersedia melalui
 `dist/GTExTissueExplorer/GTExTissueExplorer.exe` setelah build. Versi ini membuka
 jendela aplikasi sendiri dan menyertakan Python, model, serta aset lokal.
-Salin seluruh folder portable, bukan hanya `.exe`. Lihat [DESKTOP.md](DESKTOP.md)
+Salin seluruh folder portable, bukan hanya `.exe`. Lihat [DESKTOP.md](docs/DESKTOP.md)
 untuk petunjuk, persyaratan runtime Windows, dan cara membangun ulang.
 Untuk pengembangan, gunakan `run_desktop_app.bat` setelah memasang
 `requirements-desktop.txt`.
@@ -336,7 +343,7 @@ Istilah antarmuka memakai **data development**, **data training**, dan **data
 validation** secara konsisten. Kamus memuat definisi ketiga subset tersebut.
 Target visual yang disetujui disimpan di `design/overview-tabs-target-20261020.png`
 dan `design/comparison-cv-holdout-target-20261020.png`. Status verifikasi visual
-dicatat terpisah dari pengujian fungsional di `design-qa.md`.
+dicatat terpisah dari pengujian fungsional di `docs/design-qa.md`.
 
 Metrik evaluasi ditampilkan sebagai persentase dengan dua desimal, termasuk
 label, tooltip, tabel, dan metrik validasi pada Panel Gen. Contoh Macro-F1
@@ -378,7 +385,7 @@ dan rincian disusun vertikal. Seluruh isi tetap berasal dari hasil tersimpan.
 ## Deployment Vercel
 
 Versi hosted memakai `cloud_app.py`, container web, layanan unggahan privat,
-serta worker terpisah (`python -m gtex_explorer.cloud.daemon`). Docker memulihkan
+serta worker terpisah (`python -m gtex_explorer.platform.cloud.daemon`). Docker memulihkan
 data notebook dari `resources/` saat build. Jangan menyimpan `.env.local` atau
 `.vercel/` ke Git. Koneksi Git memakai repository privat dan perlindungan
 Vercel Authentication tetap aktif.

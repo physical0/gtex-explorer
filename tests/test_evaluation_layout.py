@@ -3,7 +3,7 @@ import json
 
 import pyarrow as pa
 
-from gtex_explorer.ui.glossary import find_terms
+from gtex_explorer.ui.pages.glossary import find_terms
 from test_overview_page import overview_app, visible_html
 from test_page_design import comparison_app
 

@@ -7,19 +7,15 @@ from pathlib import Path
 import altair as alt
 import pandas as pd
 import streamlit as st
-from gtex_explorer.cloud.media import download_button
-from gtex_explorer.error_messages import user_error
-from gtex_explorer.ui.workspace_ui import current_workspace_root, upload_widget_key
-from gtex_explorer.cloud.uploads import file_uploader
+from gtex_explorer.platform.cloud.media import download_button
+from gtex_explorer.ui.shell.error_messages import user_error
+from gtex_explorer.ui.workspace import current_workspace_root, upload_widget_key
+from gtex_explorer.platform.cloud.uploads import file_uploader
 
-from gtex_explorer.analysis.core import (
-    DATA_DIR,
-    InputAudit,
-    audit_and_align_input,
-    explain_prediction,
-    parse_expression_file,
-    predict_tissues,
-)
+from gtex_explorer.experiments.reference_tables import DATA_DIR
+from gtex_explorer.inference.audit import InputAudit, audit_and_align_input
+from gtex_explorer.inference.prediction import explain_prediction, predict_tissues
+from gtex_explorer.inference.parsing import parse_expression_file
 
 
 ANALYSIS_STATE_KEYS = (
@@ -54,14 +50,14 @@ def sync_prediction_model(state, entry) -> None:
 # Models are large once loaded, so an instance keeps only the few in recent use.
 @st.cache_resource(max_entries=3, show_spinner="Memuat model prediksi...")
 def _selected_bundle(entry):
-    from gtex_explorer.model_registry import load_prediction_model
+    from gtex_explorer.platform.model_registry import load_prediction_model
     return load_prediction_model(entry)
 
 
 def _choose_model(preprocessor, classifier):
-    from gtex_explorer.analysis.core import APP_DIR
-    from gtex_explorer.desktop_runtime import state_directory
-    from gtex_explorer.model_registry import list_models
+    from gtex_explorer.platform.paths import APP_ROOT as APP_DIR
+    from gtex_explorer.platform.desktop_runtime import state_directory
+    from gtex_explorer.platform.model_registry import list_models
     issues = []
     entries = list_models(APP_DIR, current_workspace_root(state_directory()), issues=issues)
     if issues:

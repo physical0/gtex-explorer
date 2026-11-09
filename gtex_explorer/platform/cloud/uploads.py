@@ -1,5 +1,5 @@
 """Private direct-to-Storage uploads avoid Function request-body limits."""
-from gtex_explorer.paths import APP_ROOT
+from gtex_explorer.platform.paths import APP_ROOT
 import hashlib
 import hmac
 import math
@@ -10,7 +10,7 @@ import uuid
 
 import streamlit as st
 
-from gtex_explorer.cloud.state import enabled, state, part_key, PART_SIZE
+from gtex_explorer.platform.cloud.state import enabled, state, part_key, PART_SIZE
 
 
 MAX_UPLOAD = 200 * 1024 * 1024

@@ -3,7 +3,7 @@ import json
 import time
 import uuid
 
-from gtex_explorer.cloud.state import state
+from gtex_explorer.platform.cloud.state import state
 
 
 def record(run_id, state_root):
@@ -41,7 +41,7 @@ def command(run_id, state_root, action):
 
 
 def assert_idle(state_root):
-    from gtex_explorer.workspaces import workspace_roots, coordination_directory
+    from gtex_explorer.platform.workspaces import workspace_roots, coordination_directory
     for _, directory in workspace_roots(coordination_directory(state_root)):
         for path in (directory / 'runs').glob('run_*/status.json'):
             if record(path.parent.name, directory).status in {'queued', 'running', 'paused', 'cancelling'}:

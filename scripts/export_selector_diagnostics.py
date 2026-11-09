@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from gtex_explorer.analysis.selector_diagnostics import DIAGNOSTIC_FILES, file_hash, validate_diagnostic_tables
+from gtex_explorer.experiments.selector_diagnostics import DIAGNOSTIC_FILES, file_hash, validate_diagnostic_tables
 
 
 def export_diagnostics() -> None:
-    from gtex_explorer.paths import APP_ROOT as app_dir
+    from gtex_explorer.platform.paths import APP_ROOT as app_dir
     data_dir = app_dir / "data"
     source_dir = app_dir.parent / "results/notebook_run_500_1000_2000_l1_grid/part_a_only"
     summary = json.loads((data_dir / "run_summary.json").read_text(encoding="utf-8"))

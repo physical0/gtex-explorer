@@ -8,9 +8,10 @@ import pytest
 from streamlit.testing.v1 import AppTest
 from ui_helpers import enter_application
 
-from gtex_explorer.analysis.core import APP_DIR, load_reference_tables
-from gtex_explorer.analysis.gene_panels import L1_INSUFFICIENT_GENES, clarify_eligibility_reasons
-from gtex_explorer.ui.glossary import SOURCES, find_terms, glossary_table
+from gtex_explorer.platform.paths import APP_ROOT as APP_DIR
+from gtex_explorer.experiments.reference_tables import load_reference_tables
+from gtex_explorer.experiments.gene_panels import L1_INSUFFICIENT_GENES, clarify_eligibility_reasons
+from gtex_explorer.ui.pages.glossary import SOURCES, find_terms, glossary_table
 
 
 def test_biology_dictionary_covers_all_target_tissues_with_indonesian_names():
@@ -75,7 +76,7 @@ def test_l1_message_changes_only_where_diagnostics_establish_insufficient_genes(
 
 
 def glossary_app():
-    app = AppTest.from_string('from gtex_explorer.ui.glossary import render_glossary_page\nrender_glossary_page()', default_timeout=30).run()
+    app = AppTest.from_string('from gtex_explorer.ui.pages.glossary import render_glossary_page\nrender_glossary_page()', default_timeout=30).run()
     assert not app.exception
     return app
 

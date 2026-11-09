@@ -16,7 +16,7 @@ def comparison_app(changes=""):
     text = (APP_DIR / "gtex_explorer/ui/pages/comparison.py").read_text(encoding="utf-8")
     definition = next(node for node in ast.parse(text).body if isinstance(node, ast.FunctionDef) and node.name == "render_comparison_page")
     source = (
-        'import streamlit as st\nimport altair as alt\nfrom gtex_explorer.analysis.core import load_reference_tables\nfrom gtex_explorer.analysis.gene_panels import clarify_eligibility_reasons\n'
+        'import streamlit as st\nimport altair as alt\nfrom gtex_explorer.experiments.reference_tables import load_reference_tables\nfrom gtex_explorer.experiments.gene_panels import clarify_eligibility_reasons\n'
         + ast.get_source_segment(text, definition)
         + "\ntables = load_reference_tables()\n" + changes
         + "\nrender_comparison_page(tables)\n"
@@ -55,7 +55,7 @@ def test_comparison_metric_changes_table_and_chart_and_zoom_is_explicit():
 
 def test_overview_chart_scores_and_denominators_equal_saved_tissue_results():
     app = AppTest.from_string(
-        'from gtex_explorer.analysis.core import load_reference_tables\nfrom gtex_explorer.ui.overview_page import render_overview_page\nrender_overview_page(load_reference_tables())\n', default_timeout=60,
+        'from gtex_explorer.experiments.reference_tables import load_reference_tables\nfrom gtex_explorer.ui.pages.overview import render_overview_page\nrender_overview_page(load_reference_tables())\n', default_timeout=60,
     ).run()
     assert not app.exception
     dataset = app.get("vega_lite_chart")[0].proto.datasets[0]
@@ -82,7 +82,7 @@ def test_overview_actions_open_existing_pages(key, title):
 
 def test_prediction_header_follows_bundle_and_has_no_duplicate_footer():
     app = AppTest.from_string(
-        "from gtex_explorer.analysis.core import load_reference_tables, load_model_bundle\nfrom gtex_explorer.ui.prediction_page import render_prediction_page\ntables=load_reference_tables()\np,c=load_model_bundle()\np.update(selector_id='anova', feature_selection='anova', feature_count=500)\nfrom unittest.mock import patch\nwith patch('gtex_explorer.ui.prediction_page._choose_model', return_value=(p,c)):\n    render_prediction_page(p,c,tables)\n", default_timeout=60,
+        "from gtex_explorer.experiments.reference_tables import load_reference_tables\nfrom gtex_explorer.inference.model_bundle import load_model_bundle\nfrom gtex_explorer.ui.pages.prediction import render_prediction_page\ntables=load_reference_tables()\np,c=load_model_bundle()\np.update(selector_id='anova', feature_selection='anova', feature_count=500)\nfrom unittest.mock import patch\nwith patch('gtex_explorer.ui.pages.prediction._choose_model', return_value=(p,c)):\n    render_prediction_page(p,c,tables)\n", default_timeout=60,
     ).run()
     assert not app.exception
     text = "\n".join(element.value for element in app.markdown)

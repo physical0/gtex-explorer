@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from gtex_explorer.cloud.state import CloudState, CloudConflict, CloudIntegrityError
+from gtex_explorer.platform.cloud.state import CloudState, CloudConflict, CloudIntegrityError
 
 
 class MemoryStore:
@@ -189,7 +189,7 @@ class FakeSupabase:
 
 
 def supabase_store():
-    from gtex_explorer.cloud.state import SupabaseStore
+    from gtex_explorer.platform.cloud.state import SupabaseStore
     store = SupabaseStore('https://example.supabase.co', 'test-key')
     fake = FakeSupabase()
     store._request = fake
@@ -226,7 +226,7 @@ def test_manifest_compare_and_swap_rejects_stale_version():
 
 
 def test_objects_above_part_size_round_trip_as_parts(monkeypatch):
-    import gtex_explorer.cloud.state as cloud_state
+    import gtex_explorer.platform.cloud.state as cloud_state
     monkeypatch.setattr(cloud_state, 'PART_SIZE', 4)
     store, fake = supabase_store()
     store.put('gtex/objects/big', b'0123456789', create=True)
@@ -347,7 +347,7 @@ def test_web_instance_defers_uploaded_matrix_until_a_run_needs_it(tmp_path, monk
 
 
 def test_download_to_disk_handles_multipart_objects(tmp_path, monkeypatch):
-    from gtex_explorer.cloud.state import SupabaseStore, PARTS_MAGIC, part_key
+    from gtex_explorer.platform.cloud.state import SupabaseStore, PARTS_MAGIC, part_key
     remote = {'k': PARTS_MAGIC + json.dumps({'parts': 2, 'size': 6}).encode(),
               part_key('k', 0): b'abc', part_key('k', 1): b'def', 'small': b'plain'}
     store = SupabaseStore('https://storage.test', 'key')
@@ -371,7 +371,7 @@ def test_download_to_disk_handles_multipart_objects(tmp_path, monkeypatch):
 def test_streamed_download_over_http(tmp_path):
     from http.server import BaseHTTPRequestHandler, HTTPServer
     import threading
-    from gtex_explorer.cloud.state import SupabaseStore
+    from gtex_explorer.platform.cloud.state import SupabaseStore
     body = b'x' * (3 * 1024 * 1024 + 7)
 
     class Handler(BaseHTTPRequestHandler):

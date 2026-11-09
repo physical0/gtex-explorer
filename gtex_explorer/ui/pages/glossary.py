@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
-from gtex_explorer.cloud.media import download_button
+from gtex_explorer.platform.cloud.media import download_button
 
 
 SOURCES = {

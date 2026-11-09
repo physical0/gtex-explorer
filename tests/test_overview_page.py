@@ -13,8 +13,8 @@ APP_DIR = Path(__file__).resolve().parents[1]
 def overview_app(changes: str = "") -> AppTest:
     source = (
         f"import sys\nsys.path.insert(0, {str(APP_DIR)!r})\n"
-        "from gtex_explorer.analysis.core import load_reference_tables\n"
-        "from gtex_explorer.ui.overview_page import render_overview_page\n"
+        "from gtex_explorer.experiments.reference_tables import load_reference_tables\n"
+        "from gtex_explorer.ui.pages.overview import render_overview_page\n"
         "tables = load_reference_tables()\n"
         f"{changes}\n"
         "render_overview_page(tables)\n"

@@ -8,16 +8,16 @@ import psutil
 import altair as alt
 import pandas as pd
 import streamlit as st
-from gtex_explorer.cloud.media import download_button
+from gtex_explorer.platform.cloud.media import download_button
 
 from gtex_explorer.training.config import training_presets, validate_training_config
 from gtex_explorer.training.data import TrainingData, load_training_data, make_cv_assignments, make_holdout_assignment, usable_candidate_genes
 from gtex_explorer.training.jobs import start_job, read_job, request_cancel, resume_job, pause_job, unpause_job, can_resume, delete_run, has_active_run, ACTIVE_STATUSES, FINALIZING_STAGES
 from gtex_explorer.training.gallery import list_gallery
 from gtex_explorer.training.uploads import audit_uploads, read_upload_table, save_training_upload
-from gtex_explorer.error_messages import user_error
-from gtex_explorer.ui.workspace_ui import upload_widget_key
-from gtex_explorer.cloud.uploads import file_uploader
+from gtex_explorer.ui.shell.error_messages import user_error
+from gtex_explorer.ui.workspace import upload_widget_key
+from gtex_explorer.platform.cloud.uploads import file_uploader
 
 METHODS = {'l1': 'Regresi logistik L1', 'anova': 'ANOVA',
            'mutual_information': 'Mutual Information', 'baseline': 'Baseline - tanpa seleksi supervised'}

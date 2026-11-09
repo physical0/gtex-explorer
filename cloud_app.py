@@ -4,7 +4,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from gtex_explorer.cloud.state import state, CloudConflict, CloudIntegrityError
+from gtex_explorer.platform.cloud.state import state, CloudConflict, CloudIntegrityError
 
 os.environ['GTEX_CLOUD'] = '1'
 os.environ['GTEX_CLOUD_ROLE'] = 'web'

@@ -16,7 +16,7 @@ import time
 import traceback
 from urllib.request import ProxyHandler, build_opener
 
-from gtex_explorer.paths import APP_ROOT
+from gtex_explorer.platform.paths import APP_ROOT
 TITLE = "GTEx Tissue Explorer"
 
 
@@ -93,10 +93,11 @@ class OfflineHeaders:
 def check_resources() -> dict:
     """Check packaged artifacts and run real demo inference, without retraining."""
     import streamlit
-    from gtex_explorer.analysis.core import (
-        MODEL_DIR, audit_and_align_input, load_model_bundle,
-        load_reference_tables, parse_expression_file, predict_tissues,
-    )
+    from gtex_explorer.inference.model_bundle import MODEL_DIR, load_model_bundle
+    from gtex_explorer.inference.audit import audit_and_align_input
+    from gtex_explorer.experiments.reference_tables import load_reference_tables
+    from gtex_explorer.inference.parsing import parse_expression_file
+    from gtex_explorer.inference.prediction import predict_tissues
     if not hasattr(streamlit, "App"):
         raise RuntimeError("Versi desktop memerlukan Streamlit 1.63.0. Instal requirements-desktop.txt.")
     manifest = json.loads((MODEL_DIR / "bundle_manifest.json").read_text(encoding="utf8"))
@@ -222,8 +223,10 @@ def launch_desktop() -> None:
 def check_training() -> dict:
     from gtex_explorer.training.config import validate_training_config
     from gtex_explorer.training.jobs import start_job, read_job, request_cancel
-    from gtex_explorer.model_registry import list_models, load_saved_model
-    from gtex_explorer.analysis.core import parse_expression_file, audit_and_align_input, predict_tissues, explain_prediction
+    from gtex_explorer.platform.model_registry import list_models, load_saved_model
+    from gtex_explorer.inference.parsing import parse_expression_file
+    from gtex_explorer.inference.audit import audit_and_align_input
+    from gtex_explorer.inference.prediction import explain_prediction, predict_tissues
     import numpy as np
     check_state = state_directory() / 'training-checks' / secrets.token_hex(8)
     record = start_job(validate_training_config({'selector': 'anova', 'top_k': 100,

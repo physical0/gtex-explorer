@@ -94,7 +94,8 @@ def load_saved_model(entry: ModelEntry) -> tuple[dict, XGBClassifier]:
 def publish_model(result: FitResult, config: TrainingConfig, provenance: dict,
                   output_dir: Path, demo_tpm: pd.DataFrame, cv_summary: dict | None,
                   holdout_summary: dict | None = None) -> ModelEntry:
-    from gtex_explorer.analysis.core import audit_and_align_input, predict_tissues
+    from gtex_explorer.inference.audit import audit_and_align_input
+    from gtex_explorer.inference.prediction import predict_tissues
     prepared = result.prepared
     if prepared.X_validation is not None and not holdout_summary:
         raise ValueError('A fold model cannot be published')
@@ -178,7 +179,7 @@ def _validate_once(entry: ModelEntry) -> None:
 
 
 def list_models(resource_root: Path, state_root: Path, *, issues: list | None = None) -> list[ModelEntry]:
-    from gtex_explorer.workspaces import bundled_models_enabled
+    from gtex_explorer.platform.workspaces import bundled_models_enabled
     include_originals = bundled_models_enabled(state_root)
     entries = []
     original = Path(resource_root) / 'model_bundle'
@@ -227,7 +228,7 @@ def list_models(resource_root: Path, state_root: Path, *, issues: list | None = 
 def load_prediction_model(entry: ModelEntry) -> tuple[dict, XGBClassifier]:
     if entry.model_id != 'original_l1_c_1_1000':
         return load_saved_model(entry)
-    from gtex_explorer.analysis.core import MODEL_DIR, load_model_bundle
+    from gtex_explorer.inference.model_bundle import MODEL_DIR, load_model_bundle
     if entry.bundle_dir.resolve() != MODEL_DIR.resolve():
         raise ValueError('Original model must use bundled resources')
     pre, classifier = load_model_bundle()

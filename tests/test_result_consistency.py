@@ -7,7 +7,7 @@ import pandas as pd
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score, precision_score, recall_score
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from gtex_explorer.analysis.core import load_reference_tables
+from gtex_explorer.experiments.reference_tables import load_reference_tables
 
 
 def test_cv_counts_fold_identity_parameters_and_aggregation() -> None:

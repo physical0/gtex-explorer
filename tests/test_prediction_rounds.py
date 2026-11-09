@@ -9,14 +9,11 @@ import pandas as pd
 import pytest
 import xgboost as xgb
 
-from gtex_explorer.analysis.core import (
-    DATA_DIR,
-    audit_and_align_input,
-    explain_prediction,
-    load_model_bundle,
-    parse_expression_file,
-    predict_tissues,
-)
+from gtex_explorer.experiments.reference_tables import DATA_DIR
+from gtex_explorer.inference.audit import audit_and_align_input
+from gtex_explorer.inference.prediction import explain_prediction, predict_tissues
+from gtex_explorer.inference.model_bundle import load_model_bundle
+from gtex_explorer.inference.parsing import parse_expression_file
 from test_streamlit_app import load_app
 
 

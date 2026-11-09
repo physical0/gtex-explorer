@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 import tempfile
 
-from gtex_explorer.paths import APP_ROOT
+from gtex_explorer.platform.paths import APP_ROOT
 
 
 def digest(path):

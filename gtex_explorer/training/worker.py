@@ -14,10 +14,10 @@ from gtex_explorer.training.config import validate_training_config, configuratio
 from gtex_explorer.training.core import fit_selector, fit_classifier, aggregate_cv, summarize_holdout, runtime_versions, FitResult, SelectorFit, TrainingCancelled
 from gtex_explorer.training.data import load_training_data, load_final_prepared, run_split, prepare_partition, stable_hash, file_hash, verify_files, atomic_publish_directory
 from gtex_explorer.training.jobs import atomic_json, job_path, process_lock, resolve_job_data
-from gtex_explorer.model_registry import publish_model, ModelEntry, load_saved_model
+from gtex_explorer.platform.model_registry import publish_model, ModelEntry, load_saved_model
 from gtex_explorer.training.gallery import finalize_gallery
-from gtex_explorer.workspaces import coordination_directory
-from gtex_explorer.cloud.state import enabled as cloud_enabled, worker_checkpoint
+from gtex_explorer.platform.workspaces import coordination_directory
+from gtex_explorer.platform.cloud.state import enabled as cloud_enabled, worker_checkpoint
 
 
 def _save_final_fit(result, identity, target):
@@ -246,9 +246,9 @@ if __name__ == '__main__':
     parser.add_argument('--state', type=Path, required=True)
     args = parser.parse_args()
     if cloud_enabled():
-        from gtex_explorer.cloud.state import state
+        from gtex_explorer.platform.cloud.state import state
         state().pull()
     else:
-        from gtex_explorer.desktop_runtime import enforce_offline_network
+        from gtex_explorer.platform.desktop_runtime import enforce_offline_network
         enforce_offline_network()
     raise SystemExit(run_job(args.run_id, args.data, args.state, interruptible=True))

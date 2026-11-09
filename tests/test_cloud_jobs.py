@@ -2,12 +2,12 @@ import json
 import time
 from unittest.mock import patch
 
-from gtex_explorer.cloud.state import CloudState
+from gtex_explorer.platform.cloud.state import CloudState
 from test_cloud_state import MemoryStore, write
 
 
 def test_remote_pause_and_stop_create_durable_commands_without_touching_local_processes(tmp_path, monkeypatch):
-    import gtex_explorer.cloud.state as cloud_state
+    import gtex_explorer.platform.cloud.state as cloud_state
     from gtex_explorer.training.jobs import pause_job, request_cancel
     store = MemoryStore()
     state = CloudState(tmp_path / 'state', store)
@@ -31,7 +31,7 @@ def test_remote_pause_and_stop_create_durable_commands_without_touching_local_pr
 
 
 def test_stale_worker_is_reported_recoverable_without_pid_probe(tmp_path, monkeypatch):
-    import gtex_explorer.cloud.state as cloud_state
+    import gtex_explorer.platform.cloud.state as cloud_state
     from gtex_explorer.training.jobs import read_job
     store = MemoryStore()
     state = CloudState(tmp_path / 'state', store)

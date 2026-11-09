@@ -88,7 +88,7 @@ def test_truncated_gct_has_descriptive_error(content):
 
 
 def test_custom_gene_prediction_keeps_gene_by_sample_orientation():
-    from gtex_explorer.analysis.core import parse_expression_file
+    from gtex_explorer.inference.parsing import parse_expression_file
     expression, _ = uploads()
     matrix = parse_expression_file(io.BytesIO(expression), 'own.csv', model_genes=['OTHER_A', 'OTHER_C'])
     assert matrix.shape == (6, 3)

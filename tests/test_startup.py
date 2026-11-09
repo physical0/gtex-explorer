@@ -7,7 +7,7 @@ import threading
 
 import pytest
 
-from gtex_explorer.cloud.state import CloudState, CloudIntegrityError
+from gtex_explorer.platform.cloud.state import CloudState, CloudIntegrityError
 from test_cloud_state import MemoryStore, write
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,7 +20,7 @@ import json, os, sys
 os.environ['GTEX_DESKTOP_STATE_DIR'] = sys.argv[1]
 from unittest.mock import patch
 from streamlit.testing.v1 import AppTest
-with patch('gtex_explorer.ui.workspace_ui.preload_libraries'):
+with patch('gtex_explorer.ui.workspace.preload_libraries'):
     app = AppTest.from_file('main.py', default_timeout=120).run()
 print(json.dumps({'error': bool(app.exception), 'titles': [t.value for t in app.title],
                   'loaded': [m for m in ['xgboost', 'sklearn', 'altair'] if m in sys.modules]}))

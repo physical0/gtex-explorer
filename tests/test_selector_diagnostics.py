@@ -6,7 +6,8 @@ import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from gtex_explorer.analysis.core import APP_DIR, load_reference_tables
+from gtex_explorer.platform.paths import APP_ROOT as APP_DIR
+from gtex_explorer.experiments.reference_tables import load_reference_tables
 from test_gene_panels import gene_app
 
 
@@ -104,7 +105,7 @@ def test_final_diagnostics_do_not_borrow_cv_metrics_and_baseline_has_no_selector
 
 def test_missing_diagnostics_preserves_panel_without_inventing_zeros():
     app = AppTest.from_string(
-        "from gtex_explorer.analysis.core import load_reference_tables\nfrom gtex_explorer.ui.gene_page import render_gene_page\ntables=load_reference_tables()\ntables['selector_diagnostics']={}\nrender_gene_page(tables)\n", default_timeout=60,
+        "from gtex_explorer.experiments.reference_tables import load_reference_tables\nfrom gtex_explorer.ui.pages.genes import render_gene_page\ntables=load_reference_tables()\ntables['selector_diagnostics']={}\nrender_gene_page(tables)\n", default_timeout=60,
     ).run()
     app.radio(key="gene_panel_source").set_value("Cross-validation").run()
     app.selectbox(key="gene_cv_method").set_value("anova").run()
@@ -114,7 +115,7 @@ def test_missing_diagnostics_preserves_panel_without_inventing_zeros():
 
 
 def test_exported_diagnostics_reconcile_with_rankings_and_all_fit_rows():
-    from gtex_explorer.analysis.selector_diagnostics import validate_diagnostic_tables
+    from gtex_explorer.experiments.selector_diagnostics import validate_diagnostic_tables
     tables = load_reference_tables()
     diagnostics = tables["selector_diagnostics"]
     validate_diagnostic_tables(diagnostics, tables["cv_folds"], tables["cv_gene_rankings"])
@@ -156,7 +157,7 @@ def test_all_saved_mi_and_l1_counts_cutoffs_and_support_flags_match_the_rankings
 
 @pytest.mark.parametrize("table", ["anova_summary", "mi_neighbors", "l1_fits"])
 def test_diagnostic_validation_rejects_missing_method_fold_checks(table):
-    from gtex_explorer.analysis.selector_diagnostics import validate_diagnostic_tables
+    from gtex_explorer.experiments.selector_diagnostics import validate_diagnostic_tables
     tables = load_reference_tables()
     broken = {key: value.copy() for key, value in tables["selector_diagnostics"].items()}
     broken[table] = broken[table].iloc[1:]
@@ -166,7 +167,7 @@ def test_diagnostic_validation_rejects_missing_method_fold_checks(table):
 
 @pytest.mark.parametrize("defect", ["fingerprint", "hash", "missing", "fits"])
 def test_diagnostic_loader_rejects_mixed_or_incomplete_exports(tmp_path, defect):
-    from gtex_explorer.analysis.selector_diagnostics import load_selector_diagnostics
+    from gtex_explorer.experiments.selector_diagnostics import load_selector_diagnostics
     manifest_path = APP_DIR / "data/selector_diagnostics_manifest.json"
     manifest = json.loads(manifest_path.read_text())
     for filename in [*manifest["files"], *manifest["bindings"]]:

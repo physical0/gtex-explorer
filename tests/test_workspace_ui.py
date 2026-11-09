@@ -7,7 +7,7 @@ APP = Path(__file__).resolve().parents[1] / "main.py"
 
 def test_open_other_workspace_process_requests_full_app_rerun(tmp_path, monkeypatch):
     import streamlit as st
-    from gtex_explorer.workspaces import create_workspace, workspace_directory
+    from gtex_explorer.platform.workspaces import create_workspace, workspace_directory
     from scripts.export_training_data import export_training_data
     from test_training_data import checkpoint_sources
     from gtex_explorer.training.config import validate_training_config
@@ -37,7 +37,7 @@ def test_open_other_workspace_process_requests_full_app_rerun(tmp_path, monkeypa
 
 def test_new_session_restores_workspace_page_and_model_from_url(tmp_path, monkeypatch):
     # A hosted reconnect starts a fresh session; the URL carries the user's place.
-    from gtex_explorer.workspaces import create_workspace
+    from gtex_explorer.platform.workspaces import create_workspace
     other = create_workspace(tmp_path / 'state', 'Other', include_bundled_models=True)
     monkeypatch.setenv('GTEX_DESKTOP_STATE_DIR', str(tmp_path / 'state'))
     app = AppTest.from_file(str(APP), default_timeout=60)

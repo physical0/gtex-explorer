@@ -7,7 +7,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from gtex_explorer.cloud.state import enabled, state, CloudConflict
+from gtex_explorer.platform.cloud.state import enabled, state, CloudConflict
 
 
 def image(source, **kwargs):

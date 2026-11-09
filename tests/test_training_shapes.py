@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from gtex_explorer.error_messages import user_error
+from gtex_explorer.ui.shell.error_messages import user_error
 from gtex_explorer.training.data import usable_candidate_genes
 
 
@@ -85,7 +85,7 @@ def inactive_gene_upload():
 
 def usable_on_form(files, *args):
     from gtex_explorer.training.uploads import audit_uploads
-    from gtex_explorer.ui.training_page import _upload_preview
+    from gtex_explorer.ui.pages.training import _upload_preview
     return usable_candidate_genes(_upload_preview(audit_uploads(files[0], 'tpm.csv', files[1], 'meta.csv')), *args)
 
 
@@ -108,7 +108,7 @@ def test_the_form_limit_accounts_for_a_gene_active_only_outside_the_training_par
     files = matrix.to_csv().encode(), meta
     from gtex_explorer.training.uploads import audit_uploads
     from gtex_explorer.training.data import make_holdout_assignment
-    from gtex_explorer.ui.training_page import _upload_preview
+    from gtex_explorer.ui.pages.training import _upload_preview
     split = make_holdout_assignment(_upload_preview(audit_uploads(*[files[0], 'tpm.csv', files[1], 'meta.csv'])), 50)
     # This gene is measurable only among the samples set aside, so it cannot be learned from.
     matrix.iloc[:, 0] = 0.

@@ -3,9 +3,9 @@ import json
 import pandas as pd
 
 import streamlit as st
-from gtex_explorer.cloud.media import download_button
+from gtex_explorer.platform.cloud.media import download_button
 
-from gtex_explorer.ui.training_page import choose_run, method_description, show_diagnostics
+from gtex_explorer.ui.pages.training import choose_run, method_description, show_diagnostics
 from gtex_explorer.training.panels import load_run_panel
 
 

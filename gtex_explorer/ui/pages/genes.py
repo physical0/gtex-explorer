@@ -5,10 +5,10 @@ import html
 
 import pandas as pd
 import streamlit as st
-from gtex_explorer.cloud.media import download_button
+from gtex_explorer.platform.cloud.media import download_button
 
-from gtex_explorer.analysis.gene_panels import cv_gene_panel
-from gtex_explorer.analysis.selector_diagnostics import render_selector_metrics, render_diagnostic_details, render_stability_details
+from gtex_explorer.experiments.gene_panels import cv_gene_panel
+from gtex_explorer.experiments.selector_diagnostics import render_selector_metrics, render_diagnostic_details, render_stability_details
 
 
 GENE_PAGE_STYLE = """

@@ -3,7 +3,7 @@ import ctypes
 import os
 import sys
 import traceback
-from gtex_explorer.desktop_runtime import main, state_directory, TITLE
+from gtex_explorer.platform.desktop_runtime import main, state_directory, TITLE
 
 
 if __name__ == "__main__":

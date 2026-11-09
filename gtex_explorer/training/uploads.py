@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from gtex_explorer.training.data import atomic_publish_directory, file_hash, stable_hash, unique_ids
-from gtex_explorer.cloud.state import operation
+from gtex_explorer.platform.cloud.state import operation
 
 
 @dataclass

@@ -7,10 +7,10 @@ import sys
 import threading
 
 import streamlit as st
-from gtex_explorer.cloud.media import image
-from gtex_explorer.paths import APP_ROOT
+from gtex_explorer.platform.cloud.media import image
+from gtex_explorer.platform.paths import APP_ROOT
 
-from gtex_explorer.workspaces import (create_workspace, delete_workspace, last_workspace, list_workspaces,
+from gtex_explorer.platform.workspaces import (create_workspace, delete_workspace, last_workspace, list_workspaces,
                         remember_workspace, rename_workspace, workspace_directory, workspace_roots)
 
 
@@ -97,7 +97,7 @@ def remember_location():
 
 def current_workspace_root(root=None):
     if root is None:
-        from gtex_explorer.desktop_runtime import state_directory
+        from gtex_explorer.platform.desktop_runtime import state_directory
         root = state_directory()
     identity = st.session_state.get('active_workspace_id', last_workspace(root))
     return workspace_directory(root, identity)
@@ -367,7 +367,7 @@ def render_workspace_controls(root):
 
 def enter_workspace() -> None:
     """Show the chooser until a workspace is open. The main app runs only after this returns."""
-    from gtex_explorer.desktop_runtime import state_directory
+    from gtex_explorer.platform.desktop_runtime import state_directory
     root = state_directory()
     restore_location(root)
     leave_removed_workspace(root)
@@ -379,4 +379,4 @@ def enter_workspace() -> None:
     # A session restored from its URL skips the chooser and can arrive before the libraries are ready.
     if 'xgboost' not in sys.modules:
         with st.spinner('Memuat aplikasi...'):
-            importlib.import_module('gtex_explorer.analysis.core')
+            importlib.import_module('gtex_explorer.inference.prediction')
