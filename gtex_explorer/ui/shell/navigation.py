@@ -1,4 +1,5 @@
 """Sidebar navigation."""
+
 from __future__ import annotations
 
 import streamlit as st
@@ -10,6 +11,7 @@ from gtex_explorer.ui.workspace import render_workspace_controls
 
 
 def navigation() -> str:
+    """Draw the sidebar and return the current page."""
     if "page" not in st.session_state:
         st.session_state.page = "Prediksi Jaringan"
 
@@ -25,6 +27,7 @@ def navigation() -> str:
             )
 
         st.write("")
+
         def destination(route, label, icon):
             if st.button(
                 label,
@@ -42,8 +45,9 @@ def navigation() -> str:
         notebook_routes = {"Ringkasan", "Perbandingan Metode", "Panel Gen"}
         notebook_active = st.session_state.page in notebook_routes
         training_active = st.session_state.page in {"Hasil Pelatihan", "Panel Gen Pelatihan"}
-        with st.expander("Gallery Hasil Pelatihan", expanded=training_active,
-                         key=f"workspace_training_{training_active}"):
+        with st.expander(
+            "Gallery Hasil Pelatihan", expanded=training_active, key=f"workspace_training_{training_active}"
+        ):
             destination("Hasil Pelatihan", "Hasil Pelatihan", ":material/monitoring:")
             destination("Panel Gen Pelatihan", "Panel Gen", ":material/table_view:")
         destination("Kamus Biologi", "Kamus Biologi", ":material/menu_book:")
@@ -52,8 +56,9 @@ def navigation() -> str:
             render_workspace_controls(state_directory())
             with st.container(key="reference_section"):
                 st.divider()
-                with st.expander("Referensi Eksperimen", expanded=notebook_active,
-                                 key=f"workspace_notebook_{notebook_active}"):
+                with st.expander(
+                    "Referensi Eksperimen", expanded=notebook_active, key=f"workspace_notebook_{notebook_active}"
+                ):
                     destination("Ringkasan", "Ringkasan", ":material/home:")
                     destination("Perbandingan Metode", "Perbandingan Metode", ":material/monitoring:")
                     destination("Panel Gen", "Panel Gen Eksperimen", ":material/table_view:")

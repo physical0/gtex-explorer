@@ -1,4 +1,5 @@
 """Run a saved model on an aligned expression matrix and explain the result."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -8,7 +9,8 @@ from xgboost import XGBClassifier
 
 
 def _prediction_iteration_range(
-    classifier: XGBClassifier, boosting_rounds: int | None,
+    classifier: XGBClassifier,
+    boosting_rounds: int | None,
 ) -> tuple[int, int]:
     """Validate a prefix of the saved model without changing its parameters."""
     total_rounds = int(classifier.get_booster().num_boosted_rounds())
@@ -33,7 +35,7 @@ def predict_tissues(
 
     if aligned_tpm.attrs.get("input_audit_ready") is False:
         raise ValueError("Input belum lolos audit. Prediksi diblokir.")
-    
+
     iteration_range = _prediction_iteration_range(classifier, boosting_rounds)
     scaled_values = transform_aligned_tpm(aligned_tpm, preprocessor)
 
@@ -71,9 +73,9 @@ def transform_aligned_tpm(
     if len(values) == 0:
         raise ValueError("Matriks tidak memuat sampel.")
     log_values = np.log2(values + 1.0)
-    scaled_values = (
-        log_values - np.asarray(preprocessor["scaler_mean"], dtype=float)
-    ) / np.asarray(preprocessor["scaler_scale"], dtype=float)
+    scaled_values = (log_values - np.asarray(preprocessor["scaler_mean"], dtype=float)) / np.asarray(
+        preprocessor["scaler_scale"], dtype=float
+    )
     return scaled_values
 
 

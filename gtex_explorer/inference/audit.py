@@ -1,4 +1,5 @@
 """Check an expression matrix and align it to a model's genes."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -11,6 +12,8 @@ from gtex_explorer.inference.parsing import _numeric_expression, strip_ensembl_v
 
 @dataclass
 class InputAudit:
+    """Everything the audit found in one uploaded expression matrix."""
+
     source_orientation: str
     sample_count: int
     supplied_gene_count: int
@@ -45,9 +48,12 @@ def audit_and_align_input(
     Observed zero TPM is available data, independently of positive expression.
     """
     for threshold in (minimum_observed_fraction, minimum_positive_fraction):
-        if (not isinstance(threshold, (int, float, np.integer, np.floating))
-                or isinstance(threshold, (bool, np.bool_))
-                or not np.isfinite(threshold) or not 0 <= threshold <= 1):
+        if (
+            not isinstance(threshold, (int, float, np.integer, np.floating))
+            or isinstance(threshold, (bool, np.bool_))
+            or not np.isfinite(threshold)
+            or not 0 <= threshold <= 1
+        ):
             raise ValueError("Nilai ambang pengingat harus berada antara 0 dan 1.")
 
     required_genes = [str(gene) for gene in preprocessor["selected_genes"]]
@@ -94,9 +100,7 @@ def audit_and_align_input(
     matched_fraction = matched_count / max(len(required_genes), 1)
     finite_values = raw_values[np.isfinite(raw_values)]
     appears_log = bool(
-        finite_values.size > 0
-        and np.nanpercentile(finite_values, 99) < 30
-        and np.nanmax(finite_values) < 100
+        finite_values.size > 0 and np.nanpercentile(finite_values, 99) < 30 and np.nanmax(finite_values) < 100
     )
     # Count availability before imputation. Neither coverage nor zero TPM blocks inference.
     observed_fraction = observed_count / max(len(required_genes), 1)
@@ -105,17 +109,19 @@ def audit_and_align_input(
     uploaded_positive_count = ((raw_values > 0) & np.isfinite(raw_values)).sum(axis=1)
     uploaded_positive_fraction = uploaded_positive_count / max(input_matrix.shape[1], 1)
     meets_positive_threshold = uploaded_positive_fraction >= minimum_positive_fraction
-    sample_quality = pd.DataFrame({
-        "SAMPID": input_matrix.index.astype(str),
-        "observed_model_genes": observed_count,
-        "imputed_model_genes": len(required_genes) - observed_count,
-        "observed_fraction": observed_fraction,
-        "positive_expression_genes": expressed_count,
-        "meets_reminder_threshold": meets_threshold,
-        "uploaded_positive_genes": uploaded_positive_count,
-        "uploaded_positive_fraction": uploaded_positive_fraction,
-        "meets_positive_reminder_threshold": meets_positive_threshold,
-    })
+    sample_quality = pd.DataFrame(
+        {
+            "SAMPID": input_matrix.index.astype(str),
+            "observed_model_genes": observed_count,
+            "imputed_model_genes": len(required_genes) - observed_count,
+            "observed_fraction": observed_fraction,
+            "positive_expression_genes": expressed_count,
+            "meets_reminder_threshold": meets_threshold,
+            "uploaded_positive_genes": uploaded_positive_count,
+            "uploaded_positive_fraction": uploaded_positive_fraction,
+            "meets_positive_reminder_threshold": meets_positive_threshold,
+        }
+    )
     below_threshold_sample_count = int((~meets_threshold).sum())
     ready = bool(
         negative_count == 0
@@ -149,9 +155,7 @@ def audit_and_align_input(
 
     aligned.attrs["input_audit_ready"] = ready
     return aligned, InputAudit(
-        source_orientation=str(
-            input_matrix.attrs.get("source_orientation", "sampel × gen")
-        ),
+        source_orientation=str(input_matrix.attrs.get("source_orientation", "sampel × gen")),
         sample_count=len(input_matrix),
         supplied_gene_count=input_matrix.shape[1],
         matched_gene_count=matched_count,

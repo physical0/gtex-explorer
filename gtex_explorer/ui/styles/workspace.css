@@ -1,3 +1,4 @@
+/* --- Colours --- */
 :root {
     --ink: #14213d;
     --muted: #667085;
@@ -13,6 +14,7 @@ html, body, [class*="css"] {
     font-family: "Segoe UI", Arial, sans-serif;
 }
 
+/* --- Page --- */
 [data-testid="stAppViewContainer"] {
     background: #fbfbfa;
 }
@@ -22,6 +24,7 @@ html, body, [class*="css"] {
     padding: 1rem 1.5rem 1.1rem;
 }
 
+/* --- Sidebar --- */
 [data-testid="stSidebar"] {
     width: 290px !important;
     background: #fcfcfb;
@@ -111,12 +114,14 @@ html, body, [class*="css"] {
     color: var(--teal-dark) !important;
 }
 
+/* --- Buttons --- */
 .stButton > button, .stDownloadButton > button {
     border-radius: .25rem;
     min-height: 2.35rem;
     box-shadow: none;
 }
 
+/* --- Brand --- */
 .brand-title {
     font-size: 1.14rem;
     font-weight: 720;
@@ -126,6 +131,7 @@ html, body, [class*="css"] {
     font-size: .72rem;
 }
 
+/* --- Page header --- */
 .workspace-header {
     display: flex;
     flex-wrap: wrap;
@@ -161,6 +167,7 @@ html, body, [class*="css"] {
     max-width: 100%;
 }
 
+/* --- Panels and files --- */
 .panel-heading {
     font-size: 1.18rem;
     font-weight: 700;
@@ -219,6 +226,7 @@ html, body, [class*="css"] {
     color: #87510a;
 }
 
+/* --- Prediction results --- */
 .result-name {
     color: var(--teal-dark);
     font-size: 1.85rem;
@@ -255,12 +263,14 @@ html, body, [class*="css"] {
 }
 .probability-summary .result-probability { font-size: 1.8rem; margin: .45rem 0 0; }
 .probability-summary-value { font-size: 1.45rem; margin-top: .5rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+/* --- Narrow screens --- */
 @media (max-width: 1050px) {
     .probability-summary { grid-template-columns: 1fr; gap: .6rem; }
     .probability-summary-item + .probability-summary-item { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: .6rem; }
     .probability-summary-name, .probability-summary .result-name { min-height: 0; }
 }
 
+/* --- Evidence and empty states --- */
 .evidence-row {
     display: flex;
     justify-content: space-between;
@@ -290,6 +300,7 @@ html, body, [class*="css"] {
     margin-bottom: .25rem;
 }
 
+/* --- Prediction workspace --- */
 .st-key-prediction_input {
     border-right: 1px solid var(--line);
     padding-right: 1.35rem;
@@ -400,6 +411,7 @@ html, body, [class*="css"] {
     margin: .55rem 0 .25rem !important;
 }
 
+/* --- Status strip and metrics --- */
 .offline-strip {
     display: flex;
     flex-wrap: wrap;

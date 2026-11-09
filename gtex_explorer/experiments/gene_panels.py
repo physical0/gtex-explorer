@@ -1,4 +1,5 @@
 """Read-only gene panels from the notebook's saved cross-validation rankings."""
+
 from __future__ import annotations
 
 import hashlib
@@ -7,7 +8,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
 
 L1_INSUFFICIENT_GENES = "Gen berkoefisien nonzero kurang dari jumlah top-k pada satu atau lebih fold"
 
@@ -18,15 +18,20 @@ def clarify_eligibility_reasons(summary: pd.DataFrame, fits: pd.DataFrame) -> pd
     for index, row in result.iterrows():
         if row.get("feature_selection") != "l1":
             continue
-        matching = fits.loc[
-            fits["selector_id"].eq(row["selector_id"]) & fits["genes"].eq(row["genes"])
-        ]
+        matching = fits.loc[fits["selector_id"].eq(row["selector_id"]) & fits["genes"].eq(row["genes"])]
         if matching.empty or not matching["nonzero_gene_count"].lt(row["genes"]).any():
             continue
         reasons = [part.strip() for part in str(row["eligibility_reason"]).split("|")]
-        reasons = [part for part in reasons if part not in {
-            "top-k mencakup skor nol atau tidak didukung", "flag eligibility fold gagal", "eligible",
-        }]
+        reasons = [
+            part
+            for part in reasons
+            if part
+            not in {
+                "top-k mencakup skor nol atau tidak didukung",
+                "flag eligibility fold gagal",
+                "eligible",
+            }
+        ]
         result.loc[index, "eligibility_reason"] = " | ".join([L1_INSUFFICIENT_GENES, *reasons])
     return result
 
@@ -75,20 +80,31 @@ def load_cv_gene_rankings(data_dir: Path, summary: dict, fits: pd.DataFrame) -> 
 def cv_gene_panel(rankings: pd.DataFrame, fit: pd.Series) -> pd.DataFrame:
     """Return exactly the top-k genes used in this fit, or the unranked baseline."""
     if bool(fit["uses_feature_selection"]):
-        panel = rankings.loc[
-            rankings["selector_id"].eq(fit["selector_id"])
-            & rankings["fold"].eq(fit["fold"])
-            & rankings["selection_rank"].le(int(fit["genes"]))
-        ].sort_values("selection_rank").copy()
+        panel = (
+            rankings.loc[
+                rankings["selector_id"].eq(fit["selector_id"])
+                & rankings["fold"].eq(fit["fold"])
+                & rankings["selection_rank"].le(int(fit["genes"]))
+            ]
+            .sort_values("selection_rank")
+            .copy()
+        )
     else:
         # All methods share the same prefiltered candidates within a fold.
         # ANOVA is only the source of their IDs, not a selector for the baseline.
-        panel = rankings.loc[
-            rankings["selector_id"].eq("anova") & rankings["fold"].eq(fit["fold"])
-        ].sort_values("gene").copy()
+        panel = (
+            rankings.loc[rankings["selector_id"].eq("anova") & rankings["fold"].eq(fit["fold"])]
+            .sort_values("gene")
+            .copy()
+        )
         panel["selector_id"] = "none"
-        for field in ["selection_rank", "selection_score", "dominant_tissue",
-                      "l2_coefficient_norm", "nonzero_class_count"]:
+        for field in [
+            "selection_rank",
+            "selection_score",
+            "dominant_tissue",
+            "l2_coefficient_norm",
+            "nonzero_class_count",
+        ]:
             panel[field] = np.nan
     if len(panel) != int(fit["genes"]):
         raise ValueError("Jumlah gen panel tidak cocok dengan konfigurasi fit.")

@@ -4,6 +4,7 @@
 2. Workspace step (gtex_explorer.ui.workspace)
 3. Main app (gtex_explorer.ui.app)
 """
+
 import streamlit as st
 
 from gtex_explorer.platform.paths import APP_ROOT

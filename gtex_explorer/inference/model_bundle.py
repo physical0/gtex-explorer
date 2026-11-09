@@ -1,4 +1,5 @@
 """Load the final model from the thesis experiment."""
+
 from __future__ import annotations
 
 import joblib
@@ -10,19 +11,15 @@ MODEL_DIR = APP_DIR / "model_bundle"
 
 
 def model_bundle_available() -> bool:
-    return (
-        (MODEL_DIR / "preprocessor.joblib").is_file()
-        and (MODEL_DIR / "xgboost_model.json").is_file()
-    )
+    """Return whether both files of the final model exist."""
+    return (MODEL_DIR / "preprocessor.joblib").is_file() and (MODEL_DIR / "xgboost_model.json").is_file()
 
 
 def load_model_bundle() -> tuple[dict, XGBClassifier]:
     """Load preprocessing constants and the trained final XGBoost model."""
 
     if not model_bundle_available():
-        raise FileNotFoundError(
-            "Model bundle belum tersedia. Jalankan export_model_bundle.py terlebih dahulu."
-        )
+        raise FileNotFoundError("Model bundle belum tersedia. Jalankan export_model_bundle.py terlebih dahulu.")
 
     preprocessor = joblib.load(MODEL_DIR / "preprocessor.joblib")
     classifier = XGBClassifier()

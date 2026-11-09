@@ -1,4 +1,5 @@
 """Perbandingan Metode page."""
+
 from __future__ import annotations
 
 import altair as alt
@@ -8,7 +9,9 @@ from gtex_explorer.experiments.gene_panels import clarify_eligibility_reasons
 
 
 def render_comparison_page(tables: dict) -> None:
-    st.markdown('''<style>
+    """Compare the feature selection methods on CV and holdout."""
+    st.markdown(
+        """<style>
     [data-testid="stAppViewContainer"]:has(.comparison-page-marker) { background: #fff; }
     [data-testid="stAppViewContainer"]:has(.comparison-page-marker) [data-testid="stMain"] .block-container {
         padding: 1.4rem 2rem 1.5rem;
@@ -20,17 +23,24 @@ def render_comparison_page(tables: dict) -> None:
     @media (max-width: 640px) {
         [data-testid="stAppViewContainer"]:has(.comparison-page-marker) [data-testid="stMain"] .block-container { padding: 1rem; }
     }
-    </style><div class="comparison-page-marker"></div>''', unsafe_allow_html=True)
+    </style><div class="comparison-page-marker"></div>""",
+        unsafe_allow_html=True,
+    )
     st.title("Perbandingan metode")
     st.caption("CV Folding untuk memilih konfigurasi, holdout untuk evaluasi akhir.")
     summary = tables["run_summary"]
     validation = tables["experiment_validation"]
     cv_summary = clarify_eligibility_reasons(tables["cv_summary"], tables["cv_folds"])
     cv_summary["eligibility_reason"] = cv_summary["eligibility_reason"].str.replace(" | ", ", ", regex=False)
+    # CV Folding: summary and metric controls.
     heading, controls = st.columns([3, 1])
     with heading:
         st.subheader("1. Hasil CV Folding")
-        st.markdown(f"**Data development: {summary['development_samples']:,} sampel - {summary['development_donors']:,} donor**".replace(",", "."))
+        st.markdown(
+            f"**Data development: {summary['development_samples']:,} sampel - {summary['development_donors']:,} donor**".replace(
+                ",", "."
+            )
+        )
         st.caption(
             f"{summary['selector_configurations']} konfigurasi seleksi fitur + {summary['baseline_configurations']} baseline - "
             f"{summary['cv_folds']} fold - {len(tables['cv_folds'])} hasil evaluasi"
@@ -49,20 +59,22 @@ def render_comparison_page(tables: dict) -> None:
         "Accuracy": ("mean_accuracy", "std_accuracy"),
     }
     mean_column, std_column = metric_lookup[metric_label]
-    selector_data = cv_summary.loc[
-        cv_summary["experiment_type"].eq("feature_selection")
-    ].copy()
-    baseline_data = cv_summary.loc[
-        cv_summary["experiment_type"].eq("baseline")
-    ].copy()
+    selector_data = cv_summary.loc[cv_summary["experiment_type"].eq("feature_selection")].copy()
+    baseline_data = cv_summary.loc[cv_summary["experiment_type"].eq("baseline")].copy()
     selector_data["lower"] = selector_data[mean_column] - selector_data[std_column]
     selector_data["upper"] = selector_data[mean_column] + selector_data[std_column]
     selector_legend = alt.Legend(
-        orient="bottom", columns=3, symbolOpacity=1,
-        symbolType="stroke", symbolStrokeWidth=3, labelColor="#344054", labelFontSize=13,
+        orient="bottom",
+        columns=3,
+        symbolOpacity=1,
+        symbolType="stroke",
+        symbolStrokeWidth=3,
+        labelColor="#344054",
+        labelFontSize=13,
     )
     selector_colors = alt.Scale(range=["#4477aa", "#0f8b8d", "#9c6b21", "#5b5f97", "#587d71"])
 
+    # Mean score per selector, with a band of one SD and the baseline as a line.
     line = (
         alt.Chart(selector_data)
         .mark_line(strokeWidth=2.2)
@@ -86,7 +98,7 @@ def render_comparison_page(tables: dict) -> None:
             ],
         )
     )
-    
+
     points = line.mark_point(size=70, filled=True, strokeWidth=2).encode(
         stroke=alt.Color("selector_label:N", scale=selector_colors, legend=None),
         fill=alt.condition(
@@ -121,9 +133,7 @@ def render_comparison_page(tables: dict) -> None:
         (band + line + baseline_rule + points).resolve_legend(color="shared").properties(height=280),
         width="stretch",
     )
-    st.caption(
-        "Titik berongga: tidak memenuhi syarat seleksi. Garis hitam: baseline. Pita: ±1 SD antar-fold."
-    )
+    st.caption("Titik berongga: tidak memenuhi syarat seleksi. Garis hitam: baseline. Pita: ±1 SD antar-fold.")
 
     # Display the notebook's locked choice instead of choosing again in the UI.
     saved_choice = tables["run_summary"]
@@ -137,24 +147,42 @@ def render_comparison_page(tables: dict) -> None:
         f"{int(best_row['genes']):,}".replace(",", ".")
         + f" gen - Macro-F1 CV {best_row['mean_macro_f1']:.2%}".replace(".", ",")
     )
-    
+
     # Show the locked configuration and ANOVA/MI at the same k; keep the full grid below.
     preview = cv_summary.loc[
         cv_summary["configuration_id"].eq(best_row["configuration_id"])
-        | (cv_summary["feature_selection"].isin(["anova", "mutual_information"])
-           & cv_summary["genes"].eq(best_row["genes"]))
+        | (
+            cv_summary["feature_selection"].isin(["anova", "mutual_information"])
+            & cv_summary["genes"].eq(best_row["genes"])
+        )
         | cv_summary["experiment_type"].eq("baseline")
     ].copy()
-    
-    preview["preview_order"] = preview["feature_selection"].map({"l1": 0, "anova": 1, "mutual_information": 2}).fillna(3)
+
+    preview["preview_order"] = (
+        preview["feature_selection"].map({"l1": 0, "anova": 1, "mutual_information": 2}).fillna(3)
+    )
     preview = preview.sort_values("preview_order")
-    preview["selection_status"] = preview["configuration_id"].eq(best_row["configuration_id"]).map({True: "Terpilih", False: "Pembanding"})
-    preview["configuration_label"] = preview["selector_label"].where(preview["experiment_type"].ne("baseline"), "Baseline")
+    preview["selection_status"] = (
+        preview["configuration_id"].eq(best_row["configuration_id"]).map({True: "Terpilih", False: "Pembanding"})
+    )
+    preview["configuration_label"] = preview["selector_label"].where(
+        preview["experiment_type"].ne("baseline"), "Baseline"
+    )
     st.markdown("#### Ringkasan konfigurasi")
     st.dataframe(
-        preview[["configuration_label", "genes", mean_column, std_column, "selection_status"]].style.apply(
-            lambda row: ["background-color: #edf7f7; color: #087278; font-weight: 600" if row["selection_status"] == "Terpilih" else ""] * len(row), axis=1,
-        ).format(
+        preview[["configuration_label", "genes", mean_column, std_column, "selection_status"]]
+        .style.apply(
+            lambda row: [
+                (
+                    "background-color: #edf7f7; color: #087278; font-weight: 600"
+                    if row["selection_status"] == "Terpilih"
+                    else ""
+                )
+            ]
+            * len(row),
+            axis=1,
+        )
+        .format(
             {
                 "genes": lambda value: f"{int(value):,}".replace(",", "."),
                 mean_column: lambda value: f"{value:.2%}".replace(".", ","),
@@ -173,29 +201,52 @@ def render_comparison_page(tables: dict) -> None:
     )
     with st.expander(f"Lihat {len(cv_summary)} konfigurasi"):
         st.dataframe(
-            cv_summary[["performance_rank", "configuration_label", "experiment_type", "genes", mean_column, std_column,
-                        "eligible_for_selector_ranking", "eligibility_reason"]].style.format({
-                "genes": lambda value: f"{int(value):,}".replace(",", "."),
-                mean_column: lambda value: f"{value:.2%}".replace(".", ","),
-                std_column: lambda value: f"{value * 100:.2f}".replace(".", ","),
-            }), width="stretch", hide_index=True,
+            cv_summary[
+                [
+                    "performance_rank",
+                    "configuration_label",
+                    "experiment_type",
+                    "genes",
+                    mean_column,
+                    std_column,
+                    "eligible_for_selector_ranking",
+                    "eligibility_reason",
+                ]
+            ].style.format(
+                {
+                    "genes": lambda value: f"{int(value):,}".replace(",", "."),
+                    mean_column: lambda value: f"{value:.2%}".replace(".", ","),
+                    std_column: lambda value: f"{value * 100:.2f}".replace(".", ","),
+                }
+            ),
+            width="stretch",
+            hide_index=True,
             column_config={
                 "performance_rank": "Peringkat Macro-F1",
                 "configuration_label": st.column_config.TextColumn("Konfigurasi", width="large"),
-                "experiment_type": "Jenis eksperimen", "genes": "Gen",
-                mean_column: f"Rerata {metric_label} CV (%)", std_column: "SD (poin persentase)",
+                "experiment_type": "Jenis eksperimen",
+                "genes": "Gen",
+                mean_column: f"Rerata {metric_label} CV (%)",
+                std_column: "SD (poin persentase)",
                 "eligible_for_selector_ranking": st.column_config.CheckboxColumn("Memenuhi syarat seleksi"),
                 "eligibility_reason": st.column_config.TextColumn("Keterangan", width="large"),
             },
         )
-        st.caption("Peringkat memakai Macro-F1. Konfigurasi terpilih tetap mengikuti notebook dan harus memenuhi syarat seleksi. Baseline bukan kandidat selector.")
+        st.caption(
+            "Peringkat memakai Macro-F1. Konfigurasi terpilih tetap mengikuti notebook dan harus memenuhi syarat seleksi. Baseline bukan kandidat selector."
+        )
         st.caption(
             f"Validasi pipeline: {validation['configuration_count']} konfigurasi, "
             f"{validation['folds_per_configuration']} fold per konfigurasi, {validation['fold_level_results']} hasil fold-level."
         )
-        st.caption(f"Baseline memakai seluruh {int(baseline_row['genes']):,} gen kandidat tanpa seleksi fitur.".replace(",", "."))
+        st.caption(
+            f"Baseline memakai seluruh {int(baseline_row['genes']):,} gen kandidat tanpa seleksi fitur.".replace(
+                ",", "."
+            )
+        )
 
     st.divider()
+    # Final comparison on the holdout data.
     st.subheader("2. Hasil akhir - holdout")
     st.markdown(f"**{summary['test_samples']:,} sampel - {summary['test_donors']:,} donor**".replace(",", "."))
     st.caption(
@@ -212,19 +263,19 @@ def render_comparison_page(tables: dict) -> None:
         selected_label = f"{best_row['selector_label']}, " + f"{int(best_row['genes']):,} gen".replace(",", ".")
         baseline_label = "Baseline, " + f"{int(baseline_row['genes']):,} gen".replace(",", ".")
         model_order = [selected_label, baseline_label]
-        holdout["model"] = holdout["experiment_type"].map(
-            {
-                "feature_selection": selected_label,
-                "baseline": baseline_label,
-            }
-        ).fillna(holdout["configuration_label"])
+        holdout["model"] = (
+            holdout["experiment_type"]
+            .map(
+                {
+                    "feature_selection": selected_label,
+                    "baseline": baseline_label,
+                }
+            )
+            .fillna(holdout["configuration_label"])
+        )
 
-        selected_holdout = holdout.loc[
-            holdout["experiment_type"].eq("feature_selection")
-        ].iloc[0]
-        baseline_holdout = holdout.loc[
-            holdout["experiment_type"].eq("baseline")
-        ].iloc[0]
+        selected_holdout = holdout.loc[holdout["experiment_type"].eq("feature_selection")].iloc[0]
+        baseline_holdout = holdout.loc[holdout["experiment_type"].eq("baseline")].iloc[0]
 
         st.markdown(
             "**Selisih Macro-F1: "
@@ -245,27 +296,23 @@ def render_comparison_page(tables: dict) -> None:
             var_name="metric",
             value_name="score",
         )
-        holdout_long["metric"] = holdout_long["metric"].map(
-            holdout_metric_labels
-        )
+        holdout_long["metric"] = holdout_long["metric"].map(holdout_metric_labels)
         holdout_long["display_score"] = holdout_long["score"].map(lambda value: f"{value:.2%}".replace(".", ","))
-        holdout_base = (
-            alt.Chart(holdout_long)
-            .encode(
-                x=alt.X("metric:N", title=None, sort=list(holdout_metric_labels.values())),
-                xOffset=alt.XOffset("model:N", sort=model_order),
-                y=alt.Y("score:Q", title="Skor holdout", scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format=".0%")),
-                color=alt.Color(
-                    "model:N",
-                    title=None, legend=alt.Legend(orient="bottom"),
-                    scale=alt.Scale(domain=model_order, range=["#078c92", "#667085"]),
-                ),
-                tooltip=[
-                    alt.Tooltip("model:N", title="Model"),
-                    alt.Tooltip("metric:N", title="Metrik"),
-                    alt.Tooltip("score:Q", title="Skor", format=".2%"),
-                ],
-            )
+        holdout_base = alt.Chart(holdout_long).encode(
+            x=alt.X("metric:N", title=None, sort=list(holdout_metric_labels.values())),
+            xOffset=alt.XOffset("model:N", sort=model_order),
+            y=alt.Y("score:Q", title="Skor holdout", scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format=".0%")),
+            color=alt.Color(
+                "model:N",
+                title=None,
+                legend=alt.Legend(orient="bottom"),
+                scale=alt.Scale(domain=model_order, range=["#078c92", "#667085"]),
+            ),
+            tooltip=[
+                alt.Tooltip("model:N", title="Model"),
+                alt.Tooltip("metric:N", title="Metrik"),
+                alt.Tooltip("score:Q", title="Skor", format=".2%"),
+            ],
         )
         holdout_chart = (
             holdout_base.mark_bar()
@@ -297,19 +344,23 @@ def render_comparison_page(tables: dict) -> None:
                         "accuracy": lambda value: f"{value:.2%}".replace(".", ","),
                     }
                 ),
-                width="stretch", hide_index=True,
+                width="stretch",
+                hide_index=True,
                 column_config={
-                    "configuration_label": "Konfigurasi final", "genes": "Jumlah gen",
-                    "macro_f1": "Macro-F1", "macro_precision": "Macro-precision",
-                    "macro_recall": "Macro-recall", "balanced_accuracy": "Balanced accuracy", "accuracy": "Accuracy",
+                    "configuration_label": "Konfigurasi final",
+                    "genes": "Jumlah gen",
+                    "macro_f1": "Macro-F1",
+                    "macro_precision": "Macro-precision",
+                    "macro_recall": "Macro-recall",
+                    "balanced_accuracy": "Balanced accuracy",
+                    "accuracy": "Accuracy",
                 },
             )
 
+        # F1-score of each tissue, for both models.
         per_tissue_holdout = tables["final_holdout_per_tissue"].copy()
         if not per_tissue_holdout.empty:
-            per_tissue_holdout["model"] = per_tissue_holdout[
-                "configuration_id"
-            ].map(
+            per_tissue_holdout["model"] = per_tissue_holdout["configuration_id"].map(
                 {
                     str(selected_holdout["configuration_id"]): selected_label,
                     str(baseline_holdout["configuration_id"]): baseline_label,

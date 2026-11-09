@@ -4,11 +4,11 @@ Run from the app root: python -m scripts.export_cv_gene_panels
 Only trusted, locally generated notebook checkpoints are read with joblib.
 The desktop application reads the compact CSV export, never these checkpoints.
 """
+
 from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 
 import joblib
 import numpy as np
@@ -18,7 +18,9 @@ from gtex_explorer.experiments.gene_panels import cv_gene_panel, load_cv_gene_ra
 
 
 def export_panels() -> None:
+    """Export the gene panel of every CV fold from the notebook results."""
     from gtex_explorer.platform.paths import APP_ROOT as app_dir
+
     data_dir = app_dir / "data"
     checkpoint_dir = app_dir.parent / "results/notebook_run_500_1000_2000_l1_grid/part_a_progress_v4"
     summary = json.loads((data_dir / "run_summary.json").read_text(encoding="utf-8"))
@@ -45,11 +47,15 @@ def export_panels() -> None:
         fold = int(prepared["fold"])
         genes = list(map(str, prepared["gene_names"]))
         training_ids = list(map(str, prepared["train_sample_ids"]))
-        ranking_hash = hashlib.sha256(("\n".join(genes) + "|samples|" + "\n".join(training_ids)).encode("utf-8")).hexdigest()
+        ranking_hash = hashlib.sha256(
+            ("\n".join(genes) + "|samples|" + "\n".join(training_ids)).encode("utf-8")
+        ).hexdigest()
         combined_payload = {"fold": fold, "gene_names": genes}
         for field in ["train_sample_ids", "validation_sample_ids", "train_donors", "validation_donors"]:
             combined_payload[field] = list(map(str, prepared[field]))
-        combined_hash = hashlib.sha256(json.dumps(combined_payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+        combined_hash = hashlib.sha256(
+            json.dumps(combined_payload, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
         fold_identity[fold] = (ranking_hash, combined_hash)
         fold_candidates[fold] = genes
     del prepared, fold_checkpoint
@@ -91,16 +97,22 @@ def export_panels() -> None:
         expected_ranks = np.arange(1, len(ordered) + 1)
         if not np.array_equal(ordered[rank_column], expected_ranks):
             raise ValueError(f"Ranking mismatch: {selector}/{fold}")
-        frame = pd.DataFrame({
-            "selector_id": selector,
-            "fold": int(fold),
-            "gene": ordered["gene"].astype(str),
-            "selection_rank": expected_ranks,
-            "selection_score": np.asarray(scores)[order],
-        })
+        frame = pd.DataFrame(
+            {
+                "selector_id": selector,
+                "fold": int(fold),
+                "gene": ordered["gene"].astype(str),
+                "selection_rank": expected_ranks,
+                "selection_score": np.asarray(scores)[order],
+            }
+        )
         for column in ["dominant_tissue", "l2_coefficient_norm", "nonzero_class_count"]:
             if column == "dominant_tissue":
-                frame[column] = ordered[column].astype(object) if column in ordered else pd.Series(None, index=frame.index, dtype=object)
+                frame[column] = (
+                    ordered[column].astype(object)
+                    if column in ordered
+                    else pd.Series(None, index=frame.index, dtype=object)
+                )
             else:
                 frame[column] = ordered[column].astype(float) if column in ordered else np.nan
         frames.append(frame)
@@ -156,7 +168,9 @@ def export_panels() -> None:
     temporary_manifest.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     temporary_manifest.replace(manifest_path)
     load_cv_gene_rankings(data_dir, summary, fits)
-    print(f"Verified {len(saved_sets)} selector panels + {len(baseline_fits)} baseline panels; exported {len(frames)} reusable rankings ({len(rankings):,} rows). No models refitted.")
+    print(
+        f"Verified {len(saved_sets)} selector panels + {len(baseline_fits)} baseline panels; exported {len(frames)} reusable rankings ({len(rankings):,} rows). No models refitted."
+    )
 
 
 if __name__ == "__main__":
