@@ -68,6 +68,19 @@ def atomic_replace_file(source: Path, target: Path) -> None:
             time.sleep(0.05 * (attempt + 1))
 
 
+def read_json_file(path: Path):
+    """Read a JSON file that another process may be replacing."""
+    # Opening a file while Windows swaps it in can briefly fail. open() reports this as a plain errno 13,
+    # without the winerror os.replace gives, so every PermissionError is retried. A lasting one is still raised.
+    for attempt in range(6):
+        try:
+            return json.loads(Path(path).read_text(encoding="utf-8"))
+        except PermissionError:
+            if attempt == 5:
+                raise
+            time.sleep(0.05 * (attempt + 1))
+
+
 def stable_hash(value: object) -> str:
     """Return a hash of JSON-compatible data that does not depend on key order."""
     return hashlib.sha256(
@@ -178,6 +191,7 @@ class TrainingData:
 
     @property
     def fingerprint(self) -> str:
+        """Return a hash that identifies this dataset."""
         return stable_hash(self.manifest)
 
 

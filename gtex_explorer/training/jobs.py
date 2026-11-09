@@ -22,6 +22,7 @@ from gtex_explorer.training.data import (
     atomic_replace_file,
     discard_directory,
     load_training_data,
+    read_json_file,
     run_split,
     safe_path,
 )
@@ -120,7 +121,7 @@ def has_active_run(state_root: Path) -> bool:
     """Return whether this workspace has a run in progress."""
     for path in (Path(state_root) / "runs").glob("run_*/status.json"):
         try:
-            if json.loads(path.read_text(encoding="utf-8")).get("status") in ACTIVE_STATUSES:
+            if read_json_file(path).get("status") in ACTIVE_STATUSES:
                 return True
         except (OSError, ValueError):
             continue
@@ -135,7 +136,7 @@ def read_job(run_id: str, state_root: Path) -> JobRecord:
 
         return record(run_id, state_root)
     path = job_path(run_id, state_root) / "status.json"
-    value = json.loads(path.read_text(encoding="utf-8"))
+    value = read_json_file(path)
     if value["status"] in {"running", "cancelling", "queued", "paused"} and not (
         value["status"] == "queued" and time.time() - value["updated"] < 30
     ):
@@ -162,7 +163,7 @@ def read_job(run_id: str, state_root: Path) -> JobRecord:
 
 def _recover_dead_job(path):
     """Correct the status of a run whose worker has died."""
-    value = json.loads(path.read_text(encoding="utf-8"))
+    value = read_json_file(path)
     if value["status"] in {"running", "cancelling", "queued", "paused"}:
         if (path.parent / "cancel.json").exists():
             value.update(status="cancelled", stage="cancelled", error=None)
@@ -221,7 +222,7 @@ def _assert_idle(state_root):
         raise ValueError("A training worker is already running") from error
     paths = [path for _, root in workspace_roots(coordinator) for path in (root / "runs").glob("run_*/status.json")]
     for path in paths:
-        status = json.loads(path.read_text(encoding="utf-8"))
+        status = read_json_file(path)
         if status["status"] == "queued" and time.time() - status["updated"] < 30:
             raise ValueError("A training worker is starting")
         if status["status"] in {"queued", "running", "cancelling", "paused"}:
@@ -404,7 +405,7 @@ def pause_job(run_id: str, state_root: Path) -> JobRecord:
             process.suspend()
             # Read again after suspension so an iteration/status update in flight
             # cannot be mistaken for the state at the earlier button click.
-            value = json.loads((root / "status.json").read_text(encoding="utf-8"))
+            value = read_json_file(root / "status.json")
             if (
                 value["status"] != "running"
                 or (root / "cancel.json").exists()

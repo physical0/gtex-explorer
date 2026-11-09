@@ -84,6 +84,7 @@ class CloudUpload:
     """An uploaded file with the same interface as a Streamlit upload."""
 
     def __init__(self, value):
+        """Validate the browser's upload reference."""
         self.reference = validate_reference(value)
         self.name = value["name"]
         self.size = value["size"]
@@ -91,6 +92,7 @@ class CloudUpload:
         self.file_id = value["id"]
 
     def getvalue(self):
+        """Download and return the uploaded bytes."""
         return _download(self.reference["id"], self.size)
 
 

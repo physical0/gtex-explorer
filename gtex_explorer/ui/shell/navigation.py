@@ -29,6 +29,7 @@ def navigation() -> str:
         st.write("")
 
         def destination(route, label, icon):
+            """Draw one sidebar link and open its page when clicked."""
             if st.button(
                 label,
                 icon=icon,

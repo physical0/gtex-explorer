@@ -96,11 +96,12 @@ desktop.py                Launcher desktop
 cloud_app.py              Launcher hosted
 gtex_explorer/
   ui/
-    app.py                Aplikasi utama setelah workspace dibuka
+    app.py                Bingkai aplikasi utama: navigasi dan rute halaman
     workspace.py          Pemilihan dan pengelolaan workspace
     pages/                Satu berkas untuk setiap halaman
+    components/           Bagian tampilan yang dipakai beberapa halaman
     shell/                Tema, navigasi, dan data bersama antarhalaman
-    styles/               CSS aplikasi
+    styles/               CSS aplikasi dan setiap halaman
   inference/              Parsing, audit input, dan prediksi jaringan
   experiments/            Tabel hasil, panel gen, dan diagnostik notebook
   training/               Data, konfigurasi, worker, checkpoint, gallery

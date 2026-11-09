@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 from gtex_explorer.platform.cloud.state import operation
-from gtex_explorer.training.data import atomic_publish_directory, file_hash, stable_hash, unique_ids
+from gtex_explorer.training.data import TrainingData, atomic_publish_directory, file_hash, stable_hash, unique_ids
 
 
 @dataclass
@@ -125,7 +125,7 @@ def audit_uploads(
         orientation = "sampel x gen"
     try:
         samples = unique_ids(sample_axis.tolist())
-        genes = unique_ids(gene_axis.tolist(), genes=True)
+        unique_ids(gene_axis.tolist(), genes=True)
     except ValueError as error:
         raise ValueError("ID sampel atau ID gen kosong/duplikat setelah suffix versi dihapus.") from error
     missing = set(samples) - ids
@@ -228,3 +228,18 @@ def save_training_upload(audit: UploadAudit, datasets_root: Path, candidate_coun
         (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         atomic_publish_directory(root, target)
     return target
+
+
+def upload_preview(audit):
+    """Wrap a checked upload so it can be split before saving."""
+    # Splitting requires only sample/label/donor axes, never fitted gene values.
+    return TrainingData(
+        Path("."),
+        {"cached_folds": []},
+        audit.sample_ids,
+        audit.donor_ids,
+        audit.classes,
+        audit.labels,
+        audit.gene_names,
+        audit.raw_tpm,
+    )

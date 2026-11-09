@@ -105,6 +105,7 @@ class SupabaseStore:
     """
 
     def __init__(self, url=None, key=None, bucket="gtex"):
+        """Read the connection settings and start with empty caches."""
         self.url = (url or os.environ.get("SUPABASE_URL", "")).rstrip("/")
         self.key = key or os.environ.get("SUPABASE_SECRET_KEY", "")
         self.bucket = bucket
@@ -113,6 +114,7 @@ class SupabaseStore:
         self._object_bytes = 0
 
     def _request(self, method, path, body=None, headers=None):
+        """Send one authenticated request and return its status and body."""
         if not self.url or not self.key:
             raise OSError(UNAVAILABLE)
         request = urllib.request.Request(
@@ -130,22 +132,27 @@ class SupabaseStore:
             raise OSError(UNAVAILABLE) from error
 
     def _json(self, method, path, value, headers=None):
+        """Send one request with a JSON body."""
         return self._request(
             method, path, json.dumps(value).encode(), {"Content-Type": "application/json", **(headers or {})}
         )
 
     @staticmethod
     def _manifest_key(key):
+        """Return whether a key is a state manifest, which lives in the database instead of file storage."""
         return key.endswith("/state.json")
 
     def _object_path(self, key):
+        """Return the storage path of an object."""
         return f"/storage/v1/object/{self.bucket}/" + urllib.parse.quote(key)
 
     # Manifest rows: version is the ETag, conditional PATCH is the compare-and-swap.
     def _row_filter(self, key):
+        """Return the query that selects one manifest row."""
         return "/rest/v1/cloud_manifest?key=eq." + urllib.parse.quote(key, safe="")
 
     def _get_row(self, key):
+        """Read a manifest row and its version, fetching the body only when it changed."""
         cached = self._rows.get(key)
         status, body = self._request("GET", self._row_filter(key) + "&select=version" + ("" if cached else ",body"))
         if status != 200:
@@ -166,6 +173,7 @@ class SupabaseStore:
         return data, version
 
     def _put_row(self, key, data, expected, create):
+        """Write a manifest row, failing with CloudConflict if its version moved on."""
         if expected is None and not create:
             current = self._get_row(key)
             if current is None:
@@ -203,6 +211,7 @@ class SupabaseStore:
 
     # Storage objects.
     def _download(self, key):
+        """Download one object, or return None if it does not exist."""
         status, body = self._request(
             "GET", f"/storage/v1/object/authenticated/{self.bucket}/" + urllib.parse.quote(key)
         )
@@ -213,6 +222,7 @@ class SupabaseStore:
         raise OSError(UNAVAILABLE)
 
     def _stream(self, key, write):
+        """Pass an object to a callback block by block and return whether it was found."""
         request = urllib.request.Request(
             self.url + f"/storage/v1/object/authenticated/{self.bucket}/" + urllib.parse.quote(key),
             headers={"apikey": self.key, "Authorization": "Bearer " + self.key},
@@ -252,6 +262,7 @@ class SupabaseStore:
         return True
 
     def _upload(self, key, data, create):
+        """Upload one object, failing with CloudConflict if it must be new but already exists."""
         status, body = self._request(
             "POST",
             self._object_path(key),
@@ -264,6 +275,7 @@ class SupabaseStore:
             raise OSError(UNAVAILABLE)
 
     def _remember(self, key, data):
+        """Keep small stored objects in a 64 MB in-memory cache."""
         if "/objects/" not in key or len(data) > PART_SIZE:
             return
         self._objects[key] = data
@@ -272,6 +284,7 @@ class SupabaseStore:
             self._object_bytes -= len(self._objects.popitem(last=False)[1])
 
     def get(self, key):
+        """Return an object and its version, joining the parts of a split file."""
         if self._manifest_key(key):
             return self._get_row(key)
         if key in self._objects:
@@ -292,11 +305,13 @@ class SupabaseStore:
         return data, "immutable"
 
     def put(self, key, data, *, expected=None, create=False):
+        """Store bytes under a key."""
         if self._manifest_key(key):
             return self._put_row(key, data, expected, create)
         return self.put_file(key, io.BytesIO(data), expected=expected, create=create)
 
     def put_file(self, key, path, *, expected=None, create=False):
+        """Store a file under a key, splitting it when it is too large for one upload."""
         if self._manifest_key(key):
             return self._put_row(key, Path(path).read_bytes(), expected, create)
         with open(path, "rb") if isinstance(path, (str, os.PathLike)) else contextlib.nullcontext(path) as handle:
@@ -316,6 +331,7 @@ class SupabaseStore:
         return "immutable"
 
     def delete(self, keys):
+        """Delete objects in batches of 100."""
         keys = list(keys)
         for start in range(0, len(keys), 100):
             status, _ = self._json(
@@ -327,6 +343,7 @@ class SupabaseStore:
             self._objects.pop(key, None)
 
     def stale(self, prefix, older_than):
+        """List objects under a prefix that are older than the given time."""
         status, body = self._json(
             "POST", "/rest/v1/rpc/stale_objects", {"name_prefix": prefix, "older_than": older_than}
         )
@@ -335,6 +352,7 @@ class SupabaseStore:
         return json.loads(body)
 
     def signed_upload_url(self, key):
+        """Return a link the browser can upload to directly."""
         # Targets belong to one browser session; upsert lets a failed upload retry.
         status, body = self._request(
             "POST",
@@ -346,6 +364,7 @@ class SupabaseStore:
         return self.url + "/storage/v1" + json.loads(body)["url"]
 
     def signed_download_url(self, key, filename, expires=3600):
+        """Return a temporary link that downloads the object under a file name."""
         status, body = self._json(
             "POST", f"/storage/v1/object/sign/{self.bucket}/" + urllib.parse.quote(key), {"expiresIn": expires}
         )
@@ -367,6 +386,7 @@ class CloudState:
     """Keeps the local state folder in sync with durable cloud storage."""
 
     def __init__(self, root, store, prefix="gtex"):
+        """Prepare the local folder, with nothing loaded yet."""
         self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.store = store
@@ -379,6 +399,7 @@ class CloudState:
         self._hash_cache = {}
 
     def _manifest(self):
+        """Read and validate the cloud manifest, and return it with its version."""
         found = self.store.get(self.prefix + "/state.json")
         if found is None:
             return {"schema_version": 1, "files": {}, "lease": None}, None
@@ -392,6 +413,7 @@ class CloudState:
         return value, found[1]
 
     def _replace(self, manifest, etag):
+        """Write a new manifest, failing if another session changed it first."""
         return self.store.put(
             self.prefix + "/state.json",
             json.dumps(manifest, sort_keys=True, allow_nan=False).encode(),
@@ -400,6 +422,7 @@ class CloudState:
         )
 
     def _install(self, name, digest, target=None):
+        """Download one file into the local folder after checking its digest."""
         # pull() validates first: resolve() is unreliable while other threads create files.
         target = target or _safe(self.root, name)
         key = self.prefix + "/objects/" + digest
@@ -423,6 +446,7 @@ class CloudState:
         self.baseline[name] = digest
 
     def pull(self):
+        """Bring the local folder up to date with cloud storage."""
         with self.lock:
             manifest, etag = self._manifest()
             self.remote_exists = etag is not None
@@ -472,6 +496,7 @@ class CloudState:
                     self.baseline.setdefault(name, digest)
 
     def _durable(self, path):
+        """Return whether a local file should be kept in cloud storage."""
         relative = path.relative_to(self.root)
         parts = relative.parts
         if path.is_symlink():
@@ -493,6 +518,7 @@ class CloudState:
         return True
 
     def _local_files(self):
+        """Return the digest of every durable local file, reusing those that did not change."""
         files = {}
         for path in self.root.rglob("*"):
             if not path.is_file() or not self._durable(path):
@@ -515,6 +541,7 @@ class CloudState:
         return files
 
     def publish(self, *, lease_owner=None, now=None, owned_paths=(), only=None):
+        """Upload local changes and update the manifest."""
         with self.lock:
             local = self._local_files()
             keys = local.keys() | self.baseline.keys()
@@ -589,6 +616,7 @@ class CloudState:
         return len(stale)
 
     def acquire_lease(self, owner, *, now=None, ttl=60):
+        """Try to become the owner of the state, and return whether that worked."""
         now = time.time() if now is None else now
         for _ in range(5):
             manifest, etag = self._manifest()
@@ -604,6 +632,7 @@ class CloudState:
         return False
 
     def release_lease(self, owner):
+        """Give up the lease if this owner still holds it."""
         for _ in range(5):
             manifest, etag = self._manifest()
             if (manifest.get("lease") or {}).get("owner") != owner:
@@ -617,6 +646,7 @@ class CloudState:
 
     @contextmanager
     def transaction(self):
+        """Pull before the outermost block and publish after it."""
         with self.lock:
             outer = self.depth == 0
             if outer:
@@ -664,6 +694,7 @@ def operation(function):
 
     @functools.wraps(function)
     def wrapped(*args, **kwargs):
+        """Run the function inside a transaction when called from the web app."""
         if remote_client():
             with state().transaction():
                 return function(*args, **kwargs)

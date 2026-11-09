@@ -8,46 +8,22 @@ import pandas as pd
 import streamlit as st
 
 from gtex_explorer.experiments.gene_panels import cv_gene_panel
-from gtex_explorer.experiments.selector_diagnostics import (
+from gtex_explorer.platform.cloud.media import download_button
+from gtex_explorer.ui.components.selector_diagnostics import (
     render_diagnostic_details,
     render_selector_metrics,
     render_stability_details,
 )
-from gtex_explorer.platform.cloud.media import download_button
-
-GENE_PAGE_STYLE = """
-<style>
-[data-testid="stAppViewContainer"]:has(.gene-page-marker) { background: #fff; }
-[data-testid="stAppViewContainer"]:has(.gene-page-marker) [data-testid="stMain"] .block-container {
-    padding: 1.4rem 2rem 1.5rem;
-}
-[data-testid="stElementContainer"]:has(.gene-page-marker),
-[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] style) { display: none; }
-.gene-identity { margin: .6rem 0 .15rem; font-size: 1.1rem; font-weight: 650; color: var(--ink); }
-[data-testid="stAppViewContainer"]:has(.gene-page-marker) [data-baseweb="tab-list"] {
-    gap: 1.5rem; border-bottom: 1px solid var(--line); margin: .5rem 0 .4rem;
-}
-[data-testid="stAppViewContainer"]:has(.gene-page-marker) [data-baseweb="tab"] {
-    padding: .75rem .4rem; font-size: 1rem; font-weight: 600; background: transparent;
-}
-[data-testid="stAppViewContainer"]:has(.gene-page-marker) [data-baseweb="tab"][aria-selected="true"] { color: #0f8b8d; }
-[data-testid="stAppViewContainer"]:has(.gene-page-marker) [data-baseweb="tab-highlight"] { background-color: #0f8b8d; }
-[data-testid="stAppViewContainer"]:has(.gene-page-marker) [data-testid="stMetricValue"] { font-size: 1.5rem; }
-[data-testid="stAppViewContainer"]:has(.gene-page-marker) [data-testid="stSubheader"] h3 { font-size: 1.2rem; }
-@media (max-width: 640px) {
-    [data-testid="stAppViewContainer"]:has(.gene-page-marker) [data-testid="stMain"] .block-container { padding: 1rem; }
-    [data-testid="stAppViewContainer"]:has(.gene-page-marker) [data-baseweb="tab-list"] { gap: .5rem; }
-    [data-testid="stAppViewContainer"]:has(.gene-page-marker) [data-baseweb="tab"] { font-size: .85rem; padding: .6rem .2rem; }
-}
-</style>
-"""
+from gtex_explorer.ui.shell.theme import page_style
 
 
 def render_gene_page(tables: dict) -> None:
     """Show the gene panels of the thesis experiment."""
-    st.markdown(GENE_PAGE_STYLE, unsafe_allow_html=True)
+    st.markdown(page_style("genes"), unsafe_allow_html=True)
     st.markdown('<div class="gene-page-marker"></div>', unsafe_allow_html=True)
     st.title("Panel gen")
+
+    # Choose where the panel comes from.
     source = st.radio(
         "Sumber panel",
         ["Model final", "Cross-validation"],
@@ -57,6 +33,8 @@ def render_gene_page(tables: dict) -> None:
     summary = tables["run_summary"]
     baseline = False
     fit = None
+
+    # Load the panel: the final model's, or one CV fold's.
     if source == "Model final":
         genes = tables["selected_genes"].copy()
         selector = summary["best_selector_id"]
@@ -116,6 +94,7 @@ def render_gene_page(tables: dict) -> None:
                     ",", "."
                 )
 
+    # Summary of the chosen panel.
     method = (
         "Tanpa seleksi fitur"
         if baseline
@@ -162,12 +141,14 @@ def render_gene_page(tables: dict) -> None:
                     "Konfigurasi ini tersimpan untuk pemeriksaan, tetapi tidak memenuhi syarat perbandingan utama pada notebook."
                 )
 
+    # Tabs for the gene list, the diagnostics, and stability across folds.
     is_l1 = selector.startswith("l1_")
     tab_labels = ["Daftar gen", "Kinerja XGBoost" if baseline else "Diagnostik metode"]
     if fit is not None and not baseline:
         tab_labels.append("Stabilitas antar-fold")
     tabs = st.tabs(tab_labels)
 
+    # Gene list with search, filters, and download.
     with tabs[0]:
         heading, download = st.columns([4, 1])
         heading.subheader("Gen kandidat" if baseline else "Gen terpilih")
@@ -276,6 +257,7 @@ def render_gene_page(tables: dict) -> None:
         if filtered.empty:
             st.info("Tidak ada gen yang sesuai dengan filter pada rentang peringkat ini.")
 
+    # Selector diagnostics, or XGBoost performance for the baseline.
     with tabs[1]:
         if not baseline:
             render_selector_metrics(tables, selector, genes, fit)
@@ -295,6 +277,7 @@ def render_gene_page(tables: dict) -> None:
         if not baseline:
             render_diagnostic_details(tables, selector, filtered, fit)
 
+    # Stability across folds, shown only for a CV panel with feature selection.
     if len(tabs) == 3:
         with tabs[2]:
             render_stability_details(tables, selector, fit)

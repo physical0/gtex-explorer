@@ -47,6 +47,8 @@ def audit_and_align_input(
     minimum_observed_fraction controls the per-sample completeness reminder.
     Observed zero TPM is available data, independently of positive expression.
     """
+
+    # Check the reminder thresholds.
     for threshold in (minimum_observed_fraction, minimum_positive_fraction):
         if (
             not isinstance(threshold, (int, float, np.integer, np.floating))
@@ -56,6 +58,7 @@ def audit_and_align_input(
         ):
             raise ValueError("Nilai ambang pengingat harus berada antara 0 dan 1.")
 
+    # Find where each model gene sits in the upload.
     required_genes = [str(gene) for gene in preprocessor["selected_genes"]]
     required_base_ids = [strip_ensembl_version(gene) for gene in required_genes]
 
@@ -69,6 +72,7 @@ def audit_and_align_input(
         else:
             supplied_by_base[base_id] = column_position
 
+    # Count the problem values.
     numeric_matrix, invalid_count = _numeric_expression(input_matrix)
     raw_values = numeric_matrix.to_numpy(dtype=float, na_value=np.nan)
     negative_count = int(np.nansum(raw_values < 0))
@@ -76,6 +80,7 @@ def audit_and_align_input(
     infinite_value_count = int(np.isinf(raw_values).sum())
     nonfinite_count = int((~np.isfinite(raw_values)).sum())
 
+    # Start from the training medians, then copy in every value the upload provides.
     medians = np.asarray(preprocessor["raw_tpm_medians"], dtype=float)
     aligned_values = np.tile(medians, (len(input_matrix), 1))
     matches = [
@@ -96,6 +101,7 @@ def audit_and_align_input(
         aligned_values[:, model_positions] = np.where(observed, block, medians[model_positions])
     aligned = pd.DataFrame(aligned_values, index=input_matrix.index, columns=required_genes)
 
+    # Gene coverage, and whether the values look log-transformed.
     missing_count = len(required_genes) - matched_count
     matched_fraction = matched_count / max(len(required_genes), 1)
     finite_values = raw_values[np.isfinite(raw_values)]
@@ -123,6 +129,8 @@ def audit_and_align_input(
         }
     )
     below_threshold_sample_count = int((~meets_threshold).sum())
+
+    # Decide whether the input can be predicted, and say why not.
     ready = bool(
         negative_count == 0
         and infinite_value_count == 0
@@ -153,6 +161,7 @@ def audit_and_align_input(
     else:
         message = "Input dapat diprediksi."
 
+    # Return the aligned matrix with the full audit.
     aligned.attrs["input_audit_ready"] = ready
     return aligned, InputAudit(
         source_orientation=str(input_matrix.attrs.get("source_orientation", "sampel × gen")),

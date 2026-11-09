@@ -7,7 +7,8 @@ import streamlit as st
 
 from gtex_explorer.platform.cloud.media import download_button
 from gtex_explorer.training.panels import load_run_panel
-from gtex_explorer.ui.pages.training import choose_run, method_description, show_diagnostics
+from gtex_explorer.training.run_labels import method_description
+from gtex_explorer.ui.components.training_runs import choose_run, show_diagnostics
 
 
 def render_training_gene_page(state_root):
@@ -18,6 +19,7 @@ def render_training_gene_page(state_root):
     if run_id is None:
         return
     try:
+        # Read the saved run.
         root = state_root / "runs" / run_id
         saved = json.loads((root / "config.json").read_text(encoding="utf-8"))
         config = saved["config"]
@@ -27,6 +29,8 @@ def render_training_gene_page(state_root):
             st.session_state.training_run = run_id
             st.session_state.page = "Hasil Pelatihan"
             st.rerun()
+
+        # Choose the final model or one fold.
         options = []
         if (state_root / "models" / run_id / "bundle_manifest.json").is_file():
             options.append("final")
@@ -43,6 +47,8 @@ def render_training_gene_page(state_root):
             key=f"training_panel_scope_{run_id}",
         )
         genes, info = load_run_panel(state_root, run_id, scope)
+
+        # Sample counts for this panel.
         dataset = saved.get("dataset", {})
         if dataset:
             st.caption(

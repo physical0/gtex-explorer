@@ -1,0 +1,13 @@
+/* Perbandingan Metode page. */
+
+[data-testid="stAppViewContainer"]:has(.comparison-page-marker) { background: #fff; }
+[data-testid="stAppViewContainer"]:has(.comparison-page-marker) [data-testid="stMain"] .block-container {
+    padding: 1.4rem 2rem 1.5rem;
+}
+[data-testid="stElementContainer"]:has(.comparison-page-marker),
+[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] style) { display: none; }
+[data-testid="stAppViewContainer"]:has(.comparison-page-marker) [data-testid="stDivider"] { margin: 1.4rem 0 .7rem; }
+[data-testid="stAppViewContainer"]:has(.comparison-page-marker) [data-testid="stSubheader"] h3 { font-size: 1.4rem; }
+@media (max-width: 640px) {
+    [data-testid="stAppViewContainer"]:has(.comparison-page-marker) [data-testid="stMain"] .block-container { padding: 1rem; }
+}

@@ -98,7 +98,7 @@ def test_gallery_and_process_history_are_separate_ui_views(tmp_path, monkeypatch
     pending = start_job(validate_training_config({'selector': 'anova', 'top_k': 2,
         'xgboost': {'n_estimators': 2}}, candidate_count=6), data, state).run_id
     script = ('from pathlib import Path\n'
-        'from gtex_explorer.ui.pages.training import render_training_results_page\n'
+        'from gtex_explorer.ui.pages.training_results import render_training_results_page\n'
         f'render_training_results_page(Path({str(data)!r}), Path({str(state)!r}))')
     app = AppTest.from_string(script, default_timeout=60).run()
     assert not app.exception
@@ -143,7 +143,7 @@ def test_saving_stage_explains_gallery_delay_and_disables_controls_in_ui(tmp_pat
     atomic_json(root / 'worker.json', {})
     with process_lock(tmp_path / 'worker.lock'):
         app = AppTest.from_string('from pathlib import Path\n'
-            'from gtex_explorer.ui.pages.training import render_training_results_page\n'
+            'from gtex_explorer.ui.pages.training_results import render_training_results_page\n'
             f'render_training_results_page(Path("unused"), Path({str(tmp_path)!r}))',
             default_timeout=60).run()
         assert not app.exception

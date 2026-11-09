@@ -54,6 +54,7 @@ class SelectorEligibilityError(ValueError):
     """The selector could not support the requested number of genes."""
 
     def __init__(self, message: str, diagnostics: dict):
+        """Keep the diagnostics so the refusal can be explained."""
         super().__init__(message)
         self.diagnostics = diagnostics
 
@@ -69,13 +70,16 @@ class _RoundProgress(TrainingCallback):
     """Reports boosting progress and stops training when asked."""
 
     def __init__(self, report):
+        """Store the function that receives the round count."""
         self.report = report
 
     def before_training(self, model):
+        """Report that no rounds have finished yet."""
         self.report(0)
         return model
 
     def after_iteration(self, model, epoch, evals_log):
+        """Report a finished round and let training continue."""
         self.report(epoch + 1)
         return False
 
@@ -87,6 +91,8 @@ def runtime_versions() -> dict:
 
 def fit_selector(prepared: PreparedData, config: TrainingConfig, ranking_cache: Path | None = None) -> SelectorFit:
     """Rank the genes on the training data and select the top ones."""
+
+    # Refuse requests the data cannot satisfy.
     count = prepared.X_train.shape[1]
     if not 1 <= config.top_k <= count:
         raise ValueError("Requested genes exceed candidate count")
@@ -95,6 +101,8 @@ def fit_selector(prepared: PreparedData, config: TrainingConfig, ranking_cache: 
             "ANOVA memerlukan jumlah sampel training lebih besar daripada jumlah kelas. "
             "Tambahkan sampel/donor, kurangi porsi data holdout, atau pilih jumlah fold lain."
         )
+
+    # Reuse a saved ranking when the same fit was already done.
     key = stable_hash(
         {
             "partition": prepared.fingerprint,
@@ -115,6 +123,7 @@ def fit_selector(prepared: PreparedData, config: TrainingConfig, ranking_cache: 
         info = meta["diagnostics"]
         elapsed = meta["seconds"]
     else:
+        # Otherwise score every candidate gene with the chosen method.
         started = time.monotonic()
         frame = pd.DataFrame({"gene": prepared.gene_names})
         info = {"selector": config.selector, "candidate_count": count}
@@ -160,6 +169,8 @@ def fit_selector(prepared: PreparedData, config: TrainingConfig, ranking_cache: 
                 nonzero_gene_count=int(np.sum(scores > 1e-12)),
                 sparsity=1 - float(np.mean(scores > 1e-12)),
             )
+
+        # Turn the scores into ranks. Ties keep the original gene order.
         scores = np.nan_to_num(np.asarray(scores, dtype=float), nan=-np.inf, posinf=np.inf, neginf=-np.inf)
         order = np.lexsort((np.arange(count), -scores))
         rank = np.empty(count, dtype=int)
@@ -168,6 +179,8 @@ def fit_selector(prepared: PreparedData, config: TrainingConfig, ranking_cache: 
         if config.selector != "baseline":
             frame["selection_score"] = scores
         elapsed = time.monotonic() - started
+
+        # Save the ranking for next time.
         if target:
             target.parent.mkdir(parents=True, exist_ok=True)
             with tempfile.TemporaryDirectory(prefix="ranking-", dir=target.parent) as directory:
@@ -182,6 +195,8 @@ def fit_selector(prepared: PreparedData, config: TrainingConfig, ranking_cache: 
                 }
                 (root / "ranking.json").write_text(json.dumps(meta, allow_nan=False), encoding="utf-8")
                 atomic_publish_directory(root, target)
+
+    # L1 counts only if it converged with enough nonzero genes.
     info = {**info, "requested_k": config.top_k}
     if config.selector == "l1":
         if not info["converged"]:
@@ -191,6 +206,8 @@ def fit_selector(prepared: PreparedData, config: TrainingConfig, ranking_cache: 
                 f'L1 has {info["nonzero_gene_count"]} nonzero genes, fewer than top-k {config.top_k}. Lower k or adjust C.',
                 info,
             )
+
+    # Keep the top genes.
     order = np.argsort(frame.selection_rank.to_numpy(), kind="stable")
     return SelectorFit(order, order[: config.top_k], frame, info, elapsed)
 

@@ -8,7 +8,7 @@ import pandas as pd
 from xgboost.core import XGBoostError
 
 from gtex_explorer.platform.cloud.state import operation
-from gtex_explorer.training.data import file_hash, stable_hash, verify_files_cached
+from gtex_explorer.training.data import file_hash, read_json_file, stable_hash, verify_files_cached
 from gtex_explorer.training.jobs import atomic_json, job_path
 
 
@@ -101,7 +101,7 @@ def list_gallery(state_root, *, issues=None):
     for path in (Path(state_root) / "runs").glob("run_*/status.json"):
         run_id = path.parent.name
         try:
-            if json.loads(path.read_text(encoding="utf-8")).get("status") != "completed":
+            if read_json_file(path).get("status") != "completed":
                 continue
             root = job_path(run_id, state_root)
             index = root / "gallery.json"

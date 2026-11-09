@@ -48,16 +48,19 @@ def enforce_offline_network() -> None:
     connect_ex = socket.socket.connect_ex
 
     def local_resolve(host, *args, **kwargs):
+        """Block DNS lookups for anything except this computer."""
         if host is not None and not is_loopback(str(host)):
             raise OSError("Offline mode: external DNS is disabled.")
         return resolve(host, *args, **kwargs)
 
     def local_connect(sock, address):
+        """Block connections to other computers."""
         if isinstance(address, tuple) and not is_loopback(str(address[0])):
             raise OSError("Offline mode: only loopback connections are allowed.")
         return connect(sock, address)
 
     def local_connect_ex(sock, address):
+        """Block connections to other computers through connect_ex."""
         if isinstance(address, tuple) and not is_loopback(str(address[0])):
             raise OSError("Offline mode: only loopback connections are allowed.")
         return connect_ex(sock, address)
@@ -71,6 +74,7 @@ class OfflineHeaders:
     """Restrict frontend resources and identify our own local server."""
 
     def __init__(self, app, token: str, port: int):
+        """Build the content security policy for this port."""
         self.app = app
         self.token = token
         self.policy = (
@@ -84,7 +88,10 @@ class OfflineHeaders:
         )
 
     async def __call__(self, scope, receive, send):
+        """Add the security headers to every response."""
+
         async def local_send(message):
+            """Add the headers when the response starts."""
             if message["type"] == "http.response.start":
                 message.setdefault("headers", []).extend(
                     [

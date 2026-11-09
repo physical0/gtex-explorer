@@ -21,6 +21,7 @@ from gtex_explorer.platform.workspaces import (
     workspace_directory,
     workspace_roots,
 )
+from gtex_explorer.ui.shell.theme import page_style
 
 _preload_started = False
 
@@ -36,6 +37,7 @@ def preload_libraries():
     _preload_started = True
 
     def load():
+        """Import each heavy library, leaving any failure for its page to report."""
         for name in [
             "numpy",
             "pandas",
@@ -313,6 +315,8 @@ def leave_removed_workspace(root):
 
 def render_workspace_launcher(root, brand_path):
     """Choose a project before rendering or loading the main application."""
+
+    # Work out which workspace is selected.
     root = Path(root).resolve()
     st.session_state.setdefault("workspace_entered", False)
     entries = {entry["id"]: entry for entry in list_workspaces(root)}
@@ -324,31 +328,7 @@ def render_workspace_launcher(root, brand_path):
         st.session_state.workspace_selection = last_workspace(root)
     selected = st.session_state.workspace_selection
 
-    st.html("""<style>
-        [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] {display:none;}
-        .st-key-workspace_launcher {max-width:1000px; margin:0 auto; padding-top:8vh;}
-        .st-key-workspace_brand {margin-bottom:2.8rem;}
-        .st-key-workspace_brand .brand-title {font-size:1.45rem;}
-        .st-key-workspace_brand .brand-subtitle {font-size:.9rem;}
-        .st-key-workspace_heading {margin-bottom:.8rem;}
-        .st-key-workspace_table_header {padding:.45rem .85rem; background:#f7f8f8;}
-        .st-key-workspace_list {border:1px solid #e2e8ec; border-radius:8px;}
-        .st-key-workspace_list, [data-testid="stLayoutWrapper"]:has(> .st-key-workspace_list) {
-            max-height:clamp(120px, calc(100dvh - 545px), 420px);}
-        [class*="st-key-workspace_row_"] {padding:.5rem .85rem; border-bottom:1px solid #e2e8ec;}
-        .st-key-workspace_row_selected {background:#eef8f8;}
-        [class*="st-key-workspace_row_"] button {justify-content:flex-start;}
-        [class*="st-key-workspace_select_"] button > div {justify-content:flex-start;}
-        [class*="st-key-workspace_select_"] button {font-weight:600;}
-        .st-key-workspace_row_selected button[kind="tertiary"] {color:#087173;}
-        .st-key-workspace_footer {padding-top:1rem;}
-        .workspace-selected-name {font-size:.95rem; color:#657184; overflow-wrap:anywhere;}
-        .workspace-selected-name strong {color:#14213d;}
-        @media(max-width:700px) {
-          .st-key-workspace_launcher {padding-top:1rem;}
-          .st-key-workspace_brand {margin-bottom:1.4rem;}
-        }
-    </style>""")
+    st.html(page_style("workspace_launcher"))
     with st.container(key="workspace_launcher"):
         with st.container(
             horizontal=True, horizontal_alignment="center", vertical_alignment="center", key="workspace_brand"
@@ -359,6 +339,8 @@ def render_workspace_launcher(root, brand_path):
                 '<div class="brand-subtitle">Analisis ekspresi gen lokal</div>',
                 unsafe_allow_html=True,
             )
+
+        # Title and the button for a new workspace.
         with st.container(key="workspace_heading"):
             title, create = st.columns([3, 1], vertical_alignment="center")
             with title:
@@ -370,6 +352,8 @@ def render_workspace_launcher(root, brand_path):
             with create:
                 if st.button("Buat workspace", icon=":material/add:", key="workspace_new", width="stretch"):
                     st.session_state.workspace_dialog = "new"
+
+        # Search box and result count.
         search, count = st.columns([4, 1], vertical_alignment="center")
         with search:
             query = st.text_input(
@@ -387,6 +371,8 @@ def render_workspace_launcher(root, brand_path):
             name.caption("Workspace")
             policy.caption("Model bawaan")
             actions.caption("Tindakan")
+
+        # Workspace list.
         with st.container(height=min(420, max(80, 68 * len(matching))), border=False, key="workspace_list"):
             if not matching:
                 st.info("Tidak ada workspace yang cocok dengan pencarian.")
@@ -426,6 +412,8 @@ def render_workspace_launcher(root, brand_path):
                                 on_click=_request_delete,
                                 args=(identity,),
                             )
+
+        # The selected workspace and the button that opens it.
         with st.container(key="workspace_footer"):
             summary, enter = st.columns([3, 1], vertical_alignment="center")
             with summary:
@@ -448,6 +436,8 @@ def render_workspace_launcher(root, brand_path):
                     args=(root, selected),
                 )
         _training_notice(root)
+
+    # Whichever dialog was requested.
     if st.session_state.get("workspace_dialog") == "new":
         _new_workspace(root)
     elif st.session_state.get("workspace_dialog") == "rename":

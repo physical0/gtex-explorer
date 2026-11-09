@@ -46,6 +46,7 @@ class TrainingConfig:
     holdout_percent: int | None = None
 
     def to_dict(self) -> dict:
+        """Return the settings in the form saved with a run."""
         # Runs saved before hold-outs existed have no such entry, and their saved config must still match.
         holdout = {"holdout_percent": self.holdout_percent} if self.holdout_percent else {}
         return {
@@ -63,6 +64,7 @@ class TrainingConfig:
         }
 
     def selector_settings(self) -> dict:
+        """Return the settings passed to the feature selector."""
         result = {"selector": self.selector}
         if self.selector == "l1":
             result.update(

@@ -6,26 +6,12 @@ import altair as alt
 import streamlit as st
 
 from gtex_explorer.experiments.gene_panels import clarify_eligibility_reasons
+from gtex_explorer.ui.shell.theme import page_style
 
 
 def render_comparison_page(tables: dict) -> None:
     """Compare the feature selection methods on CV and holdout."""
-    st.markdown(
-        """<style>
-    [data-testid="stAppViewContainer"]:has(.comparison-page-marker) { background: #fff; }
-    [data-testid="stAppViewContainer"]:has(.comparison-page-marker) [data-testid="stMain"] .block-container {
-        padding: 1.4rem 2rem 1.5rem;
-    }
-    [data-testid="stElementContainer"]:has(.comparison-page-marker),
-    [data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] style) { display: none; }
-    [data-testid="stAppViewContainer"]:has(.comparison-page-marker) [data-testid="stDivider"] { margin: 1.4rem 0 .7rem; }
-    [data-testid="stAppViewContainer"]:has(.comparison-page-marker) [data-testid="stSubheader"] h3 { font-size: 1.4rem; }
-    @media (max-width: 640px) {
-        [data-testid="stAppViewContainer"]:has(.comparison-page-marker) [data-testid="stMain"] .block-container { padding: 1rem; }
-    }
-    </style><div class="comparison-page-marker"></div>""",
-        unsafe_allow_html=True,
-    )
+    st.markdown(page_style("comparison") + '<div class="comparison-page-marker"></div>', unsafe_allow_html=True)
     st.title("Perbandingan metode")
     st.caption("CV Folding untuk memilih konfigurasi, holdout untuk evaluasi akhir.")
     summary = tables["run_summary"]
@@ -51,6 +37,8 @@ def render_comparison_page(tables: dict) -> None:
             ["Macro-F1", "Macro precision", "Macro recall", "Balanced accuracy", "Accuracy"],
         )
         zoom_scores = st.checkbox("Perbesar rentang skor pada grafik", key="comparison_zoom", value=False)
+
+    # Prepare the chosen metric for the chart.
     metric_lookup = {
         "Macro-F1": ("mean_macro_f1", "std_macro_f1"),
         "Macro precision": ("mean_macro_precision", "std_macro_precision"),
@@ -168,6 +156,8 @@ def render_comparison_page(tables: dict) -> None:
     preview["configuration_label"] = preview["selector_label"].where(
         preview["experiment_type"].ne("baseline"), "Baseline"
     )
+
+    # Short summary table, with the full grid in an expander.
     st.markdown("#### Ringkasan konfigurasi")
     st.dataframe(
         preview[["configuration_label", "genes", mean_column, std_column, "selection_status"]]
@@ -283,6 +273,7 @@ def render_comparison_page(tables: dict) -> None:
             + " poin persentase**"
         )
 
+        # Bar chart of each holdout metric.
         holdout_metric_labels = {
             "macro_f1": "Macro-F1",
             "macro_precision": "Macro precision",
@@ -320,6 +311,7 @@ def render_comparison_page(tables: dict) -> None:
         ).properties(height=240, padding={"top": 18})
         st.altair_chart(holdout_chart, width="stretch")
 
+        # Full holdout metrics.
         holdout_table = holdout[
             [
                 "configuration_label",

@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from gtex_explorer.platform.cloud.media import download_button
+from gtex_explorer.ui.shell.theme import page_style
 
 SOURCES = {
     "gene": ("NHGRI - Gene", "https://www.genome.gov/genetics-glossary/Gene"),
@@ -374,47 +375,6 @@ ENTRIES = [
 ]
 
 
-GLOSSARY_STYLE = """
-<style>
-[data-testid="stAppViewContainer"]:has(.glossary-page-marker) { background: #fff; }
-[data-testid="stAppViewContainer"]:has(.glossary-page-marker) [data-testid="stMain"] .block-container {
-    padding: 1.4rem 2rem 1.5rem;
-}
-[data-testid="stElementContainer"]:has(.glossary-page-marker),
-[data-testid="stAppViewContainer"]:has(.glossary-page-marker) [data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] style) { display: none; }
-[data-testid="stAppViewContainer"]:has(.glossary-page-marker) h1 { font-size: 2.4rem !important; }
-[data-testid="stAppViewContainer"]:has(.glossary-page-marker) [data-testid="stCaptionContainer"] p { font-size: .95rem; }
-.st-key-glossary_filters input { font-size: 1rem; }
-.st-key-glossary_filters { border-top: 1px solid #e2e8ec; padding-top: .9rem; margin-bottom: .6rem; }
-.st-key-glossary_index .stButton > button {
-    width: 100%; justify-content: flex-start; border: 0; border-bottom: 1px solid #e2e8ec;
-    border-radius: 0; background: transparent; color: #172033; padding: .55rem .8rem; min-height: 2.9rem;
-}
-.st-key-glossary_index button > div { justify-content: flex-start !important; }
-.st-key-glossary_index button p { text-align: left; font-size: 1rem; }
-.st-key-glossary_index .stButton > button:hover { background: #f0f8f8; color: #087173; }
-.st-key-glossary_index .stButton > button[kind="primary"] {
-    background: #e9f5f5 !important; color: #087173 !important; border-left: 4px solid #0f8b8d; font-weight: 650;
-}
-.st-key-glossary_index .stButton > button[kind="primary"] * { color: #087173 !important; }
-.st-key-glossary_index { gap: 0; }
-.st-key-glossary_index [data-testid="stVerticalBlock"] { gap: 0; }
-.st-key-glossary_detail { border-left: 1px solid #e2e8ec; padding: .25rem 0 0 2rem; min-height: 530px; }
-.st-key-glossary_detail h2 { font-size: 2.4rem !important; margin: .1rem 0 .1rem; }
-.st-key-glossary_detail [data-testid="stMarkdownContainer"] p { max-width: 64ch; line-height: 1.65; font-size: 1rem; }
-.st-key-glossary_detail h3, [data-testid="stAppViewContainer"]:has(.glossary-page-marker) h3 { font-size: 1.2rem !important; }
-.st-key-glossary_detail hr { margin: .6rem 0; }
-.st-key-glossary_related .stButton > button {
-    min-height: 2rem; padding: .1rem .4rem; color: #087173; text-decoration: underline;
-}
-@media (max-width: 640px) {
-    [data-testid="stAppViewContainer"]:has(.glossary-page-marker) [data-testid="stMain"] .block-container { padding: 1rem; }
-    .st-key-glossary_detail { border-left: 0; border-top: 1px solid #e2e8ec; padding: 1rem 0 0; min-height: 0; }
-}
-</style>
-"""
-
-
 # --- Term lookup ---
 
 
@@ -481,7 +441,7 @@ def _select_term(term: str, reset_filters: bool = False) -> None:
 
 def render_glossary_page() -> None:
     """Show the Kamus Biologi page."""
-    st.markdown(GLOSSARY_STYLE, unsafe_allow_html=True)
+    st.markdown(page_style("glossary"), unsafe_allow_html=True)
     st.markdown('<div class="glossary-page-marker"></div>', unsafe_allow_html=True)
     st.title("Kamus Biologi")
     st.caption("Kenali istilah dan jaringan yang digunakan dalam data ekspresi gen.")

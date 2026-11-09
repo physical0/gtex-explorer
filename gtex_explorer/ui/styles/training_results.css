@@ -1,0 +1,29 @@
+/* Hasil Pelatihan page. */
+
+.st-key-training_results h3 {font-size:1.3rem !important;}
+.st-key-training_results h1 {font-size:2.4rem !important;}
+.st-key-training_results hr {margin:.6rem 0 !important;}
+.st-key-training_results [data-testid="stVerticalBlock"] {gap:.6rem;}
+.st-key-training_results [data-baseweb="tab-list"] {gap:2rem;}
+.st-key-training_results [data-baseweb="tab-list"] button p {font-size:1rem; font-weight:600;}
+.st-key-gallery_models {border-right:1px solid #dce3e7; padding-right:1.1rem;
+    min-height:calc(100dvh - 14rem); padding-top:1rem;}
+.st-key-gallery_detail {padding-top:1rem;}
+.st-key-gallery_models button {text-align:left; justify-content:flex-start; border:0;
+    border-left:3px solid transparent; border-radius:5px; padding:.7rem .8rem;}
+.st-key-gallery_models button[kind="primary"] {background:#edf8f8 !important; color:#14213d !important;
+    border:0 !important; border-left:3px solid #078c92 !important;}
+.st-key-gallery_models button[kind="primary"] * {color:#14213d !important;}
+.st-key-gallery_models button > div {width:100%; justify-content:flex-start;}
+.st-key-gallery_models button [data-testid="stMarkdownContainer"] {text-align:left;}
+.st-key-gallery_models button p {white-space:normal; overflow-wrap:anywhere; font-size:.9rem; line-height:1.6;}
+.st-key-gallery_models button strong {font-size:1.05rem;}
+.st-key-gallery_detail [data-testid="stMetric"] {padding:.7rem;}
+.st-key-gallery_detail [data-testid="stMetricValue"] {font-size:2rem;}
+@media(max-width:1000px) {
+    .st-key-training_cv_results [data-testid="stHorizontalBlock"], .st-key-training_holdout_results [data-testid="stHorizontalBlock"] {flex-wrap:wrap;}
+    .st-key-training_cv_results [data-testid="stColumn"], .st-key-training_holdout_results [data-testid="stColumn"] {width:100%; flex:1 1 100%;}
+    .st-key-training_results [data-testid="stHorizontalBlock"]:has(> div .st-key-gallery_models) {flex-wrap:wrap;}
+    .st-key-training_results [data-testid="stHorizontalBlock"]:has(> div .st-key-gallery_models) > [data-testid="stColumn"] {width:100%; flex:1 1 100%;}
+    .st-key-gallery_models {border-right:0; border-bottom:1px solid #dce3e7; padding-right:0; padding-bottom:1rem; min-height:0;}
+}

@@ -85,6 +85,25 @@ def test_blank_candidate_count_blocks_training_with_recovery_message(tmp_path, m
     assert any('Isi jumlah gen kandidat' in item.value for item in app.error)
 
 
+def test_missing_notebook_data_after_an_older_upload_shows_only_the_message(tmp_path, monkeypatch):
+    from test_training_uploads import uploads
+    from gtex_explorer.training.uploads import audit_uploads
+    import gtex_explorer.ui.pages.training as training_page
+    def missing(_):
+        raise FileNotFoundError('training_data')
+    monkeypatch.setenv('GTEX_DESKTOP_STATE_DIR', str(tmp_path))
+    monkeypatch.setattr(training_page, 'cached_data', missing)
+    expression, metadata = uploads()
+    app = AppTest.from_file(str(APP), default_timeout=60).run()
+    app = enter_application(app)
+    app.session_state.training_upload_audit = audit_uploads(expression, 'own.csv', metadata, 'labels.csv')
+    app.button(key='nav_Pelatihan Model').click().run()
+    app.radio(key='training_source').set_value('Data eksperimen notebook').run()
+    assert not app.exception
+    assert any('Data notebook tidak tersedia' in item.value for item in app.error)
+    assert app.button(key='training_start').disabled
+
+
 def test_model_swap_discards_audit_predictions_and_rounds(tmp_path, monkeypatch):
     monkeypatch.setenv('GTEX_DESKTOP_STATE_DIR', str(tmp_path))
     app = AppTest.from_file(str(APP), default_timeout=60).run()
@@ -165,7 +184,7 @@ def test_paused_training_has_live_resume_and_separate_end_button(tmp_path, monke
 def test_run_time_uses_saved_start_not_restored_file_time(tmp_path):
     # Hosted instances rewrite files on restore, so file times are not the run's age.
     import json, os, time
-    from gtex_explorer.ui.pages.training import run_created
+    from gtex_explorer.training.run_labels import run_created
     run = tmp_path / 'run_x'
     run.mkdir()
     (run / 'config.json').write_text(json.dumps({'created': 1_000_000.0}), encoding='utf-8')

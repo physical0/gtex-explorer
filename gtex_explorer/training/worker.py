@@ -109,6 +109,8 @@ def _load_final_fit(target, identity, prepared, config):
 
 def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=False) -> int:
     """Run one training job from start to publication."""
+
+    # State shared by the helper functions below.
     root = job_path(run_id, state_root)
     started = time.monotonic()
     status_lock = threading.RLock()
@@ -118,11 +120,13 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
     clock_path = root / "pause_clock.json"
 
     def paused_seconds():
+        """Return the total time this run has spent paused."""
         return json.loads(clock_path.read_text(encoding="utf-8"))["seconds"] if clock_path.exists() else 0.0
 
     initial_paused_seconds = paused_seconds()
 
     def status(stage, **extra):
+        """Save the current stage for the page to read, and for the cloud when it matters."""
         nonlocal last_cloud_write
         with status_lock:
             changed_stage = stage != current.get("stage")
@@ -149,6 +153,7 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
                 last_cloud_write = time.monotonic()
 
     def cancelled():
+        """Return whether a stop was requested, recording it if so."""
         if (root / "cancel.json").exists():
             with status_lock:
                 kept = {key: current[key] for key in ["fold", "rounds_completed", "rounds_total"] if key in current}
@@ -158,10 +163,12 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
         return False
 
     def progress_for(stage, config, fold=None):
+        """Build the callback that reports boosting progress for one fit."""
         last_update = 0.0
         total = config.xgboost_parameters["n_estimators"]
 
         def report(completed):
+            """Save progress at most four times a second, and stop if cancelled."""
             nonlocal last_update
             if (root / "cancel.json").exists():
                 raise TrainingCancelled()
@@ -174,6 +181,7 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
         return report
 
     def watch_cancellation():
+        """End the worker process as soon as a stop is requested."""
         # This watcher is enabled only in a dedicated worker process. It can stop
         # native sklearn/MI fits that expose no cancellation callback. OS exit releases
         # the worker lock; only atomically published checkpoints are reused on resume.
@@ -189,6 +197,7 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
                     pass  # read_job recovers cancellation if a status write was interrupted.
                 os._exit(0)
 
+    # Only one worker may train at a time. Everything below holds this lock.
     coordinator = coordination_directory(state_root)
     with process_lock(coordinator / "worker.lock"):
         atomic_json(
@@ -207,6 +216,7 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
             )
             threading.Thread(target=watch_cancellation, name="training-cancellation", daemon=True).start()
         try:
+            # Load the run and confirm that its data and settings have not changed.
             saved = json.loads((root / "config.json").read_text(encoding="utf-8"))
             if saved.get("data_root") and resolve_job_data(saved, state_root, data_root) != Path(data_root).resolve():
                 raise ValueError("Run dataset path does not match saved data source")
@@ -216,6 +226,8 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
             identity = configuration_fingerprint(config, data.fingerprint, split, runtime_versions())
             if identity != saved["identity"] or data.fingerprint != saved["data_fingerprint"]:
                 raise ValueError("Run identity changed. Start a new run instead of resuming.")
+
+            # A model that was already published only needs its final checks.
             published = Path(state_root) / "models" / run_id
             if published.is_dir():
                 manifest_file = published / "bundle_manifest.json"
@@ -239,6 +251,8 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
                 finalize_gallery(run_id, state_root)
                 status("completed", status="completed", cv_summary=summary, holdout_summary=holdout_result)
                 return 0
+
+            # Cross-validation, one fold at a time. Folds that already finished are reused.
             rows, sets = [], []
             for assignment in assignments:
                 if cancelled():
@@ -285,6 +299,8 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
                 sets.append(set(row["selected_genes"]))
             if cancelled():
                 return 0
+
+            # Combine the fold results.
             summary = (
                 aggregate_cv(
                     rows, sets, expected_folds=config.cv_folds, supervised_selector=config.selector != "baseline"
@@ -292,6 +308,8 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
                 if assignments
                 else None
             )
+
+            # Train the final model, reusing its checkpoint when there is one.
             status("final_selector")
             # With a hold-out, the saved model learns from the development part only and is scored on the rest.
             prepared = (
@@ -312,6 +330,8 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
                 _save_final_fit(result, identity, checkpoint)
             if cancelled():
                 return 0
+
+            # Prepare what gets published with the model.
             holdout_result = summarize_holdout(result, list(data.classes), config.holdout_percent) if holdout else None
             genes = [prepared.gene_names[i] for i in selector.selected_indices]
             demo = pd.DataFrame(

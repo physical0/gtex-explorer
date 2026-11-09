@@ -61,7 +61,7 @@ def _selected_bundle(entry):
     return load_prediction_model(entry)
 
 
-def _choose_model(preprocessor, classifier):
+def _choose_model():
     """Show the model selector and return the loaded model."""
     from gtex_explorer.platform.desktop_runtime import state_directory
     from gtex_explorer.platform.model_registry import list_models
@@ -366,6 +366,7 @@ def _render_input_panel(preprocessor: dict | None) -> None:
         unsafe_allow_html=True,
     )
 
+    # Upload.
     st.markdown("**Unggah matriks TPM**")
     st.caption("CSV, TSV, TXT, atau GCT. Baris dapat berupa sampel atau gen.")
     uploaded_file = file_uploader(
@@ -377,6 +378,7 @@ def _render_input_panel(preprocessor: dict | None) -> None:
 
     _sync_uploaded_input(uploaded_file)
 
+    # Recount the reminders if their thresholds changed.
     positive_percent, completeness_percent = _reminder_percentages()
     original_matrix = st.session_state.get("input_matrix_before_imputation")
     existing_audit = st.session_state.get("input_audit")
@@ -398,6 +400,7 @@ def _render_input_panel(preprocessor: dict | None) -> None:
             minimum_positive_fraction=positive_percent / 100,
         )
 
+    # Check the upload, or load the example.
     button_columns = st.columns([1, 1])
     with button_columns[0]:
         inspect_clicked = st.button(
@@ -444,12 +447,14 @@ def _render_input_panel(preprocessor: dict | None) -> None:
         except Exception as error:
             st.error(f"Data contoh tidak dapat dimuat: {error}")
 
+    # Nothing more to show until an audit exists.
     audit = st.session_state.get("input_audit")
     aligned = st.session_state.get("audited_tpm")
     if audit is None or aligned is None:
         _render_reminder_controls(None)
         return
 
+    # Choose which sample to review.
     sample_ids = aligned.index.astype(str).tolist()
     if not sample_ids:
         st.error(audit.message)
@@ -468,11 +473,13 @@ def _render_input_panel(preprocessor: dict | None) -> None:
         st.caption(f"{_format_file_size(st.session_state.input_file_size)} - 1 sampel - {active_sample}")
     st.session_state.active_sample = active_sample
 
+    # Audit result.
     _render_audit_summary(audit, int(preprocessor["feature_count"]), active_sample)
     if not audit.ready:
         st.error(f"**Input perlu diperbaiki**\n\n{audit.message}")
     _render_reminder_controls(audit)
 
+    # Explain any filled-in values and possibly log-transformed input.
     imputed_count = int(audit.sample_quality["imputed_model_genes"].sum())
     if audit.ready and (audit.missing_gene_count or imputed_count):
         fully_imputed = int(audit.sample_quality["observed_model_genes"].eq(0).sum())
@@ -661,6 +668,7 @@ def _render_prediction_panel(preprocessor: dict | None, classifier) -> None:
         st.error("Model lokal belum tersedia. Ekspor bundle model terlebih dahulu.")
         return
 
+    # What the panel says depends on the audit.
     has_input = audit is not None and aligned is not None
     ready = has_input and audit.ready
     if not has_input:
@@ -674,6 +682,7 @@ def _render_prediction_panel(preprocessor: dict | None, classifier) -> None:
         run_key = "run_prediction"
     st.markdown(f'<div class="panel-copy">{copy}</div>', unsafe_allow_html=True)
 
+    # Run controls.
     total_rounds = int(classifier.get_booster().num_boosted_rounds())
     choices = sorted({rounds for rounds in [100, 200, total_rounds] if rounds <= total_rounds})
     if st.session_state.get("prediction_boosting_rounds") not in choices:
@@ -712,6 +721,7 @@ def _render_prediction_panel(preprocessor: dict | None, classifier) -> None:
             )
     st.caption(f"{boosting_rounds} dari {total_rounds} putaran model tersimpan. Tanpa pelatihan ulang.")
 
+    # Stop here until there is a valid input.
     if not has_input:
         st.markdown(
             '<div class="empty-result"><strong>Menunggu input yang valid</strong>'
@@ -728,6 +738,7 @@ def _render_prediction_panel(preprocessor: dict | None, classifier) -> None:
         )
         return
 
+    # Run the model.
     if run_clicked:
         _clear_prediction_results()
         try:
@@ -745,6 +756,8 @@ def _render_prediction_panel(preprocessor: dict | None, classifier) -> None:
             st.error(f"Prediksi tidak dapat dijalankan: {error}")
 
     st.divider()
+
+    # Show the results, if there are any.
     if "predictions" not in st.session_state:
         with st.container(key="prediction_ready"):
             st.markdown(":material/description:")
@@ -758,10 +771,10 @@ def _render_prediction_panel(preprocessor: dict | None, classifier) -> None:
 # --- Page ---
 
 
-def render_prediction_page(preprocessor: dict | None, classifier, tables: dict) -> None:
+def render_prediction_page(tables: dict) -> None:
     """Show the Prediksi Jaringan page."""
     st.title("Prediksi jaringan")
-    preprocessor, classifier = _choose_model(preprocessor, classifier)
+    preprocessor, classifier = _choose_model()
     if preprocessor is None:
         return
     if preprocessor:

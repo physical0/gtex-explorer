@@ -18,6 +18,7 @@ def export_training_data(cache_path: Path, preprocessing_path: Path, folds_path:
     # Joblib may execute code: these are project-owned checkpoint paths, not uploads.
     import joblib
 
+    # Load the checkpoints and confirm they belong together.
     cache = joblib.load(cache_path)
     pre = joblib.load(preprocessing_path, mmap_mode="r")
     folds = joblib.load(folds_path, mmap_mode="r")
@@ -29,6 +30,8 @@ def export_training_data(cache_path: Path, preprocessing_path: Path, folds_path:
     log = final["X_development_log"]
     if list(raw.index) != list(log.index) or not log.equals(values["X_development_log"]):
         raise ValueError("Development axes/values mismatch")
+
+    # Check the samples and build the labels.
     samples = unique_ids(list(raw.index))
     unique_ids(list(raw.columns), genes=True)
     if set(samples) & set(values["X_test_log"].index):
@@ -40,6 +43,8 @@ def export_training_data(cache_path: Path, preprocessing_path: Path, folds_path:
     classes = sorted(tissues.unique())
     labels = np.array([classes.index(t) for t in tissues], dtype=np.int64)
     donors = meta.loc[list(samples), values["DONOR_COLUMN"]].astype(str).tolist()
+
+    # Write to a temporary folder first.
     output_dir = Path(output_dir)
     if output_dir.exists():
         raise FileExistsError(f"Refusing to overwrite {output_dir}")
@@ -49,6 +54,7 @@ def export_training_data(cache_path: Path, preprocessing_path: Path, folds_path:
         root.mkdir()
 
         def save(name, array):
+            """Save one array and return its file name."""
             np.save(root / name, np.asarray(array), allow_pickle=False)
             return name
 
@@ -71,6 +77,8 @@ def export_training_data(cache_path: Path, preprocessing_path: Path, folds_path:
         (root / "raw_genes.json").write_text(json.dumps(list(raw.columns)), encoding="utf-8")
         scaler = final["final_scaler"]
         final_log = log.to_numpy(dtype=np.float64)
+
+        # Preprocessing for the final model.
         manifest["final"] = {
             "genes": list(log.columns),
             "train_samples": list(samples),
@@ -80,6 +88,8 @@ def export_training_data(cache_path: Path, preprocessing_path: Path, folds_path:
             "scaler_mean": save("mean.npy", scaler.mean_),
             "scaler_scale": save("scale.npy", scaler.scale_),
         }
+
+        # Preprocessing for each fold.
         for fold in fold_values["prepared_cv_folds"]:
             number = int(fold["fold"])
             spec = {
@@ -95,6 +105,8 @@ def export_training_data(cache_path: Path, preprocessing_path: Path, folds_path:
                 if not np.array_equal(expected, fold[key]):
                     raise ValueError("Fold label mapping mismatch")
             manifest["cached_folds"].append(spec)
+
+        # Seal the folder, confirm it loads, and publish it.
         manifest["files"] = {p.name: file_hash(p) for p in root.iterdir() if p.is_file()}
         (root / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         loaded = load_training_data(root)

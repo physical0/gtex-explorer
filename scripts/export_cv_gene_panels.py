@@ -21,6 +21,7 @@ def export_panels() -> None:
     """Export the gene panel of every CV fold from the notebook results."""
     from gtex_explorer.platform.paths import APP_ROOT as app_dir
 
+    # Read the exported summary and CV fits.
     data_dir = app_dir / "data"
     checkpoint_dir = app_dir.parent / "results/notebook_run_500_1000_2000_l1_grid/part_a_progress_v4"
     summary = json.loads((data_dir / "run_summary.json").read_text(encoding="utf-8"))
@@ -30,6 +31,7 @@ def export_panels() -> None:
     source_hashes = {}
 
     def read_checkpoint(filename: str, fingerprint_key: str = "experiment_fingerprint") -> dict:
+        """Load a notebook checkpoint after checking that it belongs to this experiment."""
         path = checkpoint_dir / filename
         payload = joblib.load(path)
         if payload[fingerprint_key] != fingerprint:
@@ -60,6 +62,7 @@ def export_panels() -> None:
         fold_candidates[fold] = genes
     del prepared, fold_checkpoint
 
+    # Collect the gene sets and scores saved by each selector step.
     saved_sets = {}
     saved_results = {}
     for filename in ["step_30_anova.joblib", "step_31_mutual_information.joblib", "step_32_l1.joblib"]:
@@ -74,6 +77,7 @@ def export_panels() -> None:
         for row in checkpoint["selection_results"]:
             saved_results[(row["selector_id"], int(row["genes"]), int(row["fold"]))] = row
 
+    # Rebuild the ranking of each selector in each fold.
     frames = []
     for selector, fold in sorted(set(zip(selector_fits["selector_id"], selector_fits["fold"]))):
         prefix = "mi" if selector == "mutual_information" else selector
@@ -118,6 +122,7 @@ def export_panels() -> None:
         frames.append(frame)
     rankings = pd.concat(frames, ignore_index=True)
 
+    # Check the rankings against every saved fit.
     expected_keys = set(zip(selector_fits["selector_id"], selector_fits["genes"], selector_fits["fold"]))
     if expected_keys != set(saved_sets) or expected_keys != set(saved_results):
         raise ValueError("Checkpoint fits do not cover all selector configurations.")
@@ -129,6 +134,7 @@ def export_panels() -> None:
             if not np.isclose(fit[metric], saved_results[key][metric], atol=1e-12, rtol=0):
                 raise ValueError(f"CV result mismatch: {key}/{metric}")
 
+    # Check the baseline the same way.
     baseline = read_checkpoint("step_32b_xgboost_all_5000.joblib", "selector_experiment_fingerprint")
     if baseline["baseline_fingerprint"] != summary["baseline_fingerprint"]:
         raise ValueError("Different baseline experiment.")

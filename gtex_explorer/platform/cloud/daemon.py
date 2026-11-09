@@ -33,6 +33,8 @@ def main():
     stopped = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stopped.set())
     signal.signal(signal.SIGINT, lambda *_: stopped.set())
+
+    # What the supervisor remembers between passes.
     child = None
     active = None
     handled = None
@@ -42,17 +44,22 @@ def main():
     try:
         while not stopped.is_set():
             try:
+                # No worker is running: tidy up storage, then look for a queued run.
                 if child is None:
                     if time.monotonic() >= next_cleanup:
                         next_cleanup = time.monotonic() + CLEANUP_INTERVAL
                         removed = durable.collect_garbage()
                         if removed:
                             print("Cloud cleanup removed", removed, "objects", flush=True)
+
+                    # Wait if another supervisor holds the lease.
                     manifest, _ = durable._manifest()
                     lease = manifest.get("lease") or {}
                     if lease.get("expires", 0) > time.time() and lease.get("owner") != owner:
                         stopped.wait(IDLE_POLL)
                         continue
+
+                    # Find the queued runs.
                     queued = []
                     for name in candidates(manifest):
                         found = durable.store.get(durable.prefix + "/objects/" + manifest["files"][name])
@@ -64,6 +71,8 @@ def main():
                     if not queued:
                         stopped.wait(IDLE_POLL)
                         continue
+
+                    # Take the lease and download the current state.
                     if not durable.acquire_lease(owner, ttl=90):
                         continue
                     owns_lease = True
@@ -73,6 +82,8 @@ def main():
                     run_id = active.name
                     workspace = active.parent.parent
                     saved = json.loads((active / "config.json").read_text(encoding="utf-8"))
+
+                    # A run stopped while it was queued never starts.
                     pending_control = active / "cloud_control.json"
                     if pending_control.is_file() and json.loads(pending_control.read_text())["action"] == "stop":
                         atomic_json(
@@ -85,6 +96,8 @@ def main():
                         owns_lease = False
                         active = None
                         continue
+
+                    # Start the training worker.
                     env = {**os.environ, "GTEX_CLOUD_ROLE": "worker", "GTEX_CLOUD_LEASE": owner}
                     child = subprocess.Popen(
                         [
@@ -104,10 +117,13 @@ def main():
                     next_heartbeat = time.monotonic() + 15
                     print("Training worker started:", run_id, flush=True)
                 else:
+                    # A worker is running: renew the lease.
                     if time.monotonic() >= next_heartbeat:
                         if not durable.acquire_lease(owner, ttl=90):
                             raise CloudLeaseLost("Another supervisor owns the worker lease")
                         next_heartbeat = time.monotonic() + 15
+
+                    # The worker has ended. If it left no final status, mark the run as failed.
                     if child.poll() is not None:
                         value = json.loads((active / "status.json").read_text(encoding="utf-8"))
                         if value["status"] not in {"completed", "failed", "cancelled"}:
@@ -124,6 +140,8 @@ def main():
                         child = None
                         active = None
                         continue
+
+                    # Apply any pause, resume, or stop command from the web app.
                     manifest, _ = durable._manifest()
                     name = (active / "cloud_control.json").relative_to(durable.root).as_posix()
                     digest = manifest["files"].get(name)
