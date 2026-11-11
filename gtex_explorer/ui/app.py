@@ -42,6 +42,5 @@ def run_app() -> None:
         "Perbandingan Metode": lambda: render_comparison_page(tables),
         "Panel Gen": lambda: render_gene_page(tables),
         "Kamus Biologi": render_glossary_page,
-        "Kamus Istilah": render_glossary_page,
     }
     routes.get(page, routes[DEFAULT_PAGE])()
