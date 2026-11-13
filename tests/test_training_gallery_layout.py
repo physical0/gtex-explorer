@@ -15,7 +15,7 @@ def gallery_app(tmp_path, monkeypatch):
         'xgboost': {'n_estimators': 2}}, candidate_count=6), data, state).run_id
     assert run_job(second, data, state) == 0
     app = AppTest.from_string('from pathlib import Path\n'
-        'from gtex_explorer.ui.training_page import render_training_results_page\n'
+        'from gtex_explorer.ui.pages.training_results import render_training_results_page\n'
         f'render_training_results_page(Path({str(data)!r}), Path({str(state)!r}))',
         default_timeout=60).run()
     assert not app.exception
@@ -101,7 +101,7 @@ def test_gallery_shows_macro_f1_and_scores_for_each_tissue(gallery_app):
 
 def test_gallery_explains_when_an_older_model_has_no_tissue_scores():
     app = AppTest.from_string('''
-from gtex_explorer.ui.training_page import _show_cv_results
+from gtex_explorer.ui.pages.training_results import _show_cv_results
 row = {'fold': 1, 'macro_f1': .9, 'macro_precision': .9, 'macro_recall': .9, 'balanced_accuracy': .9, 'accuracy': .9, 'selected_genes': ['a']}
 summary = {'fold_count': 2, 'fold_results': [row, {**row, 'fold': 2}], 'mean_jaccard': None, 'jaccard_pairs': [],
            **{prefix + key: .9 if prefix == 'mean_' else .01 for prefix in ['mean_', 'std_']
@@ -119,7 +119,7 @@ def test_gallery_shows_holdout_scores_for_a_run_without_folds(tmp_path, monkeypa
     data, state, run_id = holdout_run(tmp_path, monkeypatch)
     assert run_job(run_id, data, state) == 0
     app = AppTest.from_string('from pathlib import Path\n'
-        'from gtex_explorer.ui.training_page import render_training_results_page\n'
+        'from gtex_explorer.ui.pages.training_results import render_training_results_page\n'
         f'render_training_results_page(Path({str(data)!r}), Path({str(state)!r}))', default_timeout=60).run()
     assert not app.exception
     assert 'Evaluasi holdout' in [item.value for item in app.subheader]
@@ -134,9 +134,19 @@ def test_gallery_shows_holdout_and_fold_results_together(tmp_path, monkeypatch):
     data, state, run_id = holdout_run(tmp_path, monkeypatch, evaluate_cv=True, cv_folds=2)
     assert run_job(run_id, data, state) == 0
     app = AppTest.from_string('from pathlib import Path\n'
-        'from gtex_explorer.ui.training_page import render_training_results_page\n'
+        'from gtex_explorer.ui.pages.training_results import render_training_results_page\n'
         f'render_training_results_page(Path({str(data)!r}), Path({str(state)!r}))', default_timeout=60).run()
     assert not app.exception
     headings = [item.value for item in app.subheader]
     assert headings.index('Evaluasi holdout') < headings.index('Evaluasi CV') and headings.count('F1-score per jaringan') == 2
-    assert any('Holdout 50% dan 2 fold' in item.value for item in app.markdown)
+    assert any('Holdout 50% dan CV 2 fold' in item.value for item in app.markdown)
+    # Saved settings read as they did on the review step of Latih Model.
+    saved = next(item for item in app.expander if item.label == 'Data dan pengaturan tersimpan')
+    tables = [table.value for table in saved.table]
+    assert [list(table.index) for table in tables] == [
+        ['Data development', 'Data holdout', 'Pembagian', 'Gen kandidat', 'Pra-pemrosesan'],
+        ['Metode seleksi fitur', 'Top-k gen', 'Evaluasi tambahan', 'Classifier', 'Putaran boosting'],
+    ]
+    assert tables[0].loc['Data holdout', 'Nilai'] == '50%'
+    parameters = saved.dataframe[0].value
+    assert 'Learning rate' in parameters['Parameter'].tolist() and 'learning_rate' not in parameters['Parameter'].tolist()

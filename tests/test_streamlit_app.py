@@ -12,8 +12,10 @@ import pytest
 from streamlit.testing.v1 import AppTest
 from ui_helpers import enter_application
 
+from gtex_explorer.display import SERIES_COLORS
 
-APP_FILE = Path(__file__).resolve().parents[1] / "app.py"
+
+APP_FILE = Path(__file__).resolve().parents[1] / "main.py"
 
 
 def load_app() -> AppTest:
@@ -54,8 +56,7 @@ def test_prediction_page_audits_demo_before_running_model() -> None:
     ("navigation_key", "expected_title"),
     [
         ("nav_Ringkasan", "Ringkasan eksperimen"),
-        ("nav_Perbandingan Metode", "Perbandingan metode"),
-        ("nav_Panel Gen", "Panel gen"),
+        ("nav_Panel Gen", "Panel gen eksperimen"),
     ],
 )
 def test_navigation_pages_load_without_exceptions(
@@ -78,9 +79,9 @@ def test_navigation_pages_load_without_exceptions(
         assert removed_text not in sidebar_text
 
 
-def test_comparison_page_displays_all_gene_baseline() -> None:
+def test_ringkasan_displays_the_method_comparison_and_all_gene_baseline() -> None:
     app = load_app()
-    app.button(key="nav_Perbandingan Metode").click().run()
+    app.button(key="nav_Ringkasan").click().run()
     assert not app.exception
     visible_text = "\n".join(
         element.value
@@ -89,9 +90,16 @@ def test_comparison_page_displays_all_gene_baseline() -> None:
     )
     assert "Baseline memakai seluruh 5.000 gen kandidat tanpa seleksi fitur" in visible_text
     assert "80 hasil fold-level" in visible_text
-    assert "2. Hasil akhir - holdout" in [
-        heading.value for heading in app.subheader
-    ]
+    assert [tab.label for tab in app.tabs] == ["Cross-validation", "Hasil akhir - holdout"]
+
+
+def test_old_links_to_perbandingan_metode_open_ringkasan() -> None:
+    app = load_app()
+    app.session_state["page"] = "Perbandingan Metode"
+    app.run()
+    assert not app.exception
+    assert app.session_state["page"] == "Ringkasan"
+    assert "Ringkasan eksperimen" in [title.value for title in app.title]
 
 
 class Upload(io.BytesIO):
@@ -230,15 +238,20 @@ def test_overview_has_no_dummy_and_chart_has_selector_legend() -> None:
     overview_text = "\n".join(markdown.value for markdown in app.markdown)
     assert "XGBoost" in overview_text
     assert "DummyClassifier" not in overview_text
-    assert len(app.dataframe) == 0
-    app.button(key="nav_Perbandingan Metode").click().run()
-    for metric in ["Macro-F1", "Macro precision", "Macro recall", "Balanced accuracy", "Accuracy"]:
-        app.selectbox[0].set_value(metric).run()
+    for metric in ["Macro-F1", "Macro-precision", "Macro-recall", "Balanced accuracy", "Accuracy"]:
+        app.selectbox(key="comparison_metric").set_value(metric).run()
         assert not app.exception
         spec = json.loads(app.get("vega_lite_chart")[0].proto.spec)
-        assert spec["resolve"]["legend"]["color"] == "shared"
         color_encodings = [layer.get("encoding", {}).get("color") for layer in spec["layer"]]
         selector_encodings = [color for color in color_encodings if color and color.get("field") == "selector_label"]
         assert selector_encodings
-        assert all(color.get("legend", {}) is not None for color in selector_encodings)
-        assert all(color["legend"]["orient"] == "bottom" for color in selector_encodings)
+        # The key is drawn outside the plot, in the selectors' fixed order and colours.
+        assert all(color["legend"] is None for color in selector_encodings)
+        assert all(color["scale"]["range"] == SERIES_COLORS for color in selector_encodings)
+        legend = next(markdown.value for markdown in app.markdown if 'class="method-legend"' in markdown.value)
+        order = selector_encodings[0]["scale"]["domain"]
+        assert order == ["ANOVA", "Mutual Information", "Regresi logistik L1 - C = 1",
+                         "Regresi logistik L1 - C = 0,1", "Regresi logistik L1 - C = 0,01"]
+        assert [legend.index(label) for label in order] == sorted(legend.index(label) for label in order)
+        # No translucent bands: the spread is drawn as thin SD bars.
+        assert not any(layer.get("mark", {}).get("type") == "errorband" for layer in spec["layer"])

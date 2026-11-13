@@ -1,0 +1,79 @@
+/* Hasil Pelatihan page. */
+
+.st-key-training_results h3 {font-size:1.3rem !important;}
+.st-key-training_results h1 {font-size:2.4rem !important;}
+.st-key-training_results hr {margin:.6rem 0 !important;}
+.st-key-training_results [data-testid="stVerticalBlock"] {gap:.6rem;}
+.st-key-training_results [data-baseweb="tab-list"] {gap:2rem;}
+.st-key-training_results [data-baseweb="tab-list"] button p {font-size:1rem; font-weight:600;}
+.st-key-gallery_models {border-right:1px solid #dce3e7; padding-right:1.1rem;
+    min-height:calc(100dvh - 14rem); padding-top:1rem;}
+.st-key-gallery_detail {padding-top:1rem;}
+.st-key-gallery_models button {text-align:left; justify-content:flex-start; border:0;
+    border-left:3px solid transparent; border-radius:5px; padding:.7rem .8rem;}
+.st-key-gallery_models button[kind="primary"] {background:#edf8f8 !important; color:#14213d !important;
+    border:0 !important; border-left:3px solid #078c92 !important;}
+.st-key-gallery_models button[kind="primary"] * {color:#14213d !important;}
+.st-key-gallery_models button > div {width:100%; justify-content:flex-start;}
+.st-key-gallery_models button [data-testid="stMarkdownContainer"] {text-align:left;}
+.st-key-gallery_models button p {white-space:normal; overflow-wrap:anywhere; font-size:.9rem; line-height:1.6;}
+.st-key-gallery_models button strong {font-size:1.05rem;}
+.st-key-gallery_detail [data-testid="stMetric"] {padding:.7rem;}
+.st-key-gallery_detail [data-testid="stMetricValue"] {font-size:2rem;}
+@media(max-width:1000px) {
+    .st-key-training_cv_results [data-testid="stHorizontalBlock"], .st-key-training_holdout_results [data-testid="stHorizontalBlock"] {flex-wrap:wrap;}
+    .st-key-training_cv_results [data-testid="stColumn"], .st-key-training_holdout_results [data-testid="stColumn"] {width:100%; flex:1 1 100%;}
+    .st-key-training_results [data-testid="stHorizontalBlock"]:has(> div .st-key-gallery_models) {flex-wrap:wrap;}
+    .st-key-training_results [data-testid="stHorizontalBlock"]:has(> div .st-key-gallery_models) > [data-testid="stColumn"] {width:100%; flex:1 1 100%;}
+    .st-key-gallery_models {border-right:0; border-bottom:1px solid #dce3e7; padding-right:0; padding-bottom:1rem; min-height:0;}
+}
+
+/* Status proses: the stages of a run in a row, then a card for the current one (training_progress.py). */
+/* The bottom margin offsets the -1rem Streamlit gives the last markdown block, so the card keeps its edge. */
+.run-progress {--tone:var(--teal); --pill-bg:#e3f3f2; --pill-ink:#0b6d6f; margin:.1rem 0 1.3rem;}
+.run-progress.tone-paused {--tone:var(--warning); --pill-bg:#fcefd9; --pill-ink:#80500a;}
+.run-progress.tone-stopped {--tone:#6b7785; --pill-bg:#eef1f4; --pill-ink:#3f4a58;}
+.run-progress.tone-failed {--tone:#c2412d; --pill-bg:#fbe7e3; --pill-ink:#9a2c1c;}
+.run-progress.tone-waiting {--pill-bg:#eef1f4; --pill-ink:#3f4a58;}
+.run-progress.tone-done {--tone:var(--success); --pill-bg:#e3f4ea; --pill-ink:#17703c;}
+.run-progress .run-hidden {position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;}
+.run-progress ol.run-steps {list-style:none; display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0, 1fr);
+    margin:0 0 .9rem; padding:0;}
+.run-progress li.run-step {position:relative; margin:0; padding:0 .7rem 0 0;}
+/* The line from each marker to the next; teal once the stage is done. */
+.run-progress li.run-step::after {content:""; position:absolute; top:.6rem; left:1.65rem; right:.45rem; height:2px;
+    background:#d3dbe1;}
+.run-progress li.run-step:last-child::after {display:none;}
+.run-progress li.run-step.is-done::after {background:var(--teal);}
+.run-progress .run-marker {display:grid; place-items:center; box-sizing:border-box; width:1.25rem; height:1.25rem;
+    margin-bottom:.45rem; border:2px solid #aab5bf; border-radius:50%; background:#fff;}
+.run-progress li.is-done .run-marker {border-color:var(--teal); background:var(--teal);}
+.run-progress li.is-done .run-marker::before {content:""; width:.28rem; height:.55rem; border:solid #fff;
+    border-width:0 2px 2px 0; transform:translateY(-1px) rotate(45deg);}
+.run-progress li.is-current .run-marker {border-color:var(--tone); box-shadow:0 0 0 4px var(--pill-bg);}
+.run-progress li.is-current .run-marker::before {content:""; width:.5rem; height:.5rem; border-radius:50%;
+    background:var(--tone);}
+.run-progress p.run-step-title {margin:0; color:var(--ink); font-size:.86rem; font-weight:600; line-height:1.3;}
+.run-progress li.is-waiting p.run-step-title {color:var(--muted); font-weight:500;}
+.run-progress p.run-step-meta {margin:.15rem 0 0; color:var(--muted); font-size:.78rem; line-height:1.3;}
+.run-progress li.is-current p.run-step-meta {color:var(--ink);}
+.run-progress .run-activity {padding:.75rem 1rem .8rem; border:1px solid var(--line); border-left:3px solid var(--tone);
+    border-radius:.5rem; background:#fff;}
+.run-progress p.run-activity-head {display:flex; flex-wrap:wrap; align-items:center; gap:.3rem .6rem; margin:0;
+    color:var(--ink); font-size:1rem; font-weight:650; line-height:1.4;}
+.run-progress .run-pill {padding:.1rem .55rem; border-radius:999px; background:var(--pill-bg); color:var(--pill-ink);
+    font-size:.75rem; font-weight:650;}
+.run-progress ol.run-substeps {list-style:none; display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; margin:.6rem 0 0; padding:0;}
+.run-progress ol.run-substeps li {position:relative; margin:0; padding:.15rem .6rem; border:1px solid var(--line);
+    border-radius:.35rem; background:var(--soft); color:var(--muted); font-size:.8rem; line-height:1.4;}
+.run-progress ol.run-substeps li:not(:last-child)::after {content:"›"; position:absolute; right:-.8rem; color:#8994a1;}
+.run-progress ol.run-substeps li.is-done {border-color:#c4e6e4; background:#e9f6f5; color:#0b6d6f;}
+.run-progress ol.run-substeps li.is-current {border:1.5px solid var(--tone); background:#fff; color:var(--ink); font-weight:650;}
+.run-progress p.run-activity-text {margin:.55rem 0 0; color:var(--muted); font-size:.88rem; line-height:1.45;}
+/* Narrow windows: the stages as a vertical list, the line running down between markers. */
+@media(max-width:760px) {
+    .run-progress ol.run-steps {grid-auto-flow:row; grid-auto-columns:auto; gap:.6rem;}
+    .run-progress li.run-step {display:grid; grid-template-columns:1.25rem 1fr; column-gap:.65rem; padding:0;}
+    .run-progress li.run-step .run-marker {grid-row:span 2; margin:0;}
+    .run-progress li.run-step::after {top:1.4rem; bottom:-.55rem; left:.55rem; right:auto; width:2px; height:auto;}
+}

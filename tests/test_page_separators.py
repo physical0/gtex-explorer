@@ -3,12 +3,12 @@ import pytest
 from streamlit.testing.v1 import AppTest
 from ui_helpers import enter_application
 
-from gtex_explorer.analysis.core import APP_DIR
+from gtex_explorer.platform.paths import APP_ROOT as APP_DIR
 
 
-@pytest.mark.parametrize("page", ["Prediksi Jaringan", "Ringkasan", "Perbandingan Metode", "Panel Gen", "Kamus Biologi"])
+@pytest.mark.parametrize("page", ["Prediksi Jaringan", "Ringkasan", "Panel Gen", "Kamus Biologi"])
 def test_pages_do_not_use_middle_dot_or_pipe_separators(page):
-    app = AppTest.from_file(str(APP_DIR / "app.py"), default_timeout=60).run()
+    app = AppTest.from_file(str(APP_DIR / "main.py"), default_timeout=60).run()
     app = enter_application(app)
     app.button(key=f"nav_{page}").click().run()
     assert not app.exception
@@ -21,7 +21,7 @@ def test_pages_do_not_use_middle_dot_or_pipe_separators(page):
 
 
 def test_cv_diagnostic_copy_and_glossary_aliases_remain_readable():
-    app = AppTest.from_file(str(APP_DIR / "app.py"), default_timeout=60).run()
+    app = AppTest.from_file(str(APP_DIR / "main.py"), default_timeout=60).run()
     app = enter_application(app)
     app.button(key="nav_Panel Gen").click().run()
     app.radio(key="gene_panel_source").set_value("Cross-validation").run()

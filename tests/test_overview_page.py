@@ -13,8 +13,8 @@ APP_DIR = Path(__file__).resolve().parents[1]
 def overview_app(changes: str = "") -> AppTest:
     source = (
         f"import sys\nsys.path.insert(0, {str(APP_DIR)!r})\n"
-        "from gtex_explorer.analysis.core import load_reference_tables\n"
-        "from gtex_explorer.ui.overview_page import render_overview_page\n"
+        "from gtex_explorer.experiments.reference_tables import load_reference_tables\n"
+        "from gtex_explorer.ui.pages.overview import render_overview_page\n"
         "tables = load_reference_tables()\n"
         f"{changes}\n"
         "render_overview_page(tables)\n"
@@ -38,16 +38,22 @@ def test_overview_shows_saved_results_and_readable_labels():
     assert "807 sampel - 494 donor" in text
     assert "193 sampel - 124 donor" in text
     assert "Donor unik" in text and ">618</div>" in text
-    for value in ["96,25%", "95,49%", "96,37%", "97,55%"]:
+    for value in ["96,25%", "95,49%", "96,37%"]:
         assert value in text
+    # Macro-precision now sits in the holdout metrics table, beside the baseline.
+    holdout = next(table.value for table in app.dataframe if "Model final" in table.value.columns)
+    assert holdout.set_index("Metrik").loc["Macro-precision", "Model final"] == "97,55%"
     assert "Part A" not in text and "l1_c_1" not in text
-    assert not app.dataframe
+    # The page says where the experiment comes from, right under its title.
+    assert "skripsi Program Studi Teknik Informatika, Universitas Tarumanagara." in app.caption[0].value
+    # The only tables are the method comparison in the Cross-validation tab and the holdout metrics.
+    assert [len(table.value) for table in app.dataframe] == [4, 16, 5]
 
 
 def test_overview_keeps_scope_and_source_details_in_their_respective_sections():
     app = overview_app()
     text = visible_html(app)
-    assert "Holdout dipisahkan sebelum validasi silang" in text
+    assert "Holdout dipisahkan sebelum cross-validation" in text
     assert "tidak digunakan untuk memilih konfigurasi" in text
     assert "dilatih ulang pada seluruh data development" in text
     assert "**Macro-F1:** 99,27% ± 0,49 poin persentase" in text
@@ -119,13 +125,14 @@ def test_overview_changes_when_export_values_change(changes, expected):
 def test_selector_label_is_not_fixed_to_l1():
     app = overview_app("tables['final_test'].loc[0, 'selector_id'] = 'anova'")
     text = visible_html(app)
-    assert "ANOVA" in text
-    assert "L1 - C = 1" not in text
+    # The final model is named from the export; L1 still appears among the methods that were tested.
+    assert '<p class="overview-model-identity">ANOVA, 1.000 gen, XGBoost</p>' in text
+    assert "<dd>ANOVA</dd>" in text and "L1 - C = 1</dd>" not in text
 
 
 def test_chart_keeps_full_names_zero_based_axis_and_saved_f1():
     app = overview_app()
-    chart = app.get("vega_lite_chart")[0]
+    chart = tissue_chart(app)
     spec = json.loads(chart.proto.spec)
     encoding = {**spec.get("encoding", {}), **spec["layer"][0].get("encoding", {})}
     assert encoding["x"]["field"] == "f1-score"
@@ -142,14 +149,74 @@ def test_chart_keeps_full_names_zero_based_axis_and_saved_f1():
     changed = overview_app(
         "tables['per_tissue'].loc[tables['per_tissue']['tissue'].eq('Thyroid'), 'f1-score'] = 0.5"
     )
-    changed_spec = json.loads(changed.get("vega_lite_chart")[0].proto.spec)
+    changed_spec = json.loads(tissue_chart(changed).proto.spec)
     changed_encoding = {**changed_spec.get("encoding", {}), **changed_spec["layer"][0].get("encoding", {})}
     assert changed_encoding["y"]["sort"][0] == "Thyroid"
     changed.selectbox(key="overview_tissue_order").set_value("F1-score tertinggi").run()
-    reordered = json.loads(changed.get("vega_lite_chart")[0].proto.spec)
+    reordered = json.loads(tissue_chart(changed).proto.spec)
     reordered_encoding = {**reordered.get("encoding", {}), **reordered["layer"][0].get("encoding", {})}
     assert reordered_encoding["y"]["sort"][-1] == "Thyroid"
     changed.selectbox(key="overview_tissue_order").set_value("Nama jaringan").run()
-    alphabetical = json.loads(changed.get("vega_lite_chart")[0].proto.spec)
+    alphabetical = json.loads(tissue_chart(changed).proto.spec)
     alphabetical_encoding = {**alphabetical.get("encoding", {}), **alphabetical["layer"][0].get("encoding", {})}
     assert alphabetical_encoding["y"]["sort"] == sorted(encoding["y"]["sort"])
+
+
+def tissue_chart(app: AppTest):
+    """The per-tissue F1 chart of the holdout tab."""
+    return next(chart for chart in app.get("vega_lite_chart") if "display_support" in chart.proto.spec)
+
+
+def pipeline_html(app: AppTest, label: str = "Rincian alur eksperimen") -> str:
+    return next(item.value for item in app.markdown if f'aria-label="{label}"' in item.value)
+
+
+def test_pipeline_row_shows_each_step_with_one_key_fact_and_keeps_details_closed():
+    app = overview_app()
+    row = pipeline_html(app, "Alur eksperimen")
+    steps = ["Data dan kohort", "Pembagian data utama", "Cross-validation", "Pemilihan konfigurasi",
+             "Pelatihan ulang", "Evaluasi akhir"]
+    positions = [row.index(f'<p class="pipeline-row-title">{step}</p>') for step in steps]
+    assert positions == sorted(positions) and row.count('class="pipeline-row-step"') == 6
+    for fact in ["1.000 sampel - 13 jaringan", "807 development - 193 holdout", "5 fold - 16 konfigurasi",
+                 "Regresi logistik L1 - C = 1, 1.000 gen", "Seluruh 807 sampel development",
+                 "Macro-F1 holdout <strong>96,25%</strong>"]:
+        assert fact in row
+    # The full text of every step sits in a closed expander, so the results stay near the top.
+    details = next(item for item in app.expander if item.label == "Rincian setiap langkah")
+    assert not details.proto.expanded
+    assert any('aria-label="Rincian alur eksperimen"' in item.value for item in details.markdown)
+
+
+def test_pipeline_lists_the_experiment_steps_in_order_from_the_exports():
+    text = pipeline_html(overview_app())
+    steps = ["Data dan kohort", "Pembagian data utama", "Cross-validation 5 fold pada data development",
+             "Pemilihan konfigurasi", "Pelatihan ulang pada data development", "Evaluasi akhir pada holdout"]
+    positions = [text.index(step) for step in steps]
+    assert positions == sorted(positions)
+    # The steps repeated in every fold sit inside step 3, in pipeline order.
+    loop = [text.index(f"3.{number} {title}") for number, title in
+            enumerate(["Pra-pemrosesan", "Seleksi fitur", "XGBoost", "Skor validation"], 1)]
+    assert positions[2] < loop[0] < loop[-1] < positions[3] and loop == sorted(loop)
+    for expected in ["1.000 sampel", "data development 807 sampel (494 donor)", "data holdout 193 sampel (124 donor)",
+                     "TPM ≥ 1 pada ≥ 20% sampel training", "log2(TPM+1), 5.000 gen kandidat", "standardisasi (z-score)",
+                     "n_neighbors = 3", "C = 1 / 0,1 / 0,01", "500, 1.000 dan 2.000 gen: 15 konfigurasi",
+                     "16 konfigurasi × 5 fold = 80 hasil evaluasi", "Dari 8 konfigurasi seleksi fitur",
+                     "Regresi logistik L1 - C = 1, 1.000 gen", "300 putaran boosting"]:
+        assert expected in text
+
+
+@pytest.mark.parametrize("changes, expected", [
+    ("tables['run_summary']['variance_prefilter_genes'] = 4000", "4.000 gen kandidat"),
+    ("tables['run_summary']['l1_c_values'] = [1.0, 0.5]", "C = 1 / 0,5"),
+    ("tables['run_summary']['feature_counts'] = [250, 750]", "250 dan 750 gen"),
+    ("tables['run_summary']['test_donors'] = 99", "data holdout 193 sampel (99 donor)"),
+])
+def test_pipeline_follows_export_values(changes, expected):
+    assert expected in pipeline_html(overview_app(changes))
+
+
+def test_overview_says_the_results_come_from_the_thesis_experiment():
+    app = overview_app()
+    assert app.caption[0].value.startswith("Hasil di bawah ini berasal dari eksperimen perbandingan metode seleksi fitur")
+    assert "tidak berubah oleh pelatihan di aplikasi" in app.caption[0].value

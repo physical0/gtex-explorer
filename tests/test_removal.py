@@ -5,13 +5,13 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from gtex_explorer.cloud.state import CloudState
+from gtex_explorer.platform.cloud.state import CloudState
 from gtex_explorer.training.jobs import delete_run, job_path
-from gtex_explorer.workspaces import create_workspace, delete_workspace, list_workspaces, remember_workspace, workspace_directory
+from gtex_explorer.platform.workspaces import create_workspace, delete_workspace, list_workspaces, remember_workspace, workspace_directory
 from test_black_box_regressions import saved_run
 from test_cloud_state import MemoryStore, write
 
-APP = Path(__file__).resolve().parents[1] / 'app.py'
+APP = Path(__file__).resolve().parents[1] / 'main.py'
 RUN = 'run_' + 'a' * 32
 
 

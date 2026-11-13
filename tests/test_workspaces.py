@@ -6,7 +6,7 @@ import pytest
 
 
 def test_default_keeps_legacy_files_in_place_and_new_workspaces_are_independent(tmp_path):
-    from gtex_explorer.workspaces import list_workspaces, create_workspace, workspace_directory, rename_workspace
+    from gtex_explorer.platform.workspaces import list_workspaces, create_workspace, workspace_directory, rename_workspace
     legacy = tmp_path / 'models' / 'legacy.json'
     legacy.parent.mkdir()
     legacy.write_text('existing')
@@ -27,14 +27,14 @@ def test_default_keeps_legacy_files_in_place_and_new_workspaces_are_independent(
 
 @pytest.mark.parametrize('name', ['', '   ', 'x'*81, 'bad\nname'])
 def test_invalid_names_do_not_create_workspace_storage(tmp_path, name):
-    from gtex_explorer.workspaces import create_workspace
+    from gtex_explorer.platform.workspaces import create_workspace
     with pytest.raises(ValueError):
         create_workspace(tmp_path, name, include_bundled_models=True)
     assert not list((tmp_path / 'workspaces').glob('*'))
 
 
 def test_unknown_workspace_and_duplicate_name_are_rejected(tmp_path):
-    from gtex_explorer.workspaces import create_workspace, workspace_directory
+    from gtex_explorer.platform.workspaces import create_workspace, workspace_directory
     create_workspace(tmp_path, 'Study A', include_bundled_models=True)
     with pytest.raises(ValueError):
         create_workspace(tmp_path, 'study a', include_bundled_models=True)
@@ -43,8 +43,8 @@ def test_unknown_workspace_and_duplicate_name_are_rejected(tmp_path):
 
 
 def test_bundled_model_choice_is_per_workspace_and_does_not_hide_user_models(tmp_path):
-    from gtex_explorer.workspaces import create_workspace, workspace_directory
-    from gtex_explorer.model_registry import list_models, publish_model
+    from gtex_explorer.platform.workspaces import create_workspace, workspace_directory
+    from gtex_explorer.platform.model_registry import list_models, publish_model
     from test_model_registry import trained_fixture
     resources = Path(__file__).resolve().parents[1]
     with_original = create_workspace(tmp_path, 'With originals', include_bundled_models=True)
@@ -59,8 +59,8 @@ def test_bundled_model_choice_is_per_workspace_and_does_not_hide_user_models(tmp
 
 
 def test_switch_clears_analysis_forms_and_uses_new_uploader_identity(tmp_path):
-    from gtex_explorer.workspaces import create_workspace
-    from gtex_explorer.ui.workspace_ui import activate_workspace, upload_widget_key
+    from gtex_explorer.platform.workspaces import create_workspace
+    from gtex_explorer.ui.workspace import activate_workspace, upload_widget_key
     a = create_workspace(tmp_path, 'A', include_bundled_models=True)
     b = create_workspace(tmp_path, 'B', include_bundled_models=False)
     state = {'page':'Prediksi Jaringan', 'active_workspace_id':a['id'],
@@ -84,7 +84,7 @@ def test_training_reservation_blocks_another_workspace_before_worker_start(tmp_p
     from test_training_data import checkpoint_sources
     from gtex_explorer.training.config import validate_training_config
     from gtex_explorer.training.jobs import start_job, read_job, atomic_json
-    from gtex_explorer.workspaces import create_workspace, workspace_directory
+    from gtex_explorer.platform.workspaces import create_workspace, workspace_directory
     a = create_workspace(tmp_path / 'state', 'A', include_bundled_models=True)
     b = create_workspace(tmp_path / 'state', 'B', include_bundled_models=False)
     ar = workspace_directory(tmp_path / 'state', a['id'])
@@ -102,7 +102,7 @@ def test_training_reservation_blocks_another_workspace_before_worker_start(tmp_p
 
 
 def test_uploads_with_identical_contents_still_have_separate_files(tmp_path):
-    from gtex_explorer.workspaces import create_workspace, workspace_directory
+    from gtex_explorer.platform.workspaces import create_workspace, workspace_directory
     from gtex_explorer.training.uploads import audit_uploads, save_training_upload
     from test_training_uploads import uploads
     a = create_workspace(tmp_path, 'A', include_bundled_models=True)
@@ -118,7 +118,7 @@ def test_uploads_with_identical_contents_still_have_separate_files(tmp_path):
 
 def test_unrelated_live_worker_does_not_keep_dead_run_alive(tmp_path):
     import time
-    from gtex_explorer.workspaces import create_workspace, workspace_directory
+    from gtex_explorer.platform.workspaces import create_workspace, workspace_directory
     from gtex_explorer.training.jobs import atomic_json, process_lock, read_job
     a = create_workspace(tmp_path, 'A', include_bundled_models=True)
     b = create_workspace(tmp_path, 'B', include_bundled_models=True)
@@ -134,9 +134,9 @@ def test_unrelated_live_worker_does_not_keep_dead_run_alive(tmp_path):
 
 
 def test_invalid_launcher_target_cannot_change_active_workspace(tmp_path, monkeypatch):
-    import gtex_explorer.ui.workspace_ui as workspace_ui
+    import gtex_explorer.ui.workspace as workspace_ui
     import pytest
-    from gtex_explorer.workspaces import create_workspace
+    from gtex_explorer.platform.workspaces import create_workspace
     entry = create_workspace(tmp_path, 'Before', include_bundled_models=False)
     class State(dict):
         __getattr__ = dict.__getitem__
@@ -148,3 +148,63 @@ def test_invalid_launcher_target_cannot_change_active_workspace(tmp_path, monkey
     assert state['active_workspace_id'] == entry['id']
     assert state['workspace_entered'] is False
     assert state['training_selected_run'] == 'keep_this_run'
+
+
+def hold_registry(root, seconds):
+    """Another session holding the workspace list's lock for `seconds`; returns its thread once it holds it."""
+    import threading
+    import time
+    from gtex_explorer.platform.workspaces import REGISTRY_LOCK
+    from gtex_explorer.training.jobs import process_lock
+    held = threading.Event()
+
+    def hold():
+        with process_lock(Path(root) / REGISTRY_LOCK):
+            held.set()
+            time.sleep(seconds)
+
+    thread = threading.Thread(target=hold)
+    thread.start()
+    held.wait()
+    return thread
+
+
+def test_opening_a_workspace_waits_for_another_session_writing_the_list(tmp_path):
+    # Two sessions writing the list at once used to fail at once with PermissionError.
+    from gtex_explorer.platform.workspaces import create_workspace, last_workspace, remember_workspace
+    entry = create_workspace(tmp_path, 'Study A')
+    other = hold_registry(tmp_path, 0.4)
+    remember_workspace(tmp_path, entry['id'])
+    other.join()
+    assert last_workspace(tmp_path) == entry['id']
+
+
+def test_a_list_kept_busy_past_the_wait_still_opens_the_workspace_but_blocks_changes(tmp_path, monkeypatch):
+    import gtex_explorer.platform.workspaces as workspaces
+    entry = workspaces.create_workspace(tmp_path, 'Study A')
+    monkeypatch.setattr(workspaces, 'REGISTRY_WAIT', 0.2)
+    other = hold_registry(tmp_path, 1.0)
+    try:
+        # Saving "last used" is skipped rather than failing the workspace that is being opened.
+        workspaces.remember_workspace(tmp_path, entry['id'])
+        assert workspaces.last_workspace(tmp_path) == 'default'
+        with pytest.raises(ValueError, match='sedang digunakan proses lain'):
+            workspaces.create_workspace(tmp_path, 'Study B')
+        with pytest.raises(ValueError, match='sedang digunakan proses lain'):
+            workspaces.rename_workspace(tmp_path, entry['id'], 'Study C')
+    finally:
+        other.join()
+    assert [item['name'] for item in workspaces.list_workspaces(tmp_path)] == ['Default', 'Study A']
+
+
+def test_training_locks_still_give_up_at_once(tmp_path):
+    import time
+    from gtex_explorer.training.jobs import LockBusy, process_lock
+    other = hold_registry(tmp_path, 0.5)  # any lock file behaves the same
+    from gtex_explorer.platform.workspaces import REGISTRY_LOCK
+    started = time.monotonic()
+    with pytest.raises(LockBusy):
+        with process_lock(tmp_path / REGISTRY_LOCK):
+            pass
+    assert time.monotonic() - started < 0.2
+    other.join()

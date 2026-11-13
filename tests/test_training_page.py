@@ -3,7 +3,7 @@ import pandas as pd
 from streamlit.testing.v1 import AppTest
 from ui_helpers import enter_application
 
-APP = Path(__file__).resolve().parents[1] / 'app.py'
+APP = Path(__file__).resolve().parents[1] / 'main.py'
 
 
 def test_training_controls_are_method_specific_and_cv_is_optional(tmp_path, monkeypatch):
@@ -20,8 +20,8 @@ def test_training_controls_are_method_specific_and_cv_is_optional(tmp_path, monk
     assert not app.exception
     assert app.checkbox(key='training_cv').value is False
     assert app.slider(key='training_folds').disabled and app.slider(key='training_folds').value == 5
+    assert not any(item.key == 'training_preset' for item in app.selectbox)
     app.selectbox(key='training_selector').set_value('baseline').run()
-    assert app.selectbox(key='training_preset').value == 'Custom'
     assert app.number_input(key='training_top_k').disabled
     assert app.number_input(key='training_top_k').value == 5000
     app.selectbox(key='training_selector').set_value('mutual_information').run()
@@ -83,6 +83,61 @@ def test_blank_candidate_count_blocks_training_with_recovery_message(tmp_path, m
     assert not app.exception
     assert app.button(key='training_start').disabled
     assert any('Isi jumlah gen kandidat' in item.value for item in app.error)
+
+
+def test_default_gene_count_follows_the_data_until_the_user_types_one(tmp_path, monkeypatch):
+    from test_training_uploads import uploads
+    from gtex_explorer.training.uploads import audit_uploads
+    monkeypatch.setenv('GTEX_DESKTOP_STATE_DIR', str(tmp_path))
+    expression, metadata = uploads()
+    app = AppTest.from_file(str(APP), default_timeout=60).run()
+    app = enter_application(app)
+    app.session_state.training_upload_audit = audit_uploads(expression, 'own.csv', metadata, 'labels.csv')
+    app.button(key='nav_Pelatihan Model').click().run()
+    method = lambda: app.selectbox(key='training_selector')
+    top_k = lambda: app.number_input(key='training_top_k').value
+    # The form starts on L1 with C = 1, as the removed preset did.
+    assert method().value == 'l1' and app.number_input(key='training_l1_c').value == 1.0
+    # A small upload: every gene is used, by default and for the baseline.
+    assert top_k() == 3
+    method().set_value('baseline').run()
+    assert not app.exception and top_k() == 3
+    method().set_value('l1').run()
+    assert top_k() == 3
+    # Larger data: the default refits instead of keeping the small number.
+    app.radio(key='training_source').set_value('Data eksperimen notebook').run()
+    assert not app.exception and top_k() == 1000
+    method().set_value('baseline').run()
+    assert top_k() == 5000
+    method().set_value('anova').run()
+    assert top_k() == 1000
+    # A number the user types is theirs to keep, and is only lowered when the data has fewer genes.
+    app.number_input(key='training_top_k').set_value(250).run()
+    method().set_value('mutual_information').run()
+    assert top_k() == 250
+    app.radio(key='training_source').set_value('Data pengguna').run()
+    assert top_k() == 3
+    app.radio(key='training_source').set_value('Data eksperimen notebook').run()
+    assert top_k() == 3
+
+
+def test_missing_notebook_data_after_an_older_upload_shows_only_the_message(tmp_path, monkeypatch):
+    from test_training_uploads import uploads
+    from gtex_explorer.training.uploads import audit_uploads
+    import gtex_explorer.ui.pages.training as training_page
+    def missing(_):
+        raise FileNotFoundError('training_data')
+    monkeypatch.setenv('GTEX_DESKTOP_STATE_DIR', str(tmp_path))
+    monkeypatch.setattr(training_page, 'cached_data', missing)
+    expression, metadata = uploads()
+    app = AppTest.from_file(str(APP), default_timeout=60).run()
+    app = enter_application(app)
+    app.session_state.training_upload_audit = audit_uploads(expression, 'own.csv', metadata, 'labels.csv')
+    app.button(key='nav_Pelatihan Model').click().run()
+    app.radio(key='training_source').set_value('Data eksperimen notebook').run()
+    assert not app.exception
+    assert any('Data eksperimen notebook tidak tersedia' in item.value for item in app.error)
+    assert app.button(key='training_start').disabled
 
 
 def test_model_swap_discards_audit_predictions_and_rounds(tmp_path, monkeypatch):
@@ -165,7 +220,7 @@ def test_paused_training_has_live_resume_and_separate_end_button(tmp_path, monke
 def test_run_time_uses_saved_start_not_restored_file_time(tmp_path):
     # Hosted instances rewrite files on restore, so file times are not the run's age.
     import json, os, time
-    from gtex_explorer.ui.training_page import run_created
+    from gtex_explorer.training.run_labels import run_created
     run = tmp_path / 'run_x'
     run.mkdir()
     (run / 'config.json').write_text(json.dumps({'created': 1_000_000.0}), encoding='utf-8')
@@ -209,3 +264,87 @@ def test_metadata_column_choices_explain_what_each_column_is_for(tmp_path, monke
                    'Periksa kembali kolom donor dan jaringan']:
         assert phrase in captions
     assert 'agar skor tidak terlalu tinggi' not in captions
+
+
+def test_steps_follow_the_pipeline_and_the_review_uses_the_form_labels(tmp_path, monkeypatch):
+    monkeypatch.setenv('GTEX_DESKTOP_STATE_DIR', str(tmp_path))
+    app = enter_application(AppTest.from_file(str(APP), default_timeout=60).run())
+    app.button(key='nav_Pelatihan Model').click().run()
+    app.radio(key='training_source').set_value('Data eksperimen notebook').run()
+    app.button(key='training_to_configuration').click().run()
+    configuration = list(app.tabs[1])
+    position = lambda match: next(i for i, item in enumerate(configuration) if match(item))
+    heading = lambda text: position(lambda item: item.type == 'subheader' and item.value == text)
+    candidates = position(lambda item: getattr(item, 'key', None) == 'training_candidates')
+    method = position(lambda item: getattr(item, 'key', None) == 'training_selector')
+    # Candidate genes belong to preprocessing; the method and its gene count to feature selection.
+    assert heading('Pembagian data utama') < heading('Pra-pemrosesan') < candidates < heading('Seleksi fitur') < method
+    assert method < position(lambda item: getattr(item, 'key', None) == 'training_l1_c') < heading('Evaluasi tambahan')
+    # The notebook data is named once in the data summary.
+    assert not any(item.value.startswith('Data eksperimen notebook') for item in app.tabs[1].caption)
+
+    app.button(key='training_to_review').click().run()
+    assert not app.exception
+    review = app.tabs[2]
+    assert [item.value for item in review.subheader] == [
+        'Tinjau data dan konfigurasi', 'Data dan pra-pemrosesan', 'Seleksi fitur dan model']
+    data_table, model_table = (table.value for table in review.table)
+    assert list(data_table.index) == ['Data development', 'Data holdout', 'Pembagian', 'Gen kandidat', 'Pra-pemrosesan']
+    assert list(model_table.index) == ['Metode seleksi fitur', 'Top-k gen', 'C (regularisasi)', 'Evaluasi tambahan',
+                                       'Classifier', 'Putaran boosting']
+    assert review.expander[0].label == 'Parameter XGBoost dan opsi selector'
+    parameters = review.expander[0].dataframe[0].value
+    assert 'Learning rate' in parameters['Parameter'].tolist() and 'Bobot kelas' in parameters['Parameter'].tolist()
+    # No internal setting names leak into the review.
+    assert not {'selector', 'top_k', 'log2_transform', 'holdout_percent', 'learning_rate'} & set(parameters['Parameter'])
+    app.button(key='training_review_back').click().run()
+    app.selectbox(key='training_selector').set_value('anova').run()
+    app.button(key='training_to_review').click().run()
+    assert app.tabs[2].expander[0].label == 'Parameter XGBoost'
+    assert 'C (regularisasi)' not in app.tabs[2].table[1].value.index
+
+
+
+def test_process_guide_explains_every_setting_on_the_form(tmp_path, monkeypatch):
+    import html
+    from gtex_explorer.display import METHODS
+    monkeypatch.setenv('GTEX_DESKTOP_STATE_DIR', str(tmp_path))
+    app = enter_application(AppTest.from_file(str(APP), default_timeout=60).run())
+    app.button(key='nav_Pelatihan Model').click().run()
+    app.radio(key='training_source').set_value('Data eksperimen notebook').run()
+    guide = html.unescape(next(item.value for item in app.markdown if 'class="training-guide"' in item.value))
+    # Streamlit's test harness lists an expander with an icon among its status elements.
+    section = next(item for item in app.status if item.label == 'Cara kerja pelatihan')
+    assert not section.proto.expanded
+    # A guide, not a status: optional stages say what runs them instead of being marked skipped.
+    assert 'Dilewati' not in guide and guide.count('>Opsional<') == 2
+    for heading in ['Langkah penggunaan', 'Alur proses pelatihan', 'Pengaturan dan pengaruhnya', '>Pra-pemrosesan<']:
+        assert heading in guide
+    # Where pra-pemrosesan happens, with and without CV, and what the technical filter keeps; each said once.
+    from gtex_explorer.training.data import TECHNICAL_FILTER_RULE
+    assert guide.count('Pada setiap fold, pra-pemrosesan') == 1
+    assert guide.count('proses pra-pemrosesan dilakukan satu kali pada data development') == 1
+    assert guide.count(TECHNICAL_FILTER_RULE) == 1 and 'tetap untuk data notebook' not in guide
+    assert 'Cross-validation aktif' not in guide  # no second telling of the run next to the flow
+    # Every control of the Konfigurasi step, for every method, is explained under its own label.
+    labels = set(METHODS.values())
+    for method in ['l1', 'mutual_information', 'anova', 'baseline']:
+        app.selectbox(key='training_selector').set_value(method).run()
+        step = app.tabs[1]
+        for kind in ['number_input', 'checkbox', 'slider', 'selectbox', 'expander']:
+            labels |= {item.label for item in getattr(step, kind)}
+    assert {'Bobot kelas', 'n_neighbors', 'Thread CPU', 'Jumlah fold', 'Porsi data holdout'} <= labels and len(labels) > 20
+    missing = sorted(label for label in labels if label not in guide)
+    assert not missing, missing
+
+
+def test_guide_step_references_name_the_step_they_mean():
+    import re
+    from gtex_explorer.ui.components import training_guide as guide
+    texts = [guide.PREPROCESSING_LEAD] + [text for _, items in guide.SETTINGS for _, text in items]
+    titles = [title for title, _, _ in guide.FLOW]
+    references = [match for text in texts for match in re.finditer(r'tahap (\d+)(?: \(([^)]+)\))?', text)]
+    assert references
+    for match in references:
+        # Every "tahap N" carries the name of flow step N, so a renamed or renumbered step cannot go stale.
+        assert match.group(2) == titles[int(match.group(1)) - 1], match.group(0)

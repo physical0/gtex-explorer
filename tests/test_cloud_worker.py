@@ -6,14 +6,14 @@ from test_training_data import checkpoint_sources
 
 
 def test_training_artifacts_restore_after_instance_replacement(tmp_path, monkeypatch):
-    import gtex_explorer.cloud.state as cloud_state
-    from gtex_explorer.cloud.state import CloudState
+    import gtex_explorer.platform.cloud.state as cloud_state
+    from gtex_explorer.platform.cloud.state import CloudState
     from scripts.export_training_data import export_training_data
     from gtex_explorer.training.config import validate_training_config
     from gtex_explorer.training.jobs import start_job
     from gtex_explorer.training.worker import run_job
     from gtex_explorer.training.gallery import list_gallery
-    from gtex_explorer.model_registry import list_models, load_saved_model
+    from gtex_explorer.platform.model_registry import list_models, load_saved_model
     from gtex_explorer.training.panels import load_run_panel
 
     root = tmp_path / 'cloud'

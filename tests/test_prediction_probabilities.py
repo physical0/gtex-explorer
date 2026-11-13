@@ -10,8 +10,11 @@ import pytest
 from streamlit.testing.v1 import AppTest
 from ui_helpers import enter_application
 
-from gtex_explorer.analysis.core import load_model_bundle, parse_expression_file, audit_and_align_input, predict_tissues
-from gtex_explorer.ui.prediction_page import _probability_chart, _probability_percent
+from gtex_explorer.inference.model_bundle import load_model_bundle
+from gtex_explorer.inference.parsing import parse_expression_file
+from gtex_explorer.inference.audit import audit_and_align_input
+from gtex_explorer.inference.prediction import predict_tissues
+from gtex_explorer.ui.pages.prediction import _probability_chart, _probability_percent
 
 
 APP_DIR = Path(__file__).resolve().parents[1]
@@ -40,7 +43,7 @@ def test_chart_retains_all_classes_sorted_with_zero_based_scale_and_visible_valu
 
 
 def test_real_demo_summary_matches_chart_and_sample_selection_changes_both():
-    app = AppTest.from_file(str(APP_DIR / "app.py"), default_timeout=60).run()
+    app = AppTest.from_file(str(APP_DIR / "main.py"), default_timeout=60).run()
     app = enter_application(app)
     app.button(key="load_local_demo").click().run()
     app.button(key="run_prediction").click().run()
@@ -74,7 +77,7 @@ def test_real_demo_summary_matches_chart_and_sample_selection_changes_both():
 def test_pending_upload_signature_does_not_read_the_file():
     # Reading and hashing a 200 MB upload on every rerun copied it each time.
     import streamlit as st
-    from gtex_explorer.ui.prediction_page import _sync_uploaded_input
+    from gtex_explorer.ui.pages.prediction import _sync_uploaded_input
 
     class Upload:
         name, file_id, size = 'big.csv', 'id-1', 10

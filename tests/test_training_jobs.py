@@ -23,11 +23,46 @@ def test_status_write_retries_transient_windows_lock(tmp_path, monkeypatch):
     assert not list(tmp_path.glob('*.part'))
 
 
+def test_status_read_retries_transient_windows_lock(tmp_path, monkeypatch):
+    from gtex_explorer.training.jobs import read_job
+    run_id = 'run_' + '0' * 32
+    status = tmp_path / 'runs' / run_id / 'status.json'
+    status.parent.mkdir(parents=True)
+    status.write_text('{"status": "completed"}', encoding='utf-8')
+    read_text = Path.read_text
+    attempts = []
+    def temporarily_locked(self, *args, **kwargs):
+        if self == status:
+            attempts.append(1)
+            if len(attempts) < 3:
+                # open() reports this lock as a plain errno 13, without a winerror.
+                raise PermissionError(13, 'Permission denied')
+        return read_text(self, *args, **kwargs)
+    monkeypatch.setattr(Path, 'read_text', temporarily_locked)
+    assert read_job(run_id, tmp_path).status == 'completed'
+    assert len(attempts) == 3
+
+
+def test_status_read_reports_a_lock_that_does_not_clear(tmp_path, monkeypatch):
+    from gtex_explorer.training import data
+    status = tmp_path / 'status.json'
+    status.write_text('{"status": "completed"}', encoding='utf-8')
+    attempts = []
+    def always_locked(self, *args, **kwargs):
+        attempts.append(1)
+        raise PermissionError(13, 'Permission denied')
+    monkeypatch.setattr(Path, 'read_text', always_locked)
+    monkeypatch.setattr(data.time, 'sleep', lambda seconds: None)
+    with pytest.raises(PermissionError):
+        data.read_json_file(status)
+    assert len(attempts) == 6
+
+
 def test_background_job_publishes_model_and_survives_repeated_status_reads(tmp_path):
     from scripts.export_training_data import export_training_data
     from gtex_explorer.training.config import validate_training_config
     from gtex_explorer.training.jobs import start_job, read_job
-    from gtex_explorer.model_registry import list_models, load_saved_model
+    from gtex_explorer.platform.model_registry import list_models, load_saved_model
     export_training_data(*checkpoint_sources(tmp_path), tmp_path / 'data')
     config = validate_training_config({'selector': 'anova', 'top_k': 2,
                                      'xgboost': {'n_estimators': 2}}, candidate_count=6)

@@ -13,8 +13,9 @@ import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from gtex_explorer.analysis.core import APP_DIR, load_reference_tables
-from gtex_explorer.analysis.gene_panels import cv_gene_panel, load_cv_gene_rankings
+from gtex_explorer.platform.paths import APP_ROOT as APP_DIR
+from gtex_explorer.experiments.reference_tables import load_reference_tables
+from gtex_explorer.experiments.gene_panels import cv_gene_panel, load_cv_gene_rankings
 
 
 @pytest.fixture(scope="module")
@@ -80,7 +81,7 @@ def test_panel_loader_rejects_inconsistent_exports(tmp_path, tables, defect):
 
 def gene_app():
     app = AppTest.from_string(
-        'from gtex_explorer.analysis.core import load_reference_tables\nfrom gtex_explorer.ui.gene_page import render_gene_page\nrender_gene_page(load_reference_tables())\n', default_timeout=30,
+        'from gtex_explorer.experiments.reference_tables import load_reference_tables\nfrom gtex_explorer.ui.pages.genes import render_gene_page\nrender_gene_page(load_reference_tables())\n', default_timeout=30,
     ).run()
     assert not app.exception
     return app
@@ -147,7 +148,7 @@ def test_l1_zero_score_genes_have_no_invented_dominant_class():
 
 def test_missing_cv_export_does_not_invent_results():
     app = AppTest.from_string(
-        "import pandas as pd\nfrom gtex_explorer.analysis.core import load_reference_tables\nfrom gtex_explorer.ui.gene_page import render_gene_page\ntables = load_reference_tables()\ntables['cv_gene_rankings'] = pd.DataFrame()\nrender_gene_page(tables)\n", default_timeout=30,
+        "import pandas as pd\nfrom gtex_explorer.experiments.reference_tables import load_reference_tables\nfrom gtex_explorer.ui.pages.genes import render_gene_page\ntables = load_reference_tables()\ntables['cv_gene_rankings'] = pd.DataFrame()\nrender_gene_page(tables)\n", default_timeout=30,
     ).run()
     app.radio(key="gene_panel_source").set_value("Cross-validation").run()
     assert not app.exception and app.warning

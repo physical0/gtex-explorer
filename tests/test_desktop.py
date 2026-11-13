@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import gtex_explorer.desktop_runtime as desktop
+import gtex_explorer.platform.desktop_runtime as desktop
 
 
 @pytest.mark.parametrize('host,expected', [

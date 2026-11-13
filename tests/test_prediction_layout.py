@@ -9,9 +9,9 @@ import pytest
 from streamlit.testing.v1 import AppTest
 from ui_helpers import enter_application
 
-from gtex_explorer.analysis.core import load_model_bundle
+from gtex_explorer.inference.model_bundle import load_model_bundle
 
-APP = Path(__file__).resolve().parents[1] / "app.py"
+APP = Path(__file__).resolve().parents[1] / "main.py"
 
 
 class Upload(io.BytesIO):
@@ -49,10 +49,10 @@ def test_navigation_groups_existing_notebook_and_training_routes():
     assert not groups["Referensi Eksperimen"].proto.expanded
     assert not groups["Gallery Hasil Pelatihan"].proto.expanded
     assert [item.label for item in groups["Referensi Eksperimen"].button] == [
-        "Ringkasan", "Perbandingan Metode", "Panel Gen Eksperimen",
+        "Ringkasan", "Panel Gen Eksperimen",
     ]
     assert [item.label for item in groups["Gallery Hasil Pelatihan"].button] == [
-        "Hasil Pelatihan", "Panel Gen",
+        "Hasil Pelatihan", "Perbandingan Model", "Panel Gen",
     ]
     app.button(key="nav_Ringkasan").click().run()
     assert not app.exception

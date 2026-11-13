@@ -20,7 +20,7 @@ def make_run(tmp_path, monkeypatch, *, cv=False):
 
 def test_bundle_is_hidden_until_saved_results_verified_and_completed(tmp_path, monkeypatch):
     import gtex_explorer.training.worker as worker
-    from gtex_explorer.model_registry import list_models
+    from gtex_explorer.platform.model_registry import list_models
     from gtex_explorer.training.gallery import list_gallery
     data, state, run_id = make_run(tmp_path, monkeypatch)
     publish = worker.publish_model
@@ -41,7 +41,7 @@ def test_bundle_is_hidden_until_saved_results_verified_and_completed(tmp_path, m
 def test_missing_cv_panel_blocks_gallery_and_prediction_and_retry_reuses_model(tmp_path, monkeypatch):
     import gtex_explorer.training.worker as worker
     from gtex_explorer.training.gallery import list_gallery
-    from gtex_explorer.model_registry import list_models
+    from gtex_explorer.platform.model_registry import list_models
     data, state, run_id = make_run(tmp_path, monkeypatch, cv=True)
     publish = worker.publish_model
     panel_bytes = []
@@ -98,7 +98,7 @@ def test_gallery_and_process_history_are_separate_ui_views(tmp_path, monkeypatch
     pending = start_job(validate_training_config({'selector': 'anova', 'top_k': 2,
         'xgboost': {'n_estimators': 2}}, candidate_count=6), data, state).run_id
     script = ('from pathlib import Path\n'
-        'from gtex_explorer.ui.training_page import render_training_results_page\n'
+        'from gtex_explorer.ui.pages.training_results import render_training_results_page\n'
         f'render_training_results_page(Path({str(data)!r}), Path({str(state)!r}))')
     app = AppTest.from_string(script, default_timeout=60).run()
     assert not app.exception
@@ -143,7 +143,7 @@ def test_saving_stage_explains_gallery_delay_and_disables_controls_in_ui(tmp_pat
     atomic_json(root / 'worker.json', {})
     with process_lock(tmp_path / 'worker.lock'):
         app = AppTest.from_string('from pathlib import Path\n'
-            'from gtex_explorer.ui.training_page import render_training_results_page\n'
+            'from gtex_explorer.ui.pages.training_results import render_training_results_page\n'
             f'render_training_results_page(Path("unused"), Path({str(tmp_path)!r}))',
             default_timeout=60).run()
         assert not app.exception
@@ -218,7 +218,7 @@ def holdout_run(tmp_path, monkeypatch, **extra):
 
 
 def test_holdout_run_scores_the_saved_model_on_samples_it_never_saw(tmp_path, monkeypatch):
-    from gtex_explorer.model_registry import list_models, load_saved_model
+    from gtex_explorer.platform.model_registry import list_models, load_saved_model
     from gtex_explorer.training.gallery import list_gallery
     from gtex_explorer.training.worker import run_job
     data, state, run_id = holdout_run(tmp_path, monkeypatch)

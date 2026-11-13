@@ -11,7 +11,7 @@
     "training": {
       "root": ".",
       "entrypoint": "Dockerfile.vercel",
-      "command": ["python", "-m", "gtex_explorer.cloud.daemon"],
+      "command": ["python", "-m", "gtex_explorer.platform.cloud.daemon"],
       "instances": {"sin1": 1},
       "resources": {"requests": {"memory": "2Gi"}},
       "terminationGracePeriodSeconds": 60

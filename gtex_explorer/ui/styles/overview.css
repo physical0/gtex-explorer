@@ -1,0 +1,145 @@
+/* Ringkasan page. */
+
+[data-testid="stAppViewContainer"]:has(.overview-page-marker) { background: #fff; }
+[data-testid="stAppViewContainer"]:has(.overview-page-marker) [data-testid="stMain"] .block-container {
+    padding: 1.4rem 2rem 1.5rem;
+}
+[data-testid="stElementContainer"]:has(.overview-page-marker),
+[data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] style) { display: none; }
+.overview-section-title {
+    margin: 0 0 .6rem !important;
+    padding: 0 !important;
+    color: var(--ink);
+    font-size: 1.08rem !important;
+    font-weight: 650;
+    line-height: 1.4;
+}
+.overview-note, .overview-stat-label { color: var(--muted); font-size: .88rem; line-height: 1.5; }
+.overview-note { margin: .4rem 0 0; }
+.overview-cohort { border-top: 1px solid var(--line); padding-top: .9rem; }
+.overview-cohort-stats, .overview-primary-metrics {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.overview-stat { padding: .35rem .75rem; min-width: 0; text-align: center; }
+.overview-stat + .overview-stat { border-left: 1px solid var(--line); }
+.overview-stat-value { color: var(--ink); font-size: 1.8rem; line-height: 1.3; font-weight: 650; font-variant-numeric: tabular-nums; }
+.overview-split-grid {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem; margin-top: .8rem; padding: .85rem 0; border-top: 1px solid var(--line);
+}
+.overview-split-grid > section + section { border-left: 1px solid var(--line); padding-left: 1.5rem; }
+.overview-split-title { margin: 0; font-size: .9rem; color: var(--muted); }
+.overview-split-count { margin: .2rem 0; font-size: 1.12rem; font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+/* Streamlit's markdown rules (".st-emotion-cache-… p" and "… li") outrank a single class, so text and list
+   rules for paragraphs and list items name the markdown container or a section class as well. */
+[data-testid="stMarkdownContainer"] p.overview-note { font-size: .88rem; line-height: 1.5; }
+[data-testid="stMarkdownContainer"] p.overview-split-title { font-size: .9rem; }
+[data-testid="stMarkdownContainer"] p.overview-split-count { font-size: 1.12rem; }
+
+/* Alur eksperimen: six numbered steps in a row joined by a line, one key fact each. */
+.overview-pipeline { border-top: 1px solid var(--line); padding-top: .9rem; }
+.overview-flow .pipeline-number {
+    position: relative; display: grid; place-items: center; width: 1.9rem; height: 1.9rem; border-radius: 50%;
+    background: #e3f3f2; color: #0b6d6f; font-size: .88rem; font-weight: 650; font-variant-numeric: tabular-nums;
+}
+.overview-flow ol.pipeline-row {
+    list-style: none; margin: .8rem 0 0; padding: 0;
+    display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1.1rem;
+}
+.overview-flow li.pipeline-row-step { position: relative; min-width: 0; margin: 0; padding: 0; }
+.overview-flow li.pipeline-row-step:not(:last-child)::after {
+    content: ""; position: absolute; top: calc(.95rem - 1px); left: 2.35rem; right: -.65rem; height: 2px; background: var(--line);
+}
+.overview-flow .pipeline-row-step .pipeline-number { margin-bottom: .6rem; }
+.overview-flow p.pipeline-row-title { margin: 0; color: var(--ink); font-size: .95rem; font-weight: 650; line-height: 1.35; }
+.overview-flow p.pipeline-row-fact { margin: .3rem 0 0; color: var(--muted); font-size: .85rem; line-height: 1.45; overflow-wrap: anywhere; }
+.overview-flow p.pipeline-row-fact strong { color: var(--ink); font-weight: 600; }
+
+/* Rincian setiap langkah, in the expander: the same steps in full, the CV loop boxed inside step 3. */
+.overview-flow ol.pipeline-steps { list-style: none; margin: .2rem 0 0; padding: 0; }
+.overview-flow li.pipeline-step {
+    position: relative; display: grid; grid-template-columns: 1.9rem minmax(0, 1fr); gap: .8rem; margin: 0; padding: 0 0 1.2rem;
+}
+.overview-flow li.pipeline-step::before {
+    content: ""; position: absolute; left: calc(.95rem - 1px); top: 2.2rem; bottom: .3rem; width: 2px; background: var(--line);
+}
+.overview-flow li.pipeline-step:last-child { padding-bottom: .4rem; }
+.overview-flow li.pipeline-step:last-child::before { display: none; }
+.overview-flow p.pipeline-title { margin: .2rem 0 .2rem; color: var(--ink); font-size: .98rem; font-weight: 650; line-height: 1.4; }
+.overview-flow p.pipeline-detail { margin: 0; color: var(--muted); font-size: .88rem; line-height: 1.55; max-width: 62rem; }
+.overview-flow p.pipeline-detail strong { color: var(--ink); font-weight: 600; }
+.overview-flow p.pipeline-where { margin: .35rem 0 0; color: #0b6d6f; font-size: .8rem; line-height: 1.45; }
+.overview-flow .pipeline-loop { margin-top: .7rem; padding: .8rem 1rem .9rem; border: 1px solid var(--line); border-radius: .5rem; background: #f8fbfb; }
+.overview-flow p.pipeline-loop-label {
+    margin: 0 0 .6rem; color: var(--muted); font-size: .78rem; font-weight: 600; letter-spacing: .02em; text-transform: uppercase;
+}
+.overview-flow ol.pipeline-substeps {
+    list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .7rem 1rem;
+}
+.overview-flow li.pipeline-substep { min-width: 0; margin: 0; padding: 0 0 0 .65rem; border-left: 3px solid #0f8b8d; }
+.overview-flow li.pipeline-substep p { margin: .15rem 0 0; color: var(--muted); font-size: .82rem; line-height: 1.5; overflow-wrap: anywhere; }
+.overview-flow li.pipeline-substep p.pipeline-substep-title { margin: 0; color: var(--ink); font-size: .88rem; font-weight: 600; }
+.overview-flow > p.overview-note { margin: .4rem 0 .2rem; }
+.overview-search { padding: .4rem 0 .9rem; }
+.overview-search strong { color: var(--ink); font-weight: 600; }
+.overview-model-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 1.6rem; margin: .6rem 0 1rem; }
+.overview-config, .overview-evaluation { padding-top: .3rem; min-width: 0; }
+.overview-config dl { margin: 0; }
+.overview-config-row { display: grid; grid-template-columns: 1fr 1.4fr; gap: .7rem; padding: .48rem 0; border-bottom: 1px solid var(--line); font-size: .9rem; }
+.overview-config dt { color: var(--muted); }
+.overview-config dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+.overview-cv-score { margin: .65rem 0 .2rem; color: var(--ink); font-size: .95rem; }
+.overview-cv-score strong { font-variant-numeric: tabular-nums; }
+.overview-evaluation .overview-note { margin: .2rem 0 .8rem; }
+.overview-model-identity { margin: .2rem 0; color: var(--ink); font-size: 1rem; font-weight: 600; }
+.overview-cv-summary { border-left: 1px solid var(--line); padding: .4rem 1.2rem; align-content: center; }
+.overview-cv-summary .overview-stat-value { font-size: 2.1rem; }
+.overview-primary-metrics .overview-stat-label { font-size: .82rem; }
+.overview-stat-delta { margin-top: .15rem; color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+/* Perbandingan metode, under the chosen configuration in the Cross-validation tab. */
+.overview-rule { border-top: 1px solid var(--line); margin: .4rem 0 .2rem; }
+/* Key for the method chart, outside the plot so the plot keeps its height. */
+.method-legend { display: flex; flex-wrap: wrap; gap: .35rem 1.2rem; margin: .1rem 0 .2rem; color: var(--ink); font-size: .85rem; line-height: 1.4; }
+.method-legend-item { display: inline-flex; align-items: center; gap: .45rem; white-space: nowrap; }
+.method-legend-line { width: 1.1rem; height: 3px; border-radius: 2px; }
+.method-legend-dash { width: 1.1rem; border-top: 2px dashed var(--ink); }
+.method-legend-hollow { width: .62rem; height: .62rem; border: 2px solid var(--muted); border-radius: 50%; background: #fff; }
+.method-legend-spread { width: 2px; height: .9rem; background: var(--muted); opacity: .7; }
+[data-testid="stMarkdownContainer"] p.overview-table-title { margin: .4rem 0 0; color: var(--ink); font-size: .95rem; font-weight: 650; }
+.overview-chart-heading { border-top: 1px solid var(--line); padding-top: .9rem; }
+.overview-chart-heading .overview-note { margin: 0; }
+[data-testid="stAppViewContainer"]:has(.overview-page-marker) [data-testid="stTabs"] {
+    margin-top: .9rem; padding-top: .4rem; border-top: 1px solid var(--line);
+}
+[data-testid="stAppViewContainer"]:has(.overview-page-marker) [data-baseweb="tab-list"] {
+    gap: 1.5rem; border-bottom: 1px solid var(--line); margin: .3rem 0 .4rem;
+}
+[data-testid="stAppViewContainer"]:has(.overview-page-marker) [data-baseweb="tab"] {
+    padding: .75rem .4rem; font-size: 1rem; font-weight: 600; background: transparent;
+}
+[data-testid="stAppViewContainer"]:has(.overview-page-marker) [data-baseweb="tab"][aria-selected="true"] { color: #0f8b8d; }
+[data-testid="stAppViewContainer"]:has(.overview-page-marker) [data-baseweb="tab-highlight"] { background-color: #0f8b8d; }
+.overview-source-table { width: 100%; border-collapse: collapse; font-size: .85rem; line-height: 1.5; }
+.overview-source-table th, .overview-source-table td { text-align: left; vertical-align: top; padding: .5rem; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.overview-sidebar-status { color: var(--muted); font-size: .8rem; position: fixed; bottom: 1.4rem; left: 1.5rem; max-width: 200px; }
+@media (max-width: 1100px) {
+    .overview-flow ol.pipeline-row { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 1.4rem; }
+    .overview-flow li.pipeline-row-step:nth-child(3n)::after { display: none; }
+    .overview-flow ol.pipeline-substeps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .overview-model-grid { grid-template-columns: 1fr; gap: 1rem; }
+    .overview-cv-summary { border-left: 0; padding: .8rem 0; border-top: 1px solid var(--line); }
+}
+@media (max-width: 640px) {
+    .overview-flow ol.pipeline-row { grid-template-columns: 1fr; row-gap: .9rem; }
+    .overview-flow li.pipeline-row-step { display: grid; grid-template-columns: 1.9rem minmax(0, 1fr); column-gap: .7rem; }
+    .overview-flow li.pipeline-row-step .pipeline-number { grid-row: span 2; margin: 0; }
+    .overview-flow li.pipeline-row-step::after { display: none; }
+    .overview-flow ol.pipeline-substeps { grid-template-columns: 1fr; }
+    .overview-flow li.pipeline-step { gap: .6rem; }
+    .overview-split-grid { grid-template-columns: 1fr; gap: .8rem; }
+    .overview-split-grid > section + section { border-left: 0; border-top: 1px solid var(--line); padding: .8rem 0 0; }
+    .overview-stat { padding: .3rem .2rem; }
+    .overview-stat-value { font-size: 1.45rem; }
+    [data-testid="stAppViewContainer"]:has(.overview-page-marker) [data-testid="stMain"] .block-container { padding: 1rem; }
+}
+@media (max-height: 620px) { .overview-sidebar-status { position: static; } }

@@ -23,8 +23,9 @@ def trained_fixture():
 
 
 def test_bundle_roundtrip_preserves_inference_and_checks_integrity(tmp_path):
-    from gtex_explorer.model_registry import publish_model, load_saved_model
-    from gtex_explorer.analysis.core import audit_and_align_input, predict_tissues, explain_prediction
+    from gtex_explorer.platform.model_registry import publish_model, load_saved_model
+    from gtex_explorer.inference.audit import audit_and_align_input
+    from gtex_explorer.inference.prediction import explain_prediction, predict_tissues
     result, config, demo = trained_fixture()
     entry = publish_model(result, config, {'classes': ['A', 'B', 'C'], 'run_id': 'run_test'},
                           tmp_path / 'run_test', demo, None)
@@ -47,7 +48,7 @@ def test_bundle_roundtrip_preserves_inference_and_checks_integrity(tmp_path):
 
 
 def test_partial_or_invalid_models_are_not_selectable(tmp_path):
-    from gtex_explorer.model_registry import publish_model, list_models
+    from gtex_explorer.platform.model_registry import publish_model, list_models
     result, config, demo = trained_fixture()
     resource = tmp_path / 'resources'
     state = tmp_path / 'state'
@@ -67,7 +68,7 @@ def test_partial_or_invalid_models_are_not_selectable(tmp_path):
 
 
 def test_bundle_rejects_path_escape_and_changed_manifest_identity(tmp_path):
-    from gtex_explorer.model_registry import publish_model, load_saved_model
+    from gtex_explorer.platform.model_registry import publish_model, load_saved_model
     result, config, demo = trained_fixture()
     entry = publish_model(result, config, {'classes': ['A', 'B', 'C']}, tmp_path / 'test', demo, None)
     path = entry.bundle_dir / 'bundle_manifest.json'
@@ -81,7 +82,7 @@ def test_bundle_rejects_path_escape_and_changed_manifest_identity(tmp_path):
 def test_baseline_export_uses_every_candidate_and_development_example(tmp_path):
     from test_training_data import checkpoint_sources
     from scripts.export_training_data import export_training_data, export_baseline
-    from gtex_explorer.model_registry import load_saved_model
+    from gtex_explorer.platform.model_registry import load_saved_model
     export_training_data(*checkpoint_sources(tmp_path), tmp_path / 'data')
     entry = export_baseline(tmp_path / 'data', tmp_path / 'baseline')
     pre, model = load_saved_model(entry)
@@ -95,7 +96,7 @@ def test_baseline_export_uses_every_candidate_and_development_example(tmp_path):
 def test_listing_models_loads_each_bundle_only_when_its_files_change(tmp_path, monkeypatch):
     import shutil
     from pathlib import Path
-    import gtex_explorer.model_registry as registry
+    import gtex_explorer.platform.model_registry as registry
     root = tmp_path / 'resources'
     root.mkdir()
     shutil.copytree(Path(__file__).resolve().parents[1] / 'baseline_bundle', root / 'baseline_bundle')

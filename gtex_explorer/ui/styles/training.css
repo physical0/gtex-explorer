@@ -1,0 +1,55 @@
+/* Latih Model page. */
+
+.st-key-training_review {border-left:1px solid #dce3eb; padding-left:24px;}
+.st-key-training_review h3 {font-size:1.12rem;}
+.st-key-training_setup h1 {font-size:2.4rem !important; line-height:1.15;}
+.st-key-training_setup h3 {font-size:1.3rem !important;}
+.st-key-training_setup hr {margin:1rem 0 !important;}
+.st-key-training_setup [data-testid="stVerticalBlock"] {gap:.7rem;}
+@media(max-width:800px) {.st-key-training_review {border-left:0; padding-left:0;}}
+
+/* Cara kerja pelatihan: how to use the page, the stages of a run, and what each setting does.
+   Paragraph and list rules name .training-guide too, to outrank Streamlit's own markdown rules. */
+.training-guide {color: var(--ink);}
+.training-guide p.guide-heading {margin: 0 0 .65rem; color: var(--muted); font-size: .76rem; font-weight: 650; letter-spacing: .04em; text-transform: uppercase;}
+.training-guide .guide-number {display: grid; place-items: center; flex: none; width: 1.8rem; height: 1.8rem; border-radius: 50%; background: #e3f3f2; color: #0b6d6f; font-size: .85rem; font-weight: 650;}
+.training-guide p.guide-title {margin: .15rem 0 .15rem; color: var(--ink); font-size: .95rem; font-weight: 650; line-height: 1.4;}
+.training-guide p.guide-text {margin: 0; color: var(--muted); font-size: .86rem; line-height: 1.55;}
+.training-guide p.guide-text em, .training-guide dd em {color: var(--ink); font-style: normal; font-weight: 600;}
+/* Langkah penggunaan: the three tabs as cards in a row. */
+.training-guide ol.guide-usage {list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .9rem; margin: 0 0 1.4rem; padding: 0;}
+.training-guide li.guide-usage-step {margin: 0; padding: .8rem .9rem; border: 1px solid var(--line); border-radius: .55rem; background: #fff;}
+.training-guide li.guide-usage-step .guide-number {margin-bottom: .45rem;}
+.training-guide .guide-grid {display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 1.6rem; align-items: start;}
+/* Alur proses pelatihan: numbered stages joined by a line. */
+.training-guide ol.guide-steps {list-style: none; margin: 0; padding: 0;}
+.training-guide li.guide-step {position: relative; display: grid; grid-template-columns: 1.8rem minmax(0, 1fr); gap: .75rem; margin: 0; padding: 0 0 1rem;}
+.training-guide li.guide-step::before {content: ""; position: absolute; left: calc(.9rem - 1px); top: 2rem; bottom: .25rem; width: 2px; background: var(--line);}
+.training-guide li.guide-step:last-child {padding-bottom: 0;}
+.training-guide li.guide-step:last-child::before {display: none;}
+.training-guide .guide-tag {margin-left: .5rem; padding: .05rem .5rem; border-radius: 999px; background: #fff4dc; color: #8a5a00; font-size: .72rem; font-weight: 600; vertical-align: middle;}
+/* Pengaturan dan pengaruhnya: every control of the Konfigurasi step, grouped as on the form. */
+.training-guide .guide-recipe {padding: .9rem 1rem; border: 1px solid var(--line); border-radius: .55rem; background: #f8fbfb;}
+.training-guide .guide-settings-group + .guide-settings-group {margin-top: .85rem; padding-top: .8rem; border-top: 1px solid var(--line);}
+.training-guide p.guide-group {margin: 0 0 .4rem; padding-left: .6rem; border-left: 3px solid #0f8b8d; color: var(--ink); font-size: .9rem; font-weight: 650;}
+.training-guide .guide-settings-group dl {margin: 0;}
+.training-guide .guide-setting {margin: 0 0 .5rem;}
+.training-guide .guide-setting:last-child {margin-bottom: 0;}
+.training-guide .guide-setting dt {color: var(--ink); font-size: .84rem; line-height: 1.45;}
+.training-guide .guide-setting dt em {font-style: normal; font-weight: 600;}
+.training-guide .guide-setting dd {margin: .1rem 0 0; color: var(--muted); font-size: .83rem; line-height: 1.5;}
+/* Pra-pemrosesan: its five steps in a row, each with the setting that belongs to it. */
+.training-guide .guide-prep {margin-top: 1.4rem; padding-top: 1rem; border-top: 1px solid var(--line);}
+.training-guide p.guide-prep-lead {margin-bottom: .8rem;}
+.training-guide ol.guide-prep-steps {list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .7rem; margin: 0 0 1rem; padding: 0;}
+.training-guide li.guide-prep-step {margin: 0; padding: .7rem .75rem; border: 1px solid var(--line); border-top: 3px solid #0f8b8d; border-radius: .45rem; background: #fff;}
+.training-guide p.guide-prep-title {display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin: 0 0 .3rem; color: var(--ink); font-size: .88rem; font-weight: 650; line-height: 1.35;}
+.training-guide .guide-prep-number {display: grid; place-items: center; width: 1.3rem; height: 1.3rem; border-radius: 50%; background: #e3f3f2; color: #0b6d6f; font-size: .74rem;}
+.training-guide li.guide-prep-step .guide-tag {margin-left: 0;}
+@media(max-width: 1100px) {
+    .training-guide ol.guide-prep-steps {grid-template-columns: repeat(3, minmax(0, 1fr));}
+}
+@media(max-width: 900px) {
+    .training-guide ol.guide-usage, .training-guide .guide-grid {grid-template-columns: 1fr; gap: .8rem;}
+    .training-guide ol.guide-prep-steps {grid-template-columns: 1fr;}
+}

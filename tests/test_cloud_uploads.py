@@ -1,9 +1,9 @@
 import pytest
 
-from gtex_explorer.cloud.uploads import validate_reference
+from gtex_explorer.platform.cloud.uploads import validate_reference
 
 
-from gtex_explorer.cloud.uploads import sign
+from gtex_explorer.platform.cloud.uploads import sign
 
 ISSUED = '0123456789abcdef0123456789abcdef'
 
@@ -27,7 +27,7 @@ def test_upload_reference_rejects_unsupported_names(name):
 
 
 def test_upload_reference_rejects_oversized_files():
-    from gtex_explorer.cloud.uploads import MAX_UPLOAD
+    from gtex_explorer.platform.cloud.uploads import MAX_UPLOAD
     with pytest.raises(ValueError):
         validate_reference({'id': ISSUED, 'sig': sign(ISSUED), 'name': 'tpm.csv', 'size': MAX_UPLOAD + 1})
 
@@ -40,7 +40,7 @@ def test_signed_reference_is_accepted_in_any_session():
 def test_hosted_form_handles_namespaced_upload_keys_without_component_error(tmp_path, monkeypatch):
     from pathlib import Path
     from streamlit.testing.v1 import AppTest
-    import gtex_explorer.cloud.state as cloud_state
+    import gtex_explorer.platform.cloud.state as cloud_state
     from test_cloud_state import MemoryStore
     monkeypatch.setenv('GTEX_CLOUD', '1')
     monkeypatch.setenv('GTEX_CLOUD_ROLE', 'web')

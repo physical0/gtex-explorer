@@ -1,3 +1,5 @@
+"""Export the final model and its preprocessing from the notebook cache."""
+
 from __future__ import annotations
 
 import argparse
@@ -10,12 +12,13 @@ import numpy as np
 import pandas as pd
 from xgboost import XGBClassifier
 
+from gtex_explorer.platform.paths import APP_ROOT as APP_DIR
 
-from gtex_explorer.paths import APP_ROOT as APP_DIR
-DEFAULT_CACHE = APP_DIR.parent / 'results/notebook_run_500_1000_2000_l1_grid/part_a_cache.joblib'
+DEFAULT_CACHE = APP_DIR.parent / "results/notebook_run_500_1000_2000_l1_grid/part_a_cache.joblib"
 
 
 def macro_metrics(y_true: np.ndarray, y_pred: np.ndarray, class_count: int) -> dict:
+    """Compute macro precision, recall, and F1."""
     precision_values = []
     recall_values = []
     f1_values = []
@@ -39,6 +42,7 @@ def macro_metrics(y_true: np.ndarray, y_pred: np.ndarray, class_count: int) -> d
 
 
 def main() -> None:
+    """Export the final model bundle."""
     parser = argparse.ArgumentParser(
         description="Export the frozen Part A preprocessing and XGBoost prediction bundle."
     )
@@ -46,19 +50,18 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=APP_DIR / "model_bundle")
     args = parser.parse_args()
 
+    # Read the notebook cache.
     payload = joblib.load(args.cache)
     variables = payload["variables"]
     if int(payload["cache_metadata"].get("schema_version", 0)) < 3:
         raise ValueError("Part A cache schema 3 or newer is required.")
 
+    # Collect the data and the selected genes.
     X_development_log = variables["X_development_log"].copy()
     X_test_log = variables["X_test_log"].copy()
     metadata = variables["metadata"].copy()
     selected_genes = (
-        variables["selected_genes"]
-        .sort_values("selection_rank", kind="stable")["gene"]
-        .astype(str)
-        .tolist()
+        variables["selected_genes"].sort_values("selection_rank", kind="stable")["gene"].astype(str).tolist()
     )
     best_feature_count = int(variables["best_feature_count"])
     if len(selected_genes) != best_feature_count:
@@ -67,6 +70,7 @@ def main() -> None:
     if missing_selected:
         raise ValueError(f"Selected genes absent from development matrix: {missing_selected[:5]}")
 
+    # Encode the tissue labels.
     sample_column = variables["SAMPLE_COLUMN"]
     tissue_column = variables["TISSUE_COLUMN"]
     metadata = metadata.set_index(sample_column, drop=False)
@@ -82,29 +86,27 @@ def main() -> None:
         dtype=int,
     )
 
+    # Scale with statistics from the development data only.
     selected_development_log = X_development_log.loc[:, selected_genes].to_numpy(dtype=float)
     selected_test_log = X_test_log.loc[:, selected_genes].to_numpy(dtype=float)
     scaler_mean = selected_development_log.mean(axis=0)
     scaler_scale = selected_development_log.std(axis=0, ddof=0)
     scaler_scale = np.where(scaler_scale > 0, scaler_scale, 1.0)
-    selected_development_scaled = (
-        selected_development_log - scaler_mean
-    ) / scaler_scale
+    selected_development_scaled = (selected_development_log - scaler_mean) / scaler_scale
     selected_test_scaled = (selected_test_log - scaler_mean) / scaler_scale
 
+    # Refit the final model and score it on the holdout.
     parameters = dict(variables["XGB_BASE_PARAMETERS"])
     classifier = XGBClassifier(num_class=len(classes), **parameters)
     classifier.fit(selected_development_scaled, y_development)
     test_predictions = classifier.predict(selected_test_scaled).astype(int)
     measured_metrics = macro_metrics(y_test, test_predictions, len(classes))
 
+    # The refit must reproduce the notebook's result.
     expected_summary = variables["final_test_summary"]
-    expected_row = expected_summary.loc[
-        expected_summary["classifier"].eq("xgboost")
-    ].iloc[0]
+    expected_row = expected_summary.loc[expected_summary["classifier"].eq("xgboost")].iloc[0]
     maximum_metric_difference = max(
-        abs(measured_metrics[metric] - float(expected_row[metric]))
-        for metric in measured_metrics
+        abs(measured_metrics[metric] - float(expected_row[metric])) for metric in measured_metrics
     )
     if maximum_metric_difference > 1e-10:
         raise RuntimeError(
@@ -116,6 +118,7 @@ def main() -> None:
     selected_raw_tpm = np.exp2(selected_development_log) - 1.0
     raw_tpm_medians = np.median(selected_raw_tpm, axis=0)
 
+    # Save the model and its preprocessing.
     args.output.mkdir(parents=True, exist_ok=True)
     classifier.save_model(args.output / "xgboost_model.json")
     preprocessor = {
@@ -135,6 +138,7 @@ def main() -> None:
     }
     joblib.dump(preprocessor, args.output / "preprocessor.joblib", compress=3)
 
+    # Save a few holdout samples as the example input.
     demo_target_tissues = [
         "Thyroid",
         "Heart - Atrial Appendage",
@@ -142,9 +146,7 @@ def main() -> None:
     ]
     demo_positions: list[int] = []
     for target_tissue in demo_target_tissues:
-        target_positions = np.flatnonzero(
-            y_test == class_to_index[target_tissue]
-        )
+        target_positions = np.flatnonzero(y_test == class_to_index[target_tissue])
         if target_positions.size:
             demo_positions.append(int(target_positions[0]))
     for candidate_position in range(len(X_test_log)):
@@ -161,9 +163,8 @@ def main() -> None:
     demo_tpm.index.name = "SAMPID"
     demo_tpm.reset_index().to_csv(APP_DIR / "data" / "demo_tpm.csv", index=False)
 
-    model_sha256 = hashlib.sha256(
-        (args.output / "xgboost_model.json").read_bytes()
-    ).hexdigest()
+    # Record what was exported.
+    model_sha256 = hashlib.sha256((args.output / "xgboost_model.json").read_bytes()).hexdigest()
     validation = {
         "cache_path": str(args.cache.resolve()),
         "cache_schema_version": payload["cache_metadata"].get("schema_version"),
@@ -176,9 +177,7 @@ def main() -> None:
         "xgboost_model_sha256": model_sha256,
         "status": "validated",
     }
-    (args.output / "bundle_manifest.json").write_text(
-        json.dumps(validation, indent=2), encoding="utf-8"
-    )
+    (args.output / "bundle_manifest.json").write_text(json.dumps(validation, indent=2), encoding="utf-8")
     print(json.dumps(validation, indent=2))
 
 

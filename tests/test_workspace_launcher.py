@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 from streamlit.testing.v1 import AppTest
 
-APP = Path(__file__).resolve().parents[1] / 'app.py'
+APP = Path(__file__).resolve().parents[1] / 'main.py'
 
 
 def launch(root, monkeypatch):
@@ -18,7 +18,7 @@ def open_selected(app):
 
 
 def test_startup_excludes_sidebar_and_resource_loading(tmp_path, monkeypatch):
-    with patch('gtex_explorer.analysis.core.load_reference_tables', side_effect=AssertionError('wait for entry')):
+    with patch('gtex_explorer.experiments.reference_tables.load_reference_tables', side_effect=AssertionError('wait for entry')):
         app = launch(tmp_path, monkeypatch)
     assert not app.exception
     assert any(item.value == 'Pilih workspace' for item in app.title)
@@ -28,7 +28,7 @@ def test_startup_excludes_sidebar_and_resource_loading(tmp_path, monkeypatch):
 
 
 def test_selecting_requires_open_and_switching_clears_previous_uploads(tmp_path, monkeypatch):
-    from gtex_explorer.workspaces import create_workspace
+    from gtex_explorer.platform.workspaces import create_workspace
     other = create_workspace(tmp_path, 'Other', include_bundled_models=False)
     app = open_selected(launch(tmp_path, monkeypatch))
     assert app.title[0].value == 'Latih model'
@@ -49,7 +49,7 @@ def test_selecting_requires_open_and_switching_clears_previous_uploads(tmp_path,
 
 
 def test_create_selects_without_entering_and_preserves_bundle_policy(tmp_path, monkeypatch):
-    from gtex_explorer.workspaces import list_workspaces
+    from gtex_explorer.platform.workspaces import list_workspaces
     app = launch(tmp_path, monkeypatch)
     app.button(key='workspace_new').click().run()
     app.text_input(key='workspace_new_name').set_value('My own models')
@@ -66,7 +66,7 @@ def test_create_selects_without_entering_and_preserves_bundle_policy(tmp_path, m
 
 
 def test_many_names_search_and_hidden_selection_keep_open_action(tmp_path, monkeypatch):
-    from gtex_explorer.workspaces import create_workspace
+    from gtex_explorer.platform.workspaces import create_workspace
     name = ('Analisis ' + 'jaringan ' * 7).strip()
     other = create_workspace(tmp_path, name, include_bundled_models=False)
     for number in range(12):
@@ -88,7 +88,7 @@ def test_many_names_search_and_hidden_selection_keep_open_action(tmp_path, monke
 
 
 def test_rename_under_search_preserves_selection_id_and_policy(tmp_path, monkeypatch):
-    from gtex_explorer.workspaces import create_workspace, list_workspaces
+    from gtex_explorer.platform.workspaces import create_workspace, list_workspaces
     other = create_workspace(tmp_path, 'Before', include_bundled_models=False)
     app = launch(tmp_path, monkeypatch)
     app.text_input(key='workspace_search').set_value('before').run()
@@ -104,7 +104,7 @@ def test_rename_under_search_preserves_selection_id_and_policy(tmp_path, monkeyp
 
 
 def test_new_session_preselects_last_workspace_but_waits_for_open(tmp_path, monkeypatch):
-    from gtex_explorer.workspaces import create_workspace, remember_workspace
+    from gtex_explorer.platform.workspaces import create_workspace, remember_workspace
     other = create_workspace(tmp_path, 'Last used')
     remember_workspace(tmp_path, other['id'])
     app = launch(tmp_path, monkeypatch)

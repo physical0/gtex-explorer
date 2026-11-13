@@ -59,7 +59,7 @@ def test_new_training_run_stays_selected_and_cancel_targets_that_run(tmp_path, m
 
 def test_invalid_restored_round_count_cannot_break_prediction_page(tmp_path, monkeypatch):
     monkeypatch.setenv('GTEX_DESKTOP_STATE_DIR', str(tmp_path))
-    app = AppTest.from_string("\nimport streamlit as st\nfrom gtex_explorer.analysis.core import load_model_bundle\nfrom gtex_explorer.ui.prediction_page import _render_prediction_panel\nst.session_state['prediction_boosting_rounds'] = 999\npre, model = load_model_bundle()\n_render_prediction_panel(pre, model)\n", default_timeout=60).run()
+    app = AppTest.from_string("\nimport streamlit as st\nfrom gtex_explorer.inference.model_bundle import load_model_bundle\nfrom gtex_explorer.ui.pages.prediction import _render_prediction_panel\nst.session_state['prediction_boosting_rounds'] = 999\npre, model = load_model_bundle()\n_render_prediction_panel(pre, model)\n", default_timeout=60).run()
     assert not app.exception
     assert app.selectbox(key='prediction_boosting_rounds').value == 300
     assert app.selectbox(key='prediction_boosting_rounds').proto.HasField('default')
@@ -67,7 +67,7 @@ def test_invalid_restored_round_count_cannot_break_prediction_page(tmp_path, mon
 
 
 def test_empty_expression_file_explains_how_to_fix_input():
-    from gtex_explorer.analysis.core import parse_expression_file
+    from gtex_explorer.inference.parsing import parse_expression_file
     with pytest.raises(ValueError, match='kosong') as error:
         parse_expression_file(io.BytesIO(b''), 'empty.csv')
     assert 'kolom' in str(error.value).lower()
@@ -81,7 +81,8 @@ def test_blank_gene_count_has_a_readable_field_name(tmp_path, monkeypatch):
     app.number_input(key='training_top_k').set_value(None).run()
     assert app.button(key='training_start').disabled
     errors = ' '.join(item.value.lower() for item in app.error)
-    assert 'jumlah gen' in errors and 'isi' in errors
+    # Named by its label on the form.
+    assert 'top-k gen' in errors and 'isi' in errors
 
 
 def test_l1_failure_explains_support_and_recovery_action(tmp_path, monkeypatch):
@@ -98,7 +99,7 @@ def test_l1_failure_explains_support_and_recovery_action(tmp_path, monkeypatch):
 
 
 def test_corrupt_saved_model_is_explained_and_cannot_be_selected(tmp_path, monkeypatch):
-    from gtex_explorer.model_registry import publish_model
+    from gtex_explorer.platform.model_registry import publish_model
     from test_model_registry import trained_fixture
     monkeypatch.setenv('GTEX_DESKTOP_STATE_DIR', str(tmp_path))
     result, config, demo = trained_fixture()
@@ -119,7 +120,7 @@ def test_corrupt_saved_model_is_explained_and_cannot_be_selected(tmp_path, monke
 
 
 def test_corrupt_original_manifest_does_not_crash_registry(tmp_path):
-    from gtex_explorer.model_registry import list_models
+    from gtex_explorer.platform.model_registry import list_models
     original = tmp_path / 'model_bundle'
     original.mkdir()
     for name in ['preprocessor.joblib', 'xgboost_model.json']:

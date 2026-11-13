@@ -11,14 +11,11 @@ import pytest
 
 APP_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(APP_DIR))
-import gtex_explorer.analysis.core as core
+import gtex_explorer.inference.prediction as core
 
-from gtex_explorer.analysis.core import (
-    audit_and_align_input,
-    load_reference_tables,
-    parse_expression_file,
-    strip_ensembl_version,
-)
+from gtex_explorer.inference.audit import audit_and_align_input
+from gtex_explorer.experiments.reference_tables import load_reference_tables
+from gtex_explorer.inference.parsing import parse_expression_file, strip_ensembl_version
 
 
 def test_strip_ensembl_version() -> None:
