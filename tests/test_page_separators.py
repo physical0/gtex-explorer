@@ -6,7 +6,7 @@ from ui_helpers import enter_application
 from gtex_explorer.platform.paths import APP_ROOT as APP_DIR
 
 
-@pytest.mark.parametrize("page", ["Prediksi Jaringan", "Ringkasan", "Perbandingan Metode", "Panel Gen", "Kamus Biologi"])
+@pytest.mark.parametrize("page", ["Prediksi Jaringan", "Ringkasan", "Panel Gen", "Kamus Biologi"])
 def test_pages_do_not_use_middle_dot_or_pipe_separators(page):
     app = AppTest.from_file(str(APP_DIR / "main.py"), default_timeout=60).run()
     app = enter_application(app)

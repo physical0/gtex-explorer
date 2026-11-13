@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from gtex_explorer.display import count
 from gtex_explorer.inference.parsing import _numeric_expression, strip_ensembl_version
 
 
@@ -140,7 +141,7 @@ def audit_and_align_input(
     )
 
     if invalid_count:
-        message = f"Ditemukan {invalid_count:,} nilai ekspresi non-numerik."
+        message = f"Ditemukan {count(invalid_count)} nilai ekspresi non-numerik."
     elif len(input_matrix) == 0:
         message = "Matriks tidak memuat sampel."
     elif negative_count:

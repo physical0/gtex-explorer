@@ -8,6 +8,8 @@ from typing import BinaryIO
 import numpy as np
 import pandas as pd
 
+from gtex_explorer.display import count
+
 
 def strip_ensembl_version(gene_id: str) -> str:
     """Return the stable Ensembl identifier before its optional version suffix."""
@@ -84,7 +86,7 @@ def parse_expression_file(file_object: BinaryIO, filename: str, *, model_genes=N
 
     if invalid_count:
         raise ValueError(
-            f"Ditemukan {invalid_count:,} nilai ekspresi non-numerik. Gunakan angka TPM atau nilai kosong, bukan teks."
+            f"Ditemukan {count(invalid_count)} nilai ekspresi non-numerik. Gunakan angka TPM atau nilai kosong, bukan teks."
         )
     matrix.attrs["source_orientation"] = source_orientation
     return matrix

@@ -9,12 +9,14 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+from gtex_explorer.display import count, decimal, method_name, percent, points
 from gtex_explorer.experiments.reference_tables import DATA_DIR
 from gtex_explorer.inference.audit import InputAudit, audit_and_align_input
 from gtex_explorer.inference.parsing import parse_expression_file
 from gtex_explorer.inference.prediction import explain_prediction, predict_tissues
 from gtex_explorer.platform.cloud.media import download_button
 from gtex_explorer.platform.cloud.uploads import file_uploader
+from gtex_explorer.training.run_labels import default_preprocessing, preprocessing_label
 from gtex_explorer.ui.shell.error_messages import user_error
 from gtex_explorer.ui.workspace import current_workspace_root, upload_widget_key
 
@@ -210,20 +212,10 @@ def _load_local_demo(preprocessor: dict) -> None:
 def _format_file_size(size: int) -> str:
     """Format a file size for display."""
     if size >= 1024 * 1024:
-        return f"{size / (1024 * 1024):.1f} MB"
+        return f"{decimal(size / (1024 * 1024), 1)} MB"
     if size >= 1024:
-        return f"{size / 1024:.1f} KB"
+        return f"{decimal(size / 1024, 1)} KB"
     return f"{size} B"
-
-
-def _format_integer(value: int) -> str:
-    """Format a whole number with dot separators."""
-    return f"{int(value):,}".replace(",", ".")
-
-
-def _format_percent(value: float, digits: int = 1) -> str:
-    """Format a share as a percentage with a decimal comma."""
-    return f"{value:.{digits}%}".replace(".", ",")
 
 
 # --- Audit panel ---
@@ -236,18 +228,18 @@ def _render_audit_summary(audit: InputAudit, feature_count: int, sample_id: str)
         [
             (
                 "Kecocokan ID gen model",
-                f"{_format_integer(audit.matched_gene_count)} / "
-                f"{_format_integer(feature_count)} ({_format_percent(audit.matched_fraction)})",
+                f"{count(audit.matched_gene_count)} / "
+                f"{count(feature_count)} ({percent(audit.matched_fraction, 1)})",
             ),
             (
                 "Kelengkapan nilai gen model",
-                f"{_format_integer(quality['observed_model_genes'])} / "
-                f"{_format_integer(feature_count)} ({_format_percent(quality['observed_fraction'])})",
+                f"{count(quality['observed_model_genes'])} / "
+                f"{count(feature_count)} ({percent(quality['observed_fraction'], 1)})",
             ),
             (
                 "Gen input dengan TPM > 0",
-                f"{_format_integer(quality['uploaded_positive_genes'])} / "
-                f"{_format_integer(audit.supplied_gene_count)} ({_format_percent(quality['uploaded_positive_fraction'])})",
+                f"{count(quality['uploaded_positive_genes'])} / "
+                f"{count(audit.supplied_gene_count)} ({percent(quality['uploaded_positive_fraction'], 1)})",
             ),
         ],
         columns=["Pemeriksaan", "Hasil"],
@@ -265,35 +257,35 @@ def _render_audit_details(audit: InputAudit, feature_count: int) -> None:
             ("Orientasi matriks", audit.source_orientation, "Lolos"),
             (
                 "Kecocokan gen model",
-                f"{_format_integer(audit.matched_gene_count)}/"
-                f"{_format_integer(feature_count)} "
-                f"({_format_percent(audit.matched_fraction)})",
+                f"{count(audit.matched_gene_count)}/"
+                f"{count(feature_count)} "
+                f"({percent(audit.matched_fraction, 1)})",
                 matched_status,
             ),
-            ("Gen model tidak ditemukan", _format_integer(audit.missing_gene_count), "Informasi"),
+            ("Gen model tidak ditemukan", count(audit.missing_gene_count), "Informasi"),
             (
                 "Gen input di luar model",
-                _format_integer(audit.supplied_gene_count - audit.matched_gene_count),
+                count(audit.supplied_gene_count - audit.matched_gene_count),
                 "Informasi",
             ),
             (
                 "Nilai negatif",
-                f"{audit.negative_value_count:,}",
+                count(audit.negative_value_count),
                 "Lolos" if audit.negative_value_count == 0 else "Tinjau",
             ),
             (
                 "Nilai tak hingga",
-                f"{audit.infinite_value_count:,}",
+                count(audit.infinite_value_count),
                 "Lolos" if audit.infinite_value_count == 0 else "Tinjau",
             ),
             (
                 "ID gen duplikat",
-                f"{audit.duplicate_gene_count:,}",
+                count(audit.duplicate_gene_count),
                 "Lolos" if audit.duplicate_gene_count == 0 else "Tinjau",
             ),
             (
                 "Nilai non-numerik",
-                f"{audit.invalid_numeric_value_count:,}",
+                count(audit.invalid_numeric_value_count),
                 "Lolos" if audit.invalid_numeric_value_count == 0 else "Tinjau",
             ),
         ],
@@ -465,7 +457,7 @@ def _render_input_panel(preprocessor: dict | None) -> None:
         st.session_state.active_sample_selector = st.session_state.active_sample
     if len(sample_ids) > 1:
         st.caption(
-            f"{_format_file_size(st.session_state.input_file_size)} - {_format_integer(audit.sample_count)} sampel"
+            f"{_format_file_size(st.session_state.input_file_size)} - {count(audit.sample_count)} sampel"
         )
         active_sample = st.selectbox("Pilih sampel", sample_ids, key="active_sample_selector")
     else:
@@ -483,11 +475,11 @@ def _render_input_panel(preprocessor: dict | None) -> None:
     imputed_count = int(audit.sample_quality["imputed_model_genes"].sum())
     if audit.ready and (audit.missing_gene_count or imputed_count):
         fully_imputed = int(audit.sample_quality["observed_model_genes"].eq(0).sum())
-        imputation_text = f"{_format_integer(imputed_count)} nilai yang tidak tersedia"
+        imputation_text = f"{count(imputed_count)} nilai yang tidak tersedia"
         if fully_imputed == audit.sample_count:
-            imputation_text = f"Seluruh {_format_integer(imputed_count)} nilai gen model"
+            imputation_text = f"Seluruh {count(imputed_count)} nilai gen model"
         notice = (
-            f"**Informasi gen model**\n\n{_format_integer(audit.matched_gene_count)} gen model ditemukan. "
+            f"**Informasi gen model**\n\n{count(audit.matched_gene_count)} gen model ditemukan. "
             f"{imputation_text} diisi dengan median data training tersimpan."
         )
         if audit.supplied_gene_count > audit.matched_gene_count:
@@ -520,7 +512,7 @@ def _probability_percent(value: float) -> str:
     """Readable percentages without rounding tiny positive probabilities to zero."""
     if 0 < value < 0.0001:
         return "<0,01%"
-    return f"{value * 100:.2f}%".replace(".", ",")
+    return percent(value)
 
 
 def _probability_chart(probability_row: pd.Series, predicted_tissue: str) -> alt.LayerChart:
@@ -622,7 +614,7 @@ def _render_prediction_result(
     st.altair_chart(_probability_chart(probability_row, predicted_tissue), width="stretch")
     st.caption(
         f"Sampel: {active_sample} - Selisih dua probabilitas tertinggi: "
-        + f"{margin * 100:.2f}".replace(".", ",")
+        + points(margin)
         + " poin persentase."
     )
 
@@ -771,27 +763,22 @@ def _render_prediction_panel(preprocessor: dict | None, classifier) -> None:
 # --- Page ---
 
 
-def render_prediction_page(tables: dict) -> None:
+def render_prediction_page() -> None:
     """Show the Prediksi Jaringan page."""
     st.title("Prediksi jaringan")
     preprocessor, classifier = _choose_model()
     if preprocessor is None:
         return
     if preprocessor:
-        selector_id = preprocessor.get("selector_id", "")
-        selector_rows = tables["cv_summary"].loc[tables["cv_summary"]["selector_id"].eq(selector_id)]
-        selector_text = (
-            str(selector_rows.iloc[0]["selector_label"])
-            if not selector_rows.empty
-            else str(preprocessor.get("feature_selection", ""))
-        )
-        if preprocessor.get("feature_selection") == "l1":
-            selector_text = f"L1 - C = {float(preprocessor['l1_c']):g}"
+        # Method names as on the training pages.
+        selector_text = method_name(preprocessor.get("feature_selection", ""), l1_c=preprocessor.get("l1_c"))
         model_text = (
             f"XGBoost - {selector_text} - "
-            f"{_format_integer(preprocessor['feature_count'])} gen - "
+            f"{count(preprocessor['feature_count'])} gen - "
             f"{len(preprocessor['classes'])} jaringan"
         )
+        if not default_preprocessing(preprocessor):
+            model_text += f" - {preprocessing_label(preprocessor)}"
     else:
         model_text = "Model lokal belum tersedia"
 

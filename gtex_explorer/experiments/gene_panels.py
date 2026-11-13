@@ -36,6 +36,19 @@ def clarify_eligibility_reasons(summary: pd.DataFrame, fits: pd.DataFrame) -> pd
     return result
 
 
+# The exports mix English and Indonesian reasons; these are shown in Indonesian.
+REASON_TEXT = {
+    "eligible": "Memenuhi syarat seleksi",
+    "reference baseline, not a selector candidate": "Baseline pembanding, bukan kandidat seleksi",
+    "flag eligibility fold gagal": "syarat seleksi tidak terpenuhi pada satu atau lebih fold",
+}
+
+
+def readable_eligibility_reason(text) -> str:
+    """Write the saved "a | b" reasons as an Indonesian list."""
+    return ", ".join(REASON_TEXT.get(part.strip(), part.strip()) for part in str(text).split("|"))
+
+
 def load_cv_gene_rankings(data_dir: Path, summary: dict, fits: pd.DataFrame) -> pd.DataFrame:
     """Require a matching, complete export; never reconstruct rankings in the UI."""
     ranking_path = data_dir / "cv_gene_rankings.csv.gz"

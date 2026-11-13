@@ -9,6 +9,20 @@
     --indigo: #4844c9;
     --success: #1f9d55;
     --warning: #c97a12;
+    /* At least 3:1 against the white page and the field fill, so a field is visible before it is used. */
+    --field-border: #848e9b;
+}
+
+/* --- Input fields --- */
+/* The theme's widget border (showWidgetBorder) is 20% ink, about 1.6:1 against the page, and the field
+   fill is almost the page colour, so an untouched field was hard to find. A focused field keeps the
+   theme's teal border, and a ticked checkbox its teal fill. */
+[data-testid="stTextInputRootElement"]:not(:focus-within),
+[data-testid="stTextAreaRootElement"]:not(:focus-within),
+[data-testid="stNumberInputContainer"]:not(:focus-within),
+:is([data-testid="stSelectbox"], [data-testid="stMultiSelect"]) [data-rac][role="group"]:not(:focus-within),
+[data-testid="stCheckbox"] label:not([data-selected]) > span + div {
+    border-color: var(--field-border);
 }
 
 /* --- Page --- */

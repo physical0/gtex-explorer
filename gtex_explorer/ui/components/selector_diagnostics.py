@@ -5,15 +5,17 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
+from gtex_explorer.display import count as format_count, decimal, percent
+
 
 def _number(value, digits=4) -> str:
-    """Format a number with a decimal comma, or say it is unavailable."""
-    return "Tidak tersedia" if pd.isna(value) else f"{float(value):.{digits}f}".replace(".", ",")
+    """A number with a decimal comma, or that it is unavailable."""
+    return decimal(value, digits, missing="Tidak tersedia")
 
 
 def _percent(value) -> str:
-    """Format a share as a percentage with a decimal comma, or say it is unavailable."""
-    return "Tidak tersedia" if pd.isna(value) else f"{float(value):.2%}".replace(".", ",")
+    """A share as a percentage, or that it is unavailable."""
+    return percent(value, missing="Tidak tersedia")
 
 
 def render_selector_metrics(tables: dict, selector: str, genes: pd.DataFrame, fit: pd.Series | None) -> None:
@@ -34,9 +36,7 @@ def render_selector_metrics(tables: dict, selector: str, genes: pd.DataFrame, fi
         n_features = int(tables["run_summary"]["variance_prefilter_genes"])
         nonzero = int(row.positive_or_nonzero_gene_count)
         st.caption(
-            f"Data development: {int(row.training_samples):,} sampel - {int(row.training_donors):,} donor.".replace(
-                ",", "."
-            )
+            f"Data development: {format_count(int(row.training_samples))} sampel - {format_count(int(row.training_donors))} donor."
         )
     elif not diagnostics:
         st.info("Diagnostik tambahan belum tersedia. Ekspor hasil notebook dengan export_selector_diagnostics.py.")
@@ -45,17 +45,13 @@ def render_selector_metrics(tables: dict, selector: str, genes: pd.DataFrame, fi
         candidates = int(tables["run_summary"]["variance_prefilter_genes"])
         if selector in {"anova", "mutual_information"}:
             st.caption(
-                f"Data training fold {int(fit.fold)} - panel top-{count:,} dari {candidates:,} gen kandidat.".replace(
-                    ",", "."
-                )
+                f"Data training fold {int(fit.fold)} - panel top-{format_count(count)} dari {format_count(candidates)} gen kandidat."
             )
 
         # ANOVA metrics.
         if selector == "anova":
             st.caption(
-                f"η² dan flag variansi: gen top-k. Spearman: seluruh {candidates:,} gen kandidat. Tidak mengikuti filter pencarian.".replace(
-                    ",", "."
-                )
+                f"η² dan flag variansi: gen top-k. Spearman: seluruh {format_count(candidates)} gen kandidat. Tidak mengikuti filter pencarian."
             )
             saved = diagnostics["anova_summary"]
             row = saved.loc[saved.fold.eq(fit.fold) & saved.top_k.eq(count)].iloc[0]
@@ -85,16 +81,12 @@ def render_selector_metrics(tables: dict, selector: str, genes: pd.DataFrame, fi
         # Mutual information metrics.
         if selector == "mutual_information":
             st.caption(
-                f"Gen berskor positif dan Spearman: seluruh {candidates:,} gen kandidat. Cutoff: gen top-k. Tidak mengikuti filter pencarian.".replace(
-                    ",", "."
-                )
+                f"Gen berskor positif dan Spearman: seluruh {format_count(candidates)} gen kandidat. Cutoff: gen top-k. Tidak mengikuti filter pencarian."
             )
             columns = st.columns(4)
             columns[0].metric(
                 "Gen berskor MI positif",
-                f"{int(fit.positive_score_gene_count):,} / {int(tables['run_summary']['variance_prefilter_genes']):,}".replace(
-                    ",", "."
-                ),
+                f"{format_count(int(fit.positive_score_gene_count))} / {format_count(int(tables['run_summary']['variance_prefilter_genes']))}",
                 help="Jumlah gen kandidat berskor positif pada n_neighbors utama, bukan jumlah gen yang terbukti signifikan.",
             )
             columns[1].metric("Cutoff MI top-k (nat)", _number(fit.score_cutoff, 6))
@@ -120,11 +112,11 @@ def render_selector_metrics(tables: dict, selector: str, genes: pd.DataFrame, fi
 
     # Candidate genes, nonzero genes, sparsity, and convergence of the fit.
     scope = f"Data training fold {int(fit.fold)} - " if fit is not None else ""
-    st.caption(f"{scope}{n_features:,} gen kandidat sebelum pemilihan top-k.".replace(",", "."))
+    st.caption(f"{scope}{format_count(n_features)} gen kandidat sebelum pemilihan top-k.")
     columns = st.columns(4)
     columns[0].metric(
         "Gen nonzero",
-        f"{nonzero:,} / {n_features:,}".replace(",", "."),
+        f"{format_count(nonzero)} / {format_count(n_features)}",
         help="Jumlah gen nonzero di antara seluruh kandidat sebelum pemilihan top-k. Koefisien absolut maksimum lintas kelas > 10⁻¹²; satu gen dihitung satu kali.",
     )
     columns[1].metric(
@@ -139,15 +131,15 @@ def render_selector_metrics(tables: dict, selector: str, genes: pd.DataFrame, fi
     )
     columns[3].metric(
         "Iterasi solver",
-        f"{int(row.n_iter_max):,}".replace(",", "."),
-        help=f"Batas iterasi {int(row.max_iter):,}; toleransi {row.tol:g}.".replace(",", "."),
+        format_count(row.n_iter_max),
+        help=f"Batas iterasi {format_count(int(row.max_iter))}; toleransi {decimal(row.tol)}.",
     )
     # Panel counts use the full saved top-k, not the filtered gene-table view.
     panel_nonzero = int(genes["selection_score"].gt(1e-12).sum())
     panel_zero = count - panel_nonzero
     st.caption(
-        f"Panel top-{count:,}: {panel_nonzero:,} gen nonzero dan {panel_zero:,} gen berskor nol. "
-        "Tidak mengikuti filter pencarian.".replace(",", ".")
+        f"Panel top-{format_count(count)}: {format_count(panel_nonzero)} gen nonzero dan {format_count(panel_zero)} gen berskor nol. "
+        "Tidak mengikuti filter pencarian."
     )
 
 
@@ -188,9 +180,7 @@ def render_diagnostic_details(tables: dict, selector: str, filtered: pd.DataFram
                     f"Residual pada top-k: nilai absolut skewness > 2 = {_percent(row.fraction_abs_skew_gt_2)}, excess kurtosis > 7 = {_percent(row.fraction_excess_kurtosis_gt_7)}. Flag ini deskriptif, bukan bukti normalitas atau batas universal."
                 )
                 st.caption(
-                    f"Subset ANOVA dan Welch pada data training fold yang sama memiliki {int(row.anova_welch_selected_overlap):,} gen bersama dari masing-masing {count:,} gen. Ini adalah pemeriksaan sensitivitas terhadap variansi, bukan perbandingan fold.".replace(
-                        ",", "."
-                    )
+                    f"Subset ANOVA dan Welch pada data training fold yang sama memiliki {format_count(int(row.anova_welch_selected_overlap))} gen bersama dari masing-masing {format_count(count)} gen. Ini adalah pemeriksaan sensitivitas terhadap variansi, bukan perbandingan fold."
                 )
             else:
                 st.caption(
@@ -266,11 +256,11 @@ def render_diagnostic_details(tables: dict, selector: str, filtered: pd.DataFram
 
         # Details for L1.
         if selector.startswith("l1_"):
-            count_label = f"{count:,}".replace(",", ".")
+            count_label = format_count(count)
             st.caption(
                 f"Cutoff koefisien absolut top-k: {_number(fit.coefficient_cutoff, 6)}. Gen nonzero dinilai dengan toleransi 10⁻¹². Konfigurasi utama memerlukan konvergensi dan sedikitnya {count_label} gen nonzero pada setiap fold."
             )
-            ties_label = f"{int(fit.tied_at_cutoff_count):,}".replace(",", ".")
+            ties_label = format_count(fit.tied_at_cutoff_count)
             st.caption(
                 f"Skor seri pada cutoff (seluruh kandidat): {ties_label}. Urutan seri mengikuti notebook; koefisien L1 bukan importance internal XGBoost."
             )
@@ -326,9 +316,7 @@ def render_stability_details(tables: dict, selector: str, fit: pd.Series | None)
     selector_label = str(labels[0]) if len(labels) == 1 else selector
     st.subheader("Stabilitas antar-fold")
     st.caption(
-        f"{selector_label} - {count:,} gen - {tables['run_summary']['cv_folds']} fold - {len(pairs)} pasangan unik".replace(
-            ",", "."
-        )
+        f"{selector_label} - {format_count(count)} gen - {tables['run_summary']['cv_folds']} fold - {len(pairs)} pasangan unik"
     )
     st.caption(f"Ringkasan seluruh fold, bukan hanya fold {fold}, dan tidak mengikuti filter gen.")
     columns = st.columns(2)

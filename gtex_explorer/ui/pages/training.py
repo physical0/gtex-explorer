@@ -7,9 +7,12 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from gtex_explorer.display import METHODS, decimal
+from gtex_explorer.display import count as format_count
 from gtex_explorer.platform.cloud.uploads import file_uploader
-from gtex_explorer.training.config import TrainingConfig, training_presets, validate_training_config
+from gtex_explorer.training.config import TrainingConfig, validate_training_config
 from gtex_explorer.training.data import (
+    TECHNICAL_FILTER_RULE,
     TrainingData,
     load_training_data,
     make_cv_assignments,
@@ -17,7 +20,7 @@ from gtex_explorer.training.data import (
     usable_candidate_genes,
 )
 from gtex_explorer.training.jobs import start_job
-from gtex_explorer.training.run_labels import METHODS
+from gtex_explorer.training.run_labels import L1_OPTION_LABELS, NOTEBOOK_DATA, RUN_NAME_LIMIT, XGBOOST_LABELS
 from gtex_explorer.training.uploads import (
     UploadAudit,
     audit_uploads,
@@ -25,11 +28,30 @@ from gtex_explorer.training.uploads import (
     save_training_upload,
     upload_preview,
 )
+from gtex_explorer.ui.components.training_guide import render_training_guide
+from gtex_explorer.ui.components.training_runs import show_settings
 from gtex_explorer.ui.shell.error_messages import user_error
 from gtex_explorer.ui.shell.theme import page_style
 from gtex_explorer.ui.workspace import upload_widget_key
 
 TRAINING_STEPS = ["1. Data training", "2. Konfigurasi", "3. Tinjau dan latih"]
+
+# XGBoost fields of step 2 as (name, low, high, default, step, format). Labels come from XGBOOST_LABELS,
+# which the review and the result pages also use.
+XGBOOST_FIELDS = [
+    ("n_estimators", 1, 1000, 300, 1, None),
+    ("learning_rate", 0.001, 1, 0.05, 0.01, "%.3f"),
+    ("max_depth", 1, 12, 6, 1, None),
+    ("min_child_weight", 0, 100, 1.0, 0.1, "%.2f"),
+    ("subsample", 0.1, 1, 0.8, 0.05, "%.2f"),
+    ("colsample_bytree", 0.1, 1, 0.8, 0.05, "%.2f"),
+]
+# Under Parameter lanjutan, as (name, high, default); the low bound is 0.
+XGBOOST_ADVANCED_FIELDS = [
+    ("reg_lambda", 10000.0, 1.0),
+    ("reg_alpha", 10000.0, 0.0),
+    ("gamma", 1000.0, 0.0),
+]
 
 
 # --- Cached data ---
@@ -57,27 +79,16 @@ def cached_data(root):
 # --- Form helpers ---
 
 
-def _preset_changed():
-    """Copy the chosen preset into the form."""
-    preset = training_presets().get(st.session_state.training_preset)
-    if preset:
-        st.session_state.training_selector = preset["selector"]
-        st.session_state.training_l1_c = float(preset.get("l1_c", 1))
-
-
 def _range_help(low, high):
     """Build the help text that states the allowed range."""
 
-    def number(value):
-        """Format a bound the way the form shows it."""
-        return f"{value:,}".replace(",", ".") if isinstance(value, int) else f"{value:g}".replace(".", ",")
-
+    number = lambda value: format_count(value) if isinstance(value, int) else decimal(value)
     return f"Rentang {number(low)}–{number(high)}."
 
 
-def _selection_changed():
-    """Mark the form as custom after a manual change."""
-    st.session_state.training_preset = "Custom"
+def _top_k_typed():
+    """Keep the gene count the user typed instead of fitting the default to the data."""
+    st.session_state.training_top_k_typed = True
 
 
 def _set_training_step(step):
@@ -97,19 +108,19 @@ def _dataset_strip(dataset):
     """Show the name and size of the chosen dataset."""
     columns = st.columns([3, 1, 1, 1, 1.3], vertical_alignment="center")
     with columns[0]:
-        st.markdown(
-            "**"
-            + ("Data eksperimen notebook" if dataset["name"] == "Data eksperimen notebook" else "Data pengguna")
-            + "**"
+        notebook = dataset["name"] == NOTEBOOK_DATA
+        st.markdown("**" + (NOTEBOOK_DATA if notebook else "Data pengguna") + "**")
+        # The notebook data has no file name, so only its description is repeated below the title.
+        st.caption(
+            dataset.get("metadata_name", "") if notebook else dataset["name"] + "  \n" + dataset.get("metadata_name", "")
         )
-        st.caption(dataset["name"] + "  \n" + dataset.get("metadata_name", ""))
     for column, label, value in zip(
         columns[1:],
         ["Sampel", "Donor", "Jaringan", "Gen input"],
         [dataset["samples"], dataset["donors"], dataset["classes"], dataset["genes"]],
     ):
         with column:
-            st.markdown("**" + f"{value:,}".replace(",", ".") + "**")
+            st.markdown(f"**{format_count(value)}**")
             st.caption(label)
 
 
@@ -149,6 +160,7 @@ def _render_training_setup(data_root: Path, state_root: Path) -> None:
     """Show the form in the order the user works through it."""
     st.title("Latih model")
     st.caption("Bangun model dari data ekspresi Anda.")
+    render_training_guide()
     data_tab, configuration_tab, review_tab = st.tabs(TRAINING_STEPS, key="training_step", on_change="rerun")
     with data_tab:
         samples = _samples_and_metadata_step(data_root)
@@ -167,7 +179,7 @@ def _samples_and_metadata_step(data_root: Path) -> TrainingSamples:
     data = None
     dataset = None
     source = st.radio(
-        "Sumber data", ["Data pengguna", "Data eksperimen notebook"], horizontal=True, key="training_source"
+        "Sumber data", ["Data pengguna", NOTEBOOK_DATA], horizontal=True, key="training_source"
     )
     if source == "Data pengguna":
         audit = _uploaded_samples(audit)
@@ -322,7 +334,7 @@ def _bundled_samples(data_root: Path) -> tuple:
     try:
         data = cached_data(data_root)
         dataset = {
-            "name": "Data eksperimen notebook",
+            "name": NOTEBOOK_DATA,
             "metadata_name": "Subset development tersimpan",
             "samples": len(data.sample_ids),
             "donors": len(set(data.donor_ids)),
@@ -332,15 +344,15 @@ def _bundled_samples(data_root: Path) -> tuple:
         _dataset_strip(dataset)
         st.caption("Menggunakan subset development eksperimen. Sampel holdout tidak dimasukkan.")
     except (OSError, ValueError, KeyError) as error:
-        st.error(f"Data notebook tidak tersedia: {error}")
+        st.error(f"{NOTEBOOK_DATA} tidak tersedia: {error}")
     return data, dataset
 
 
-# --- Step 2: split, method and genes, evaluation, and hyperparameters ---
+# --- Step 2: split, preprocessing, feature selection, evaluation, and hyperparameters ---
 
 
 def _configuration_step(samples: TrainingSamples) -> TrainingChoices:
-    """Step 2: holdout, method and genes, cross-validation, then XGBoost."""
+    """Step 2, in pipeline order: holdout, candidate genes and transforms, selection, cross-validation, XGBoost."""
     dataset = samples.dataset
     if dataset:
         _dataset_strip(dataset)
@@ -353,7 +365,9 @@ def _configuration_step(samples: TrainingSamples) -> TrainingChoices:
     usable = _genes_passing_filter(samples, holdout)
     if usable is not None:
         available = max(1, min(available, usable))
-    values, count, candidate_blank = _method_and_genes_step(samples, available, usable)
+    transforms, count, candidate_blank = _preprocessing_step(samples, available, usable)
+    values = _method_and_genes_step(count)
+    values.update(transforms)
     fold_note = _cross_validation_step(values, holdout, evaluation_note)
     _xgboost_step(values)
 
@@ -390,6 +404,37 @@ def _development_holdout_step() -> tuple:
     return holdout, evaluation_note
 
 
+def _preprocessing_step(samples: TrainingSamples, available: int, usable: int | None) -> tuple:
+    """Choose the candidate genes and the transforms applied to them before feature selection and XGBoost."""
+    st.subheader("Pra-pemrosesan")
+    st.session_state.setdefault("training_log2", True)
+    st.session_state.setdefault("training_standardize", True)
+    genes_column, transform_column = st.columns(2)
+    with genes_column:
+        count = _candidate_genes_input(samples, available, usable)
+    with transform_column:
+        log2 = st.checkbox(
+            "Transformasi log2(TPM+1)",
+            key="training_log2",
+            help="Setiap nilai TPM diubah menjadi log2(TPM+1) sebelum seleksi fitur dan XGBoost.",
+        )
+        standardize = st.checkbox(
+            "Standardisasi (z-score)",
+            key="training_standardize",
+            help=(
+                "Setiap gen dipusatkan ke rerata 0 dengan simpangan baku 1. Rerata dan simpangan baku dihitung "
+                "dari data training saja, termasuk pada setiap fold, lalu dipakai ulang untuk validasi dan prediksi."
+            ),
+        )
+    st.caption(
+        f"Gen kandidat disaring dengan filter teknis ({TECHNICAL_FILTER_RULE}) lalu diperingkat menurut varians "
+        "log2(TPM+1), sehingga sama untuk setiap pilihan transformasi."
+    )
+    st.divider()
+    candidate_blank = count is None
+    return {"log2_transform": log2, "standardize": standardize}, available if candidate_blank else count, candidate_blank
+
+
 def _genes_passing_filter(samples: TrainingSamples, holdout: int) -> int | None:
     """Count the genes of an upload that pass the filter for this split."""
     # A checked upload stays in the session after the user switches source, so it counts only while it is in use.
@@ -403,40 +448,26 @@ def _genes_passing_filter(samples: TrainingSamples, holdout: int) -> int | None:
     )
 
 
-def _method_and_genes_step(samples: TrainingSamples, available: int, usable: int | None) -> tuple:
-    """Choose feature selection plus XGBoost, or XGBoost only, and the number of genes."""
+def _method_and_genes_step(count: int) -> dict:
+    """Choose the selection method and how many of the `count` candidate genes it keeps."""
     st.subheader("Seleksi fitur")
-    selector_left, selector_right = st.columns(2)
-    with selector_left:
-        st.selectbox(
-            "Preset seleksi fitur",
-            [*training_presets(), "Custom"],
-            key="training_preset",
-            on_change=_preset_changed,
-        )
-    with selector_right:
+    method_column, genes_column = st.columns(2)
+    with method_column:
         method = st.selectbox(
             "Metode seleksi fitur",
             list(METHODS),
             format_func=METHODS.get,
             key="training_selector",
-            on_change=_selection_changed,
         )
-    with selector_right:
-        count = _candidate_genes_input(samples, available, usable)
-    candidate_blank = count is None
-    if candidate_blank:
-        count = available
-    # A template fits its gene count to the data. A number the user typed is only capped.
-    template = training_presets().get(st.session_state.training_preset, {})
+    # Until the user types a number, the gene count follows the data: up to 1.000 genes.
+    # A number the user typed is only capped. Baseline always uses every candidate gene.
     if method == "baseline":
         st.session_state.training_top_k = count
-    elif "top_k" in template:
-        st.session_state.training_top_k = min(template["top_k"], count)
+    elif not st.session_state.get("training_top_k_typed"):
+        st.session_state.training_top_k = min(1000, count)
     elif st.session_state.get("training_top_k") is not None and st.session_state.training_top_k > count:
         st.session_state.training_top_k = count
-    st.session_state.setdefault("training_top_k", min(1000, count))
-    with selector_left:
+    with genes_column:
         k = st.number_input(
             "Top-k gen",
             value=None,
@@ -444,12 +475,13 @@ def _method_and_genes_step(samples: TrainingSamples, available: int, usable: int
             help=_range_help(1, count),
             key="training_top_k",
             disabled=method == "baseline",
-            on_change=_selection_changed,
+            on_change=_top_k_typed,
         )
     values = {"selector": method, "top_k": k}
-    _selector_options(values, selector_right)
+    # The method's own settings sit under the method they belong to.
+    _selector_options(values, method_column)
     st.divider()
-    return values, count, candidate_blank
+    return values
 
 
 def _candidate_genes_input(samples: TrainingSamples, available: int, usable: int | None) -> int | None:
@@ -467,22 +499,24 @@ def _candidate_genes_input(samples: TrainingSamples, available: int, usable: int
         value=None,
         key="training_candidates",
         disabled=data is not None,
-        on_change=_selection_changed,
-        help="Jumlah gen setelah filter teknis dan pemeringkatan varians. Dipelajari dari data training setiap fold.",
+        help=(
+            f"Jumlah gen yang dipertahankan setelah filter teknis ({TECHNICAL_FILTER_RULE}) dan pemeringkatan "
+            "varians. Dipelajari dari data training setiap fold."
+        ),
     )
     if usable is not None and usable < min(5000, dataset["genes"]):
         st.caption(
-            f"Maksimum {usable} dari {dataset['genes']} gen. Gen lain tidak lolos filter teknis pada pembagian data ini: "
-            "bernilai sedikitnya 1 TPM pada 20% sampel dan bervariasi antarsampel."
+            f"Maksimum {usable} dari {dataset['genes']} gen. Gen lain tidak lolos filter teknis pada pembagian data ini "
+            f"({TECHNICAL_FILTER_RULE})."
         )
     return count
 
 
-def _selector_options(values: dict, selector_right) -> None:
+def _selector_options(values: dict, method_column) -> None:
     """Show the settings that only the chosen selector has."""
     method = values["selector"]
     if method == "l1":
-        with selector_right:
+        with method_column:
             st.session_state.setdefault("training_l1_c", 1.0)
             values["l1_c"] = st.number_input(
                 "C (regularisasi)",
@@ -491,14 +525,17 @@ def _selector_options(values: dict, selector_right) -> None:
                 format="%.4f",
                 help=_range_help(0.0001, 1000),
                 key="training_l1_c",
-                on_change=_selection_changed,
             )
         with st.expander("Opsi selector"):
             values["l1_max_iter"] = st.number_input(
-                "Maksimum iterasi", value=20000, step=1, help=_range_help(100, 50000), key="training_l1_iterations"
+                L1_OPTION_LABELS["l1_max_iter"],
+                value=20000,
+                step=1,
+                help=_range_help(100, 50000),
+                key="training_l1_iterations",
             )
             values["l1_tol"] = st.number_input(
-                "Toleransi",
+                L1_OPTION_LABELS["l1_tol"],
                 value=0.001,
                 step=0.0001,
                 format="%.6f",
@@ -506,10 +543,11 @@ def _selector_options(values: dict, selector_right) -> None:
                 key="training_l1_tol",
             )
             values["l1_class_weight"] = st.selectbox(
-                "Bobot kelas", ["balanced", None], format_func=lambda x: x or "None", key="training_l1_weight"
+                L1_OPTION_LABELS["l1_class_weight"],
+                ["balanced", None], format_func=lambda x: x or "None", key="training_l1_weight"
             )
     elif method == "mutual_information":
-        with selector_right:
+        with method_column:
             values["mi_neighbors"] = st.number_input(
                 "n_neighbors", value=3, step=1, help=_range_help(1, 20), key="training_mi_neighbors"
             )
@@ -547,18 +585,10 @@ def _xgboost_step(values: dict) -> None:
     xgb = {}
     # Bounds are checked by validate_training_config so an out-of-range entry stays visible as an error
     # instead of the widget silently keeping the previous value.
-    specs = [
-        ("n_estimators", "Putaran boosting", 1, 1000, 300, 1, None),
-        ("learning_rate", "Learning rate", 0.001, 1, 0.05, 0.01, "%.3f"),
-        ("max_depth", "Max depth", 1, 12, 6, 1, None),
-        ("min_child_weight", "Min child weight", 0, 100, 1.0, 0.1, "%.2f"),
-        ("subsample", "Subsample", 0.1, 1, 0.8, 0.05, "%.2f"),
-        ("colsample_bytree", "Colsample (bytree)", 0.1, 1, 0.8, 0.05, "%.2f"),
-    ]
-    for i, (name, label, low, high, default, step, number_format) in enumerate(specs):
+    for i, (name, low, high, default, step, number_format) in enumerate(XGBOOST_FIELDS):
         with columns[i % 3]:
             xgb[name] = st.number_input(
-                label,
+                XGBOOST_LABELS[name],
                 value=default,
                 step=step,
                 format=number_format,
@@ -567,16 +597,10 @@ def _xgboost_step(values: dict) -> None:
             )
     with st.expander("Parameter lanjutan"):
         advanced = st.columns(2)
-        for i, (name, label, high, default) in enumerate(
-            [
-                ("reg_lambda", "L2 XGBoost (lambda)", 10000.0, 1.0),
-                ("reg_alpha", "L1 XGBoost (alpha)", 10000.0, 0.0),
-                ("gamma", "Gamma", 1000.0, 0.0),
-            ]
-        ):
+        for i, (name, high, default) in enumerate(XGBOOST_ADVANCED_FIELDS):
             with advanced[i % 2]:
                 xgb[name] = st.number_input(
-                    label,
+                    XGBOOST_LABELS[name],
                     value=default,
                     step=0.1,
                     format="%.2f",
@@ -585,7 +609,7 @@ def _xgboost_step(values: dict) -> None:
                 )
         with advanced[1]:
             xgb["n_jobs"] = st.number_input(
-                "Thread CPU",
+                XGBOOST_LABELS["n_jobs"],
                 1,
                 max(1, os.cpu_count() or 1),
                 min(4, os.cpu_count() or 1),
@@ -606,7 +630,8 @@ def _check_choices(
             raise ValueError("Isi jumlah gen kandidat sebelum memulai training.")
         if usable == 0:
             raise ValueError(
-                "Tidak ada gen yang lolos filter teknis pada pembagian data ini. Periksa nilai TPM atau ubah pembagian data."
+                f"Tidak ada gen yang lolos filter teknis ({TECHNICAL_FILTER_RULE}) pada pembagian data ini. "
+                "Periksa nilai TPM atau ubah pembagian data."
             )
         config = validate_training_config(values, candidate_count=count)
         _show_split_sizes(samples, config, values, evaluation_note, fold_note)
@@ -683,52 +708,19 @@ def _review_step(samples: TrainingSamples, choices: TrainingChoices, data_root: 
     else:
         st.info("Unggah dan periksa data pada langkah 1 sebelum memulai training.")
     st.divider()
-    _show_choices(choices)
+    # The same view as a saved run on Hasil Pelatihan, in the order and with the labels of step 2.
+    show_settings(choices.values, choices.candidate_genes)
     _show_readiness(dataset, choices)
     st.divider()
+    st.text_input(
+        "Nama pelatihan",
+        key="training_run_name",
+        max_chars=RUN_NAME_LIMIT,
+        placeholder="Opsional, misalnya ANOVA 500 gen - holdout 20%",
+        help="Memudahkan mencari dan membedakan hasil di Hasil Pelatihan, Perbandingan Model, Panel Gen, dan "
+        "Prediksi Jaringan. Dapat diubah nanti di Hasil Pelatihan.",
+    )
     _start_training_buttons(samples, choices, data_root, state_root)
-
-
-def _show_choices(choices: TrainingChoices) -> None:
-    """Show a summary of the chosen method and evaluation."""
-    values, count = choices.values, choices.candidate_genes
-    method, k, xgb = values["selector"], values["top_k"], values["xgboost"]
-    selection, model = st.columns(2, gap="large")
-    with selection:
-        st.subheader("Seleksi fitur")
-        rows = [
-            ("Metode", METHODS[method]),
-            ("Gen kandidat", f"{count:,}".replace(",", ".")),
-            ("Top-k gen", f"{k or 0:,}".replace(",", ".")),
-        ]
-        if method == "l1":
-            rows.append(("C", str(values.get("l1_c"))))
-        elif method == "mutual_information":
-            rows.append(("n_neighbors", str(values["mi_neighbors"])))
-        st.table(pd.DataFrame(rows, columns=["Pengaturan", "Nilai"]).set_index("Pengaturan"))
-    with model:
-        st.subheader("Model dan evaluasi")
-        rows = [
-            ("Classifier", "XGBoost"),
-            ("Putaran boosting", str(xgb["n_estimators"])),
-            ("Data development", f"{100 - values.get('holdout_percent', 0)}%"),
-            ("Data holdout", f"{values['holdout_percent']}%" if values.get("holdout_percent") else "Tidak ada"),
-            (
-                "Evaluasi tambahan",
-                f"Cross-validation {values['cv_folds']} fold" if values["evaluate_cv"] else "Tidak ada",
-            ),
-        ]
-        if values["evaluate_cv"] or values.get("holdout_percent"):
-            rows.append(("Pembagian", "Donor terpisah"))
-        st.table(pd.DataFrame(rows, columns=["Pengaturan", "Nilai"]).set_index("Pengaturan"))
-    with st.expander("Parameter XGBoost dan opsi selector"):
-        st.dataframe(
-            pd.DataFrame(
-                [{"Parameter": name, "Nilai": str(value)} for name, value in values.items() if name != "xgboost"]
-                + [{"Parameter": name, "Nilai": str(value)} for name, value in xgb.items()]
-            ),
-            hide_index=True,
-        )
 
 
 def _show_readiness(dataset: dict | None, choices: TrainingChoices) -> None:
@@ -772,7 +764,9 @@ def _start_training_buttons(
                     actual_root = (
                         data_root if data is not None else save_training_upload(audit, state_root / "datasets", count)
                     )
-                    record = start_job(config, actual_root, state_root)
+                    record = start_job(config, actual_root, state_root, name=st.session_state.get("training_run_name"))
+                # The next run starts unnamed.
+                st.session_state.pop("training_run_name", None)
                 st.session_state.training_selected_run = record.run_id
                 st.session_state.training_run = record.run_id
                 st.session_state.training_results_view = "Status proses"

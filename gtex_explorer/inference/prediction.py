@@ -63,17 +63,24 @@ def transform_aligned_tpm(
     aligned_tpm: pd.DataFrame,
     preprocessor: dict,
 ) -> np.ndarray:
-    """Apply the frozen log and scaling steps used during model inference."""
+    """Apply the frozen log and scaling steps used during model inference.
 
+    Models trained without log2(TPM+1) say so in their preprocessor; models trained without
+    standardization carry a mean of 0 and a scale of 1, so the scaling below leaves them unchanged.
+    """
+
+    log2 = preprocessor.get("log2_transform", True)
     values = aligned_tpm.to_numpy(dtype=float)
     if not np.isfinite(values).all():
         raise ValueError("Matriks TPM terselaraskan masih memuat nilai non-finite.")
     if (values < 0).any():
-        raise ValueError("Transformasi log2(TPM+1) memerlukan nilai TPM non-negatif.")
+        raise ValueError(
+            "Transformasi log2(TPM+1) memerlukan nilai TPM non-negatif." if log2 else "Nilai TPM tidak boleh negatif."
+        )
     if len(values) == 0:
         raise ValueError("Matriks tidak memuat sampel.")
-    log_values = np.log2(values + 1.0)
-    scaled_values = (log_values - np.asarray(preprocessor["scaler_mean"], dtype=float)) / np.asarray(
+    features = np.log2(values + 1.0) if log2 else values
+    scaled_values = (features - np.asarray(preprocessor["scaler_mean"], dtype=float)) / np.asarray(
         preprocessor["scaler_scale"], dtype=float
     )
     return scaled_values

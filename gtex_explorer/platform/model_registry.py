@@ -23,6 +23,7 @@ from gtex_explorer.training.data import (
     unique_ids,
     verify_files,
 )
+from gtex_explorer.training.run_labels import method_description, run_name
 
 # --- Model entries ---
 
@@ -59,10 +60,27 @@ def _entry(root: Path) -> ModelEntry:
     for key in ["feature_count", "class_count", "boosting_rounds"]:
         if type(manifest.get(key)) is not int or manifest[key] <= 0:
             raise ValueError("Invalid numeric model manifest fields")
-    display_name = manifest["display_name"]
+    display_name = _display_name(manifest)
     if not model_id.startswith("original_"):
         display_name += f" - {manifest['boosting_rounds']} putaran - {model_id[-8:]}"
+        # A user model lives in <workspace>/models/<run id>; the name its run was given leads the label.
+        name = run_name(root.parent.parent / "runs" / model_id)
+        if name:
+            display_name = f"{name} · {display_name}"
     return ModelEntry(model_id, display_name, root, file_hash(path), root / "demo_tpm.csv")
+
+
+def _display_name(manifest: dict) -> str:
+    """Name a model as the training pages do; bundled models are the ones from the notebook experiment."""
+    try:
+        name = method_description(manifest["config"])
+    except (KeyError, TypeError, ValueError):
+        # Models saved without a readable config keep the name they were saved with.
+        name = manifest["display_name"]
+    return EXPERIMENT_PREFIX + name if manifest["model_id"].startswith("original_") else name
+
+
+EXPERIMENT_PREFIX = "Eksperimen notebook - "
 
 
 def load_saved_model(entry: ModelEntry) -> tuple[dict, XGBClassifier]:
@@ -89,23 +107,30 @@ def load_saved_model(entry: ModelEntry) -> tuple[dict, XGBClassifier]:
     }
     if not required.issubset(manifest["files"]):
         raise ValueError("Incomplete saved model files")
+    
     if manifest["versions"]["xgboost"].split(".")[0] != runtime_versions()["xgboost"].split(".")[0]:
         raise ValueError("Incompatible XGBoost model version")
+    
     pre = json.loads((root / "preprocessor.json").read_text(encoding="utf-8"))
+    
     if (
         not isinstance(pre, dict)
         or not isinstance(pre.get("selected_genes"), list)
         or not isinstance(pre.get("classes"), list)
     ):
         raise ValueError("Invalid preprocessing metadata")
+    
     if any(not isinstance(value, str) for value in pre["selected_genes"] + pre["classes"]):
         raise ValueError("Invalid model identifier axes")
+    
     genes = unique_ids(pre["selected_genes"], genes=True)
     classes = unique_ids(pre["classes"])
     if not 1 <= len(genes) <= 5000 or len(genes) != pre["feature_count"] or len(genes) != manifest["feature_count"]:
         raise ValueError("Model gene count mismatch")
+    
     if len(classes) != manifest["class_count"] or pre["model_id"] != entry.model_id:
         raise ValueError("Model identity/class mismatch")
+    
     with np.load(root / "preprocessing.npz", allow_pickle=False) as arrays:
         if set(arrays.files) != {"raw_tpm_medians", "scaler_mean", "scaler_scale"}:
             raise ValueError("Invalid preprocessing arrays")
@@ -116,6 +141,13 @@ def load_saved_model(entry: ModelEntry) -> tuple[dict, XGBClassifier]:
             pre[key] = values.copy()
     if (pre["raw_tpm_medians"] < 0).any() or (pre["scaler_scale"] <= 0).any():
         raise ValueError("Invalid TPM medians/scaling")
+    
+    if not isinstance(pre.get("log2_transform", True), bool) or not isinstance(pre.get("standardize", True), bool):
+        raise ValueError("Invalid preprocessing flags")
+    
+    if pre.get("standardize") is False and ((pre["scaler_mean"] != 0).any() or (pre["scaler_scale"] != 1).any()):
+        raise ValueError("Unstandardized model has scaling constants")
+    
     classifier = XGBClassifier()
     classifier.load_model(root / "xgboost_model.json")
     booster = classifier.get_booster()
@@ -182,6 +214,9 @@ def publish_model(
         "selected_genes": list(genes),
         "classes": list(classes),
         "xgboost_parameters": dict(config.xgboost_parameters),
+        # Prediction repeats these steps; older bundles without them used both.
+        "log2_transform": config.log2_transform,
+        "standardize": config.standardize,
     }
     constants = {}
     for key in ["raw_tpm_medians", "scaler_mean", "scaler_scale"]:
@@ -209,7 +244,7 @@ def publish_model(
             "schema_version": 1,
             "status": "validated",
             "model_id": model_id,
-            "display_name": provenance.get("display_name", f"{config.selector} - {len(genes):,} gen"),
+            "display_name": provenance.get("display_name", method_description(config.to_dict())),
             "provenance": provenance,
             "config": config.to_dict(),
             "versions": runtime_versions(),
@@ -274,7 +309,7 @@ def list_models(resource_root: Path, state_root: Path, *, issues: list | None = 
             entries.append(
                 ModelEntry(
                     "original_l1_c_1_1000",
-                    "Original - L1, C = 1 - 1.000 gen",
+                    EXPERIMENT_PREFIX + "Regresi logistik L1 - C = 1 - 1.000 gen",
                     original,
                     stable_hash({name: cached_file_hash(original / name) for name in names}),
                     Path(resource_root) / "data" / "demo_tpm.csv",

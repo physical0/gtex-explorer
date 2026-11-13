@@ -5,9 +5,10 @@ import json
 import pandas as pd
 import streamlit as st
 
+from gtex_explorer.display import SCORE_LABELS, count, percent, plain
 from gtex_explorer.platform.cloud.media import download_button
 from gtex_explorer.training.panels import load_run_panel
-from gtex_explorer.training.run_labels import method_description
+from gtex_explorer.training.run_labels import NOTEBOOK_DATA, method_description, run_name
 from gtex_explorer.ui.components.training_runs import choose_run, show_diagnostics
 
 
@@ -24,13 +25,18 @@ def render_training_gene_page(state_root):
         saved = json.loads((root / "config.json").read_text(encoding="utf-8"))
         config = saved["config"]
         heading, back = st.columns([3, 1], vertical_alignment="center")
-        heading.subheader(method_description(config))
+        # A named run leads with its name, its method below it.
+        name = run_name(root)
+        heading.subheader(plain(name) if name else method_description(config))
+        if name:
+            heading.caption(method_description(config))
         if back.button("Kembali ke hasil", key="training_panel_back", icon=":material/arrow_back:", width="stretch"):
             st.session_state.training_run = run_id
             st.session_state.page = "Hasil Pelatihan"
             st.rerun()
 
-        # Choose the final model or one fold.
+        # Choose the final model or one fold. The final model learns from the development data only.
+        development = "data development" if config.get("holdout_percent") else "seluruh data development"
         options = []
         if (state_root / "models" / run_id / "bundle_manifest.json").is_file():
             options.append("final")
@@ -42,7 +48,7 @@ def render_training_gene_page(state_root):
             "Sumber panel",
             options,
             format_func=lambda x: (
-                "Model final - seluruh data training" if x == "final" else f"Fold {x} - data training"
+                f"Model final - {development}" if x == "final" else f"Fold {x} - data training"
             ),
             key=f"training_panel_scope_{run_id}",
         )
@@ -52,7 +58,7 @@ def render_training_gene_page(state_root):
         dataset = saved.get("dataset", {})
         if dataset:
             st.caption(
-                dataset.get("source", {}).get("expression_file", "Data notebook")
+                dataset.get("source", {}).get("expression_file", NOTEBOOK_DATA)
                 + f" - dataset lengkap: {dataset['sample_count']} sampel"
             )
         training_count = info.get("training_samples", dataset.get("sample_count") if scope == "final" else None)
@@ -63,9 +69,17 @@ def render_training_gene_page(state_root):
             [training_count, validation_count, len(genes), info.get("candidate_count", dataset.get("candidate_count"))],
             ["Sampel training", "Sampel validation", "Gen terpilih", "Gen kandidat"],
         ):
-            column.markdown(f"**{value:,}**  \n{label}" if value is not None else f"**-**  \n{label}")
+            column.markdown(f"**{count(value)}**  \n{label}")
         if scope == "final":
-            st.caption("Panel final menggunakan seluruh data training. Data validation hanya digunakan dalam CV.")
+            st.caption(
+                f"Panel final dipilih dari {development}. "
+                + (
+                    "Data holdout hanya dipakai untuk menguji model."
+                    if config.get("holdout_percent")
+                    else "Tanpa data holdout, model tidak diuji pada data terpisah."
+                )
+                + (" Setiap fold CV memiliki panelnya sendiri." if config["evaluate_cv"] else "")
+            )
         gene_tab, diagnostic_tab, stability_tab = st.tabs(["Daftar gen", "Diagnostik metode", "Stabilitas antar-fold"])
         with gene_tab:
             search, limit = st.columns([3, 1])
@@ -77,20 +91,16 @@ def render_training_gene_page(state_root):
             labels = {
                 "gene": "ID gen",
                 "selection_rank": "Peringkat",
-                "selection_score": {
-                    "anova": "Skor F (ANOVA)",
-                    "mutual_information": "Skor MI (nat)",
-                    "l1": "Koefisien absolut maksimum",
-                }.get(config["selector"], "Skor seleksi"),
+                "selection_score": SCORE_LABELS.get(config["selector"], "Skor seleksi"),
                 "p_value": "p-value",
                 "nonzero_class_count": "Jumlah kelas dengan koefisien nonzero",
             }
             if config["selector"] == "baseline":
                 visible = visible.drop(columns="selection_rank", errors="ignore")
                 st.caption(
-                    "Seluruh gen kandidat digunakan. Daftar ini tidak memiliki skor atau peringkat seleksi supervised."
+                    "Seluruh gen kandidat digunakan. Daftar ini tidak memiliki skor atau peringkat seleksi fitur."
                 )
-            st.caption(f"{len(visible):,} dari {len(genes):,} gen sesuai pencarian".replace(",", "."))
+            st.caption(f"{count(len(visible))} dari {count(len(genes))} gen sesuai pencarian")
             # Format a display copy. The complete CSV keeps the original values and precision.
             display = visible.head(maximum).copy()
             ordered = [name for name in ["selection_rank", "gene", "selection_score", "p_value"] if name in display]
@@ -112,7 +122,7 @@ def render_training_gene_page(state_root):
                 key="training_download_genes",
                 icon=":material/download:",
             )
-            st.caption(f"CSV berisi seluruh {len(genes):,} gen pada panel ini.".replace(",", "."))
+            st.caption(f"CSV berisi seluruh {count(len(genes))} gen pada panel ini.")
         with diagnostic_tab:
             show_diagnostics(info)
             if config["selector"] == "anova":
@@ -125,24 +135,29 @@ def render_training_gene_page(state_root):
                 st.caption(
                     "Skor seleksi adalah koefisien absolut maksimum antarkelas. Gen nonzero dihitung pada seluruh gen kandidat."
                 )
+                if config.get("standardize") is False:
+                    st.caption(
+                        "Model ini dilatih tanpa standardisasi, jadi besar koefisien juga dipengaruhi skala ekspresi "
+                        "setiap gen, bukan hanya kekuatan hubungannya dengan jaringan."
+                    )
         with stability_tab:
             status = json.loads((root / "status.json").read_text(encoding="utf-8"))
             summary = status.get("cv_summary")
             if summary and summary.get("mean_jaccard") is not None:
-                st.metric("Rerata Jaccard antar-fold", f"{summary['mean_jaccard']:.2%}".replace(".", ","))
+                st.metric("Rerata Jaccard antar-fold", percent(summary["mean_jaccard"]))
                 pairs = pd.DataFrame(summary["jaccard_pairs"]).rename(
                     columns={"fold_a": "Fold A", "fold_b": "Fold B", "jaccard": "Jaccard"}
                 )
-                pairs["Jaccard"] = pairs["Jaccard"].map(lambda value: f"{value:.2%}".replace(".", ","))
+                pairs["Jaccard"] = pairs["Jaccard"].map(percent)
                 st.caption("Perbandingan gen terpilih antar-fold pada seluruh run ini.")
                 st.dataframe(pairs, hide_index=True, width="stretch")
             elif config["selector"] == "baseline":
-                st.info("Baseline menggunakan seluruh gen kandidat. Jaccard seleksi supervised tidak dihitung.")
+                st.info("Baseline menggunakan seluruh gen kandidat. Jaccard seleksi fitur tidak dihitung.")
             elif not config["evaluate_cv"]:
                 st.info("Run ini dilatih tanpa CV. Stabilitas antar-fold tidak dihitung.")
             else:
                 st.info(
-                    "Jaccard tersedia setelah seluruh fold selector supervised selesai. Baseline tidak dihitung sebagai stabilitas seleksi."
+                    "Jaccard tersedia setelah seleksi fitur pada seluruh fold selesai. Baseline tidak dihitung sebagai stabilitas seleksi."
                 )
     except (ValueError, OSError, KeyError, TypeError) as error:
         st.error(f"Panel tidak dapat dibaca: {error}")

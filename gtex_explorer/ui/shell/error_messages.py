@@ -2,24 +2,19 @@
 
 import re
 
+from gtex_explorer.display import count
+from gtex_explorer.training.run_labels import XGBOOST_LABELS
+
 FIELD_NAMES = {
-    "top_k": "jumlah gen (top-k)",
-    "C": "C regularisasi L1",
-    "max_iter": "maksimum iterasi L1",
-    "tol": "toleransi L1",
-    "n_neighbors": "jumlah tetangga MI",
-    "folds": "jumlah fold",
-    "holdout_percent": "porsi data holdout",
-    "n_estimators": "putaran boosting",
-    "learning_rate": "learning rate",
-    "max_depth": "max depth",
-    "min_child_weight": "min child weight",
-    "subsample": "subsample",
-    "colsample_bytree": "colsample bytree",
-    "reg_lambda": "lambda XGBoost",
-    "reg_alpha": "alpha XGBoost",
-    "gamma": "gamma",
-    "n_jobs": "jumlah thread CPU",
+    # The field labels of the Latih Model form, so an error names the field to fix.
+    "top_k": "Top-k gen",
+    "C": "C (regularisasi)",
+    "max_iter": "Maksimum iterasi",
+    "tol": "Toleransi",
+    "n_neighbors": "n_neighbors",
+    "folds": "Jumlah fold",
+    "holdout_percent": "Porsi data holdout",
+    **{name: label for name, label in XGBOOST_LABELS.items()},
 }
 
 
@@ -28,10 +23,10 @@ def user_error(error) -> str:
     message = str(error)
     support = re.fullmatch(r"L1 has (\d+) nonzero genes, fewer than top-k (\d+)\. Lower k or adjust C\.", message)
     if support:
-        found, requested = (f"{int(n):,}".replace(",", ".") for n in support.groups())
+        found, requested = (count(n) for n in support.groups())
         return (
             f"L1 menghasilkan {found} gen berkoefisien nonzero, kurang dari top-k {requested}. "
-            "Kurangi jumlah gen atau naikkan C, lalu mulai pelatihan baru dengan konfigurasi tersebut."
+            "Kurangi Top-k gen atau naikkan C (regularisasi), lalu mulai pelatihan baru dengan konfigurasi tersebut."
         )
     if message.startswith("L1 did not converge"):
         return (

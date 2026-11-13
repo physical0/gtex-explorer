@@ -7,6 +7,7 @@ import html
 import pandas as pd
 import streamlit as st
 
+from gtex_explorer.display import METHODS, SCORE_LABELS, count, decimal, method_name, percent
 from gtex_explorer.experiments.gene_panels import cv_gene_panel
 from gtex_explorer.platform.cloud.media import download_button
 from gtex_explorer.ui.components.selector_diagnostics import (
@@ -21,7 +22,11 @@ def render_gene_page(tables: dict) -> None:
     """Show the gene panels of the thesis experiment."""
     st.markdown(page_style("genes"), unsafe_allow_html=True)
     st.markdown('<div class="gene-page-marker"></div>', unsafe_allow_html=True)
-    st.title("Panel gen")
+    st.title("Panel gen eksperimen")
+    st.caption(
+        "Model final: panel dari pelatihan ulang pada data development (langkah 5 alur eksperimen di Ringkasan). "
+        "Cross-validation: panel setiap fold (langkah 3)."
+    )
 
     # Choose where the panel comes from.
     source = st.radio(
@@ -39,9 +44,7 @@ def render_gene_page(tables: dict) -> None:
         genes = tables["selected_genes"].copy()
         selector = summary["best_selector_id"]
         c_value = summary.get("best_l1_c")
-        context = f"Data development: {summary['development_samples']:,} sampel - {summary['development_donors']:,} donor".replace(
-            ",", "."
-        )
+        context = f"Data development: {count(summary['development_samples'])} sampel - {count(summary['development_donors'])} donor"
     else:
         rankings = tables.get("cv_gene_rankings", pd.DataFrame())
         if rankings.empty:
@@ -54,7 +57,7 @@ def render_gene_page(tables: dict) -> None:
         labels = (
             tables["cv_summary"].dropna(subset=["selector_id"]).set_index("selector_id")["selector_label"].to_dict()
         )
-        labels[summary["baseline_id"]] = "Baseline — tanpa seleksi fitur"
+        labels[summary["baseline_id"]] = METHODS["baseline"]
         controls = st.columns([2, 1, 1])
         selector = controls[0].selectbox(
             "Metode seleksi fitur",
@@ -66,16 +69,16 @@ def render_gene_page(tables: dict) -> None:
         baseline = selector == summary["baseline_id"]
         method_fits = fits.loc[fits["configuration_id"].eq(selector) if baseline else fits["selector_id"].eq(selector)]
         counts = sorted(method_fits["genes"].astype(int).unique().tolist())
-        count = controls[1].selectbox(
-            "Jumlah gen",
+        top_k = controls[1].selectbox(
+            "Top-k gen",
             counts,
             index=counts.index(summary["best_feature_count"]) if summary["best_feature_count"] in counts else 0,
-            format_func=lambda value: f"{value:,}".replace(",", "."),
+            format_func=count,
             key="gene_cv_count",
         )
         folds = sorted(method_fits["fold"].astype(int).unique().tolist())
         fold = controls[2].selectbox("Fold", folds, key="gene_cv_fold")
-        matching_fits = method_fits.loc[method_fits["genes"].eq(count) & method_fits["fold"].eq(fold)]
+        matching_fits = method_fits.loc[method_fits["genes"].eq(top_k) & method_fits["fold"].eq(fold)]
         if len(matching_fits) != 1:
             st.error("Konfigurasi/fold tidak tersedia atau duplikat pada hasil CV.")
             return
@@ -90,24 +93,12 @@ def render_gene_page(tables: dict) -> None:
             if len(sizes) == 1 and 0 < int(sizes[0]) < int(summary["development_samples"]):
                 training_samples = int(sizes[0])
                 validation_samples = int(summary["development_samples"]) - training_samples
-                context = f"Data training: {training_samples:,} sampel - Data validation: {validation_samples:,} sampel".replace(
-                    ",", "."
-                )
+                context = f"Data training: {count(training_samples)} sampel - Data validation: {count(validation_samples)} sampel"
 
-    # Summary of the chosen panel.
-    method = (
-        "Tanpa seleksi fitur"
-        if baseline
-        else (
-            "Regresi logistik L1"
-            if selector.startswith("l1_")
-            else "Mutual Information" if selector == "mutual_information" else "ANOVA"
-        )
-    )
-    pills = [method]
-    if selector.startswith("l1_"):
-        pills.append(f"C = {float(c_value):g}")
-    pills.extend([f"{len(genes):,} gen".replace(",", "."), "XGBoost"])
+    # Summary of the chosen panel, its method named as on every other page.
+    is_l1 = selector.startswith("l1_")
+    selection = "baseline" if baseline else "l1" if is_l1 else selector
+    pills = [method_name(selection, l1_c=c_value), f"{count(len(genes))} gen", "XGBoost"]
     if fit is not None:
         pills.append(f"Fold {int(fit['fold'])}")
     st.markdown(
@@ -123,11 +114,10 @@ def render_gene_page(tables: dict) -> None:
                 else int(genes["selection_score"].le(0).sum())
             )
             if zero_count:
-                zero_label = f"{zero_count:,}".replace(",", ".")
-                count_label = f"{len(genes):,}".replace(",", ".")
+                zero_label, count_label = count(zero_count), count(len(genes))
                 interpretation = (
                     "Jumlah gen berkoefisien nonzero kurang dari top-k pada fold ini. "
-                    if selector.startswith("l1_")
+                    if is_l1
                     else "Jumlah gen berskor positif kurang dari top-k pada fold ini. "
                 )
                 st.warning(
@@ -142,7 +132,6 @@ def render_gene_page(tables: dict) -> None:
                 )
 
     # Tabs for the gene list, the diagnostics, and stability across folds.
-    is_l1 = selector.startswith("l1_")
     tab_labels = ["Daftar gen", "Kinerja XGBoost" if baseline else "Diagnostik metode"]
     if fit is not None and not baseline:
         tab_labels.append("Stabilitas antar-fold")
@@ -191,19 +180,17 @@ def render_gene_page(tables: dict) -> None:
                     else filtered["dominant_tissue"].eq(dominant)
                 )
             ]
-        status = f"Menampilkan {len(filtered):,} dari {len(genes):,} gen"
+        status = f"Menampilkan {count(len(filtered))} dari {count(len(genes))} gen"
         if not baseline and not query and dominant == "Semua":
-            status += f" - Peringkat 1–{int(max_rank):,}"
+            status += f" - Peringkat 1–{count(max_rank)}"
         elif not baseline:
-            status += f" dalam peringkat 1–{int(max_rank):,}"
-        st.caption(status.replace(",", "."))
+            status += f" dalam peringkat 1–{count(max_rank)}"
+        st.caption(status)
         columns = ["gene"] if baseline else ["selection_rank", "gene", "selection_score"]
         if is_l1:
             columns.append("dominant_tissue")
-        score_label = "Skor L1" if is_l1 else "Statistik F" if selector == "anova" else "Skor MI (nat)"
-        shown = filtered[columns].style.format(
-            {"selection_score": lambda value: f"{value:.6f}".replace(".", ",")} if not baseline else {}
-        )
+        score_label = SCORE_LABELS[selection] if not baseline else None
+        shown = filtered[columns].style.format({"selection_score": lambda value: decimal(value, 6)} if not baseline else {})
         st.dataframe(
             shown,
             width="stretch",
@@ -245,7 +232,7 @@ def render_gene_page(tables: dict) -> None:
                         "nonzero_class_count": "Jumlah kelas dengan koefisien nonzero",
                     },
                 )
-            st.caption("Skor L1: koefisien absolut maksimum lintas kelas setelah standardisasi.")
+            st.caption(f"{SCORE_LABELS['l1']}: koefisien L1 terbesar lintas kelas setelah standardisasi.")
         elif baseline:
             st.caption("Seluruh kandidat gen pada fold, diurutkan menurut ID gen tanpa peringkat seleksi.")
         elif selector == "anova":
@@ -273,7 +260,7 @@ def render_gene_page(tables: dict) -> None:
                     ("Macro-recall validasi", "macro_recall"),
                 ],
             ):
-                column.metric(label, f"{fit[field]:.2%}".replace(".", ","))
+                column.metric(label, percent(fit[field]))
         if not baseline:
             render_diagnostic_details(tables, selector, filtered, fit)
 

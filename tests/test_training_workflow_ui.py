@@ -51,7 +51,8 @@ def test_review_explains_blocking_configuration_beside_training_action(tmp_path,
     app.radio(key='training_source').set_value('Data eksperimen notebook').run()
     app.number_input(key='training_top_k').set_value(None).run()
     assert app.button(key='training_start').disabled
-    assert any('jumlah gen' in error.value.lower() for error in app.tabs[2].error)
+    # The message names the field to fix by its label on the form.
+    assert any('Top-k gen' in error.value for error in app.tabs[2].error)
 
 
 @pytest.mark.parametrize('status,key,label,icon', [
@@ -152,3 +153,32 @@ def test_training_form_values_survive_visiting_another_page(tmp_path, monkeypatc
     app.button(key='nav_Pelatihan Model').click().run()
     assert not app.exception
     assert app.number_input(key='training_xgb_n_estimators').value == 500
+
+
+def test_final_panel_names_the_development_data_and_the_form_settings(tmp_path, monkeypatch):
+    from gtex_explorer.training.jobs import atomic_json
+    from gtex_explorer.training.config import validate_training_config
+    import gtex_explorer.ui.pages.training_genes as training_gene_page
+    run_id = 'run_' + 'd' * 32
+    root = tmp_path / 'runs' / run_id
+    config = validate_training_config({'selector': 'l1', 'top_k': 2, 'holdout_percent': 20, 'standardize': False})
+    atomic_json(root / 'config.json', {'config': config.to_dict(), 'dataset': {
+        'sample_count': 100, 'class_count': 13, 'donor_count': 100, 'source': {'expression_file': 'own.csv'}}})
+    atomic_json(root / 'status.json', {'status': 'completed', 'updated': 0})
+    atomic_json(tmp_path / 'models' / run_id / 'bundle_manifest.json', {})
+    raw = pd.DataFrame({'gene': ['GENE_A', 'GENE_B'], 'selection_rank': [1, 2], 'selection_score': [0.4, 0.1]})
+    info = {'selector': 'l1', 'candidate_count': 50, 'requested_k': 2, 'l1_c': 1.0, 'training_samples': 80}
+    monkeypatch.setattr(training_gene_page, 'load_run_panel', lambda *args: (raw, info))
+    monkeypatch.setattr(training_gene_page, 'choose_run', lambda *args, **kwargs: run_id)
+    app = AppTest.from_string('from pathlib import Path\n'
+        'from gtex_explorer.ui.pages.training_genes import render_training_gene_page\n'
+        f'render_training_gene_page(Path({str(tmp_path)!r}))', default_timeout=60).run()
+    assert not app.exception
+    assert app.selectbox(key=f'training_panel_scope_{run_id}').value == 'final'
+    assert 'Model final - data development' in app.selectbox(key=f'training_panel_scope_{run_id}').options
+    captions = [item.value for item in app.caption]
+    assert any('Panel final dipilih dari data development' in text and 'Data holdout' in text for text in captions)
+    assert not any('seluruh data training' in text for text in captions)
+    assert any('tanpa standardisasi' in text for text in captions)
+    diagnostics = next(frame.value for frame in app.dataframe if 'Diagnostik' in frame.value.columns)
+    assert {'Metode seleksi fitur', 'Top-k gen', 'C (regularisasi)'} <= set(diagnostics['Diagnostik'])

@@ -4,9 +4,33 @@ import json
 import re
 import time
 import uuid
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
 from gtex_explorer.platform.cloud.state import operation, remote_client, state
+
+# The registry is locked only for a quick read and write, so another session holding it is waited for.
+REGISTRY_LOCK = "gtex_explorer.workspaces.lock"
+REGISTRY_WAIT = 5.0
+BUSY_MESSAGE = "Workspace sedang digunakan proses lain. Coba kembali beberapa saat lagi."
+
+
+class WorkspaceBusy(ValueError):
+    """The workspace list stayed locked by another session or process for longer than REGISTRY_WAIT."""
+
+
+@contextmanager
+def _registry_lock(root):
+    """Hold the workspace list's lock, waiting briefly for another session to finish its write."""
+    from gtex_explorer.training.jobs import LockBusy, process_lock
+
+    with ExitStack() as stack:
+        try:
+            stack.enter_context(process_lock(Path(root) / REGISTRY_LOCK, wait=REGISTRY_WAIT))
+        except LockBusy as error:
+            raise WorkspaceBusy(BUSY_MESSAGE) from error
+        yield
+
 
 # --- Registry ---
 
@@ -73,13 +97,13 @@ def workspace_directory(root, workspace_id):
 @operation
 def create_workspace(root, name, *, include_bundled_models=True):
     """Create a workspace and return its entry."""
-    from gtex_explorer.training.jobs import atomic_json, process_lock
+    from gtex_explorer.training.jobs import atomic_json
 
     name = _name(name)
     if type(include_bundled_models) is not bool:
         raise ValueError("Pilihan model bawaan tidak valid.")
     root = Path(root).resolve()
-    with process_lock(root / "gtex_explorer.workspaces.lock"):
+    with _registry_lock(root):
         registry = _registry(root)
         if name.casefold() in {entry["name"].casefold() for entry in registry["workspaces"]}:
             raise ValueError("Nama workspace sudah digunakan.")
@@ -100,11 +124,11 @@ def create_workspace(root, name, *, include_bundled_models=True):
 @operation
 def rename_workspace(root, workspace_id, name):
     """Change the name of a workspace."""
-    from gtex_explorer.training.jobs import atomic_json, process_lock
+    from gtex_explorer.training.jobs import atomic_json
 
     name = _name(name)
     root = Path(root).resolve()
-    with process_lock(root / "gtex_explorer.workspaces.lock"):
+    with _registry_lock(root):
         registry = _registry(root)
         entry = next((x for x in registry["workspaces"] if x["id"] == workspace_id), None)
         if entry is None:
@@ -130,7 +154,8 @@ def delete_workspace(root, workspace_id):
     for run_id in runs:
         read_job(run_id, directory)
     try:
-        with process_lock(root / "launch.lock"), process_lock(root / "gtex_explorer.workspaces.lock"):
+        # A running worker holds the launch lock, so that one still gives up at once.
+        with process_lock(root / "launch.lock"), _registry_lock(root):
             if any(read_job(run_id, directory).status in ACTIVE_STATUSES for run_id in runs):
                 raise ValueError("Workspace masih memiliki pelatihan aktif. Hentikan pelatihan sebelum menghapus.")
             registry = _registry(root)
@@ -151,23 +176,30 @@ def delete_workspace(root, workspace_id):
                 atomic_json(root / "workspaces.json", registry)
                 raise
     except OSError as error:
-        raise ValueError("Workspace sedang digunakan proses lain. Coba kembali beberapa saat lagi.") from error
+        raise ValueError(BUSY_MESSAGE) from error
     if remote_client():
         state().forget(directory)
 
 
 @operation
 def remember_workspace(root, workspace_id):
-    """Record the workspace to preselect next time."""
-    from gtex_explorer.training.jobs import atomic_json, process_lock
+    """Record the workspace to preselect next time.
+
+    Opening a workspace must not fail because this could not be saved, so if another session keeps the
+    list locked past the wait, the workspace opens and the previous choice stays preselected.
+    """
+    from gtex_explorer.training.jobs import atomic_json
 
     root = Path(root).resolve()
-    with process_lock(root / "gtex_explorer.workspaces.lock"):
-        registry = _registry(root)
-        if workspace_id not in {entry["id"] for entry in registry["workspaces"]}:
-            raise ValueError("Workspace tidak ditemukan.")
-        registry["last_workspace_id"] = workspace_id
-        atomic_json(root / "workspaces.json", registry)
+    try:
+        with _registry_lock(root):
+            registry = _registry(root)
+            if workspace_id not in {entry["id"] for entry in registry["workspaces"]}:
+                raise ValueError("Workspace tidak ditemukan.")
+            registry["last_workspace_id"] = workspace_id
+            atomic_json(root / "workspaces.json", registry)
+    except WorkspaceBusy:
+        return
 
 
 # --- Lookups ---

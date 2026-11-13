@@ -48,6 +48,11 @@ Gen dan kelas jaringan pengguna tidak harus sama dengan model eksperimen asli.
 Atur ANOVA, Mutual Information, regresi logistik L1, atau baseline semua kandidat
 pada langkah **Konfigurasi**. Periksa ringkasan pada langkah **Tinjau dan latih**
 sebelum memilih **Latih dan simpan model**. Tombol Kembali mempertahankan pengaturan.
+**Nama pelatihan** bersifat opsional (maksimum 80 karakter, unik dalam workspace) dan
+tampil paling depan pada Hasil Pelatihan, Perbandingan Model, Panel Gen, dan Prediksi
+Jaringan. Nama dapat diubah atau dikosongkan melalui **Ubah nama** di Hasil Pelatihan.
+Nama disimpan pada `runs/<run_id>/name.json`, terpisah dari `config.json` yang
+diverifikasi gallery, sehingga mengubah nama tidak memengaruhi verifikasi model.
 Jumlah kandidat (maksimum 5.000), top-k, parameter selector,
 dan XGBoost dapat diubah. L1 harus konvergen dan memiliki cukup gen nonzero.
 
@@ -216,50 +221,46 @@ Istilah terkait membuka definisi lain dan menghapus filter yang menghalangi tuju
 Unduhan CSV memuat seluruh hasil pencarian, bukan hanya definisi yang sedang terbuka,
 beserta alamat rujukannya. Definisi dan rujukan dapat dibaca tanpa internet.
 
-Pada Perbandingan Metode, pesan L1 diperjelas menjadi “Gen berkoefisien nonzero
+Pada tab Cross-validation di Ringkasan, pesan L1 diperjelas menjadi “Gen berkoefisien nonzero
 kurang dari jumlah top-k pada satu atau lebih fold” ketika diagnostik tersimpan
 memang menunjukkan kekurangan tersebut. Ini perubahan keterangan tampilan, bukan
 perubahan metrik, aturan eligibility, hasil fit, atau checkpoint notebook.
 
 ## Menjalankan aplikasi
 
-Versi **desktop Windows offline** tersedia melalui
-`dist/GTExTissueExplorer/GTExTissueExplorer.exe` setelah build. Versi ini membuka
-jendela aplikasi sendiri dan menyertakan Python, model, serta aset lokal.
-Salin seluruh folder portable, bukan hanya `.exe`. Lihat [DESKTOP.md](docs/DESKTOP.md)
-untuk petunjuk, persyaratan runtime Windows, dan cara membangun ulang.
-Untuk pengembangan, gunakan `run_desktop_app.bat` setelah memasang
-`requirements-desktop.txt`.
+Environment aplikasi berada di `.venv` (Python 3.12), terpisah dari venv notebook.
+Jalankan dari folder aplikasi:
 
-Environment aplikasi berada di `.venv`, terpisah dari venv notebook. Klik dua kali
-`run_offline_app.bat`, atau jalankan `./run_offline_app.ps1`. Launcher menguji
-interpreter dan impor dependensi, bukan hanya keberadaan `python.exe`.
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run main.py
+```
 
-Untuk menyiapkan ulang di komputer lain (dengan Python yang terinstal), jalankan
+Browser terbuka pada `http://127.0.0.1:8501`. Tekan `Ctrl+C` di terminal untuk
+menghentikan server. Pemantauan berkas dimatikan di `.streamlit/config.toml`, jadi
+mulai ulang server setelah kode diubah.
+
+Versi jendela desktop, tanpa browser, dijalankan dari source dengan
+`.\.venv\Scripts\python.exe desktop.py`. Lihat [DESKTOP.md](docs/DESKTOP.md) untuk
+persyaratan runtime Windows, perilaku offline, dan pemeriksaan. Executable portable
+tidak tersedia di repository ini: skrip build dan spesifikasi PyInstaller tidak
+tersimpan, sehingga `.exe` belum dapat dibuat ulang dari folder ini.
+
+Untuk menyiapkan ulang di komputer lain (dengan Python 3.12 terinstal), jalankan
 dari folder aplikasi:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\run_offline_app.ps1
+.\.venv\Scripts\python.exe -m streamlit run main.py
 ```
+
+Pasang `requirements-desktop.txt` sebagai pengganti `requirements.txt` bila versi
+jendela desktop juga diperlukan.
 
 Aplikasi hanya mendengarkan koneksi lokal pada `127.0.0.1:8501`. Telemetri
 Streamlit dinonaktifkan melalui `.streamlit/config.toml`.
 Pemasangan paket pertama dapat memerlukan internet. Setelah environment tersedia,
-launcher dan inferensi tidak mengunduh paket/data. Mode browser ini memerlukan
-Python. Versi desktop portable di atas sudah menyertakan runtime Python.
-
-Pemeriksaan launcher tanpa membuka server:
-
-```powershell
-.\run_offline_app.ps1 -CheckOnly
-.\run_offline_app.bat -CheckOnly
-```
-
-Opsional: set `THESIS_PYTHON` ke path interpreter lain yang memiliki semua
-dependensi. Jika interpreter itu gagal, launcher mencoba `.venv` aplikasi,
-venv tesis, venv lama aplikasi, lalu Python pada PATH. Venv yang rusak dilewati.
+aplikasi dan inferensi tidak mengunduh paket/data.
 
 Pengujian otomatis:
 
@@ -313,7 +314,7 @@ mengubah keluaran model. Referensi lokasi jaringan tidak ditampilkan.
 
 Ringkasan membedakan seluruh kohort dari dua subset berbasis donor. Jumlah donor
 unik seluruh kohort adalah penjumlahan donor development dan donor holdout,
-karena keduanya tidak tumpang tindih. Validasi silang hanya menggunakan data
+karena keduanya tidak tumpang tindih. Cross-validation hanya menggunakan data
 development. Setelah konfigurasi dipilih, model dilatih ulang pada seluruh
 data development dan dievaluasi pada holdout.
 
@@ -329,11 +330,13 @@ dengan pilihan urutan terendah, tertinggi, atau alfabetis. Precision dan recall
 tambahan tersedia pada “Metrik lengkap holdout”. Tombol di bagian bawah membuka
 halaman perbandingan, panel gen, atau prediksi yang sudah ada.
 
-Pada Perbandingan Metode, metrik pilihan mengubah grafik dan kolom nilai tabel.
-Bagian pertama memuat CV, ringkasan empat konfigurasi pada jumlah gen terpilih,
-dan tabel lengkap 16 konfigurasi yang dapat dibuka. Bagian kedua memuat hasil
-holdout untuk konfigurasi terpilih dan baseline, dengan persentase langsung pada
-grafik. Titik CV berongga menandai konfigurasi yang tidak memenuhi syarat seleksi.
+Perbandingan metode ada di Ringkasan; halaman Perbandingan Metode yang terpisah
+digabungkan ke sana, dan tautan lama membuka Ringkasan. Tab Cross-validation memuat
+konfigurasi terpilih, lalu grafik semua metode dengan metrik pilihan, ringkasan
+empat konfigurasi pada jumlah gen terpilih, dan tabel lengkap 16 konfigurasi yang
+dapat dibuka. Tab Hasil akhir - holdout memuat skor model final beserta selisihnya
+dengan baseline, F1-score per jaringan untuk keduanya, dan tabel metrik lengkap.
+Titik CV berongga menandai konfigurasi yang tidak memenuhi syarat seleksi.
 Peringkat Macro-F1 dan konfigurasi final tetap mengikuti ekspor notebook, bukan
 dipilih ulang di aplikasi. Grafik memakai skala 0–1 dengan opsi perbesaran yang
 ditandai. Panel Gen menjelaskan rentang peringkat pencarian. Halaman Prediksi
@@ -380,7 +383,11 @@ model dan checkpoint yang sudah tersimpan jika identitas serta hash cocok.
 Gallery menggunakan daftar model yang dapat dicari berdasarkan metode, parameter
 selektor, jumlah gen, atau nama dataset. Pilihan model ditampilkan di panel kanan,
 dengan tombol prediksi dan Panel Gen sebelum metrik CV. Tab Status proses
-menampung pemantauan dan kontrol proses. Pada jendela yang lebih sempit, daftar
+menampung pemantauan dan kontrol proses. Tahapan yang dipakai run ditampilkan
+dengan nama yang sama seperti panduan Cara kerja pelatihan, beserta fold,
+langkah yang sedang berjalan (pra-pemrosesan, seleksi fitur, XGBoost, atau
+evaluasi), data yang dilatih atau dievaluasi, dan tahap tempat run dijeda,
+dihentikan, atau gagal. Pada jendela yang lebih sempit, daftar
 dan rincian disusun vertikal. Seluruh isi tetap berasal dari hasil tersimpan.
 
 ## Deployment Vercel

@@ -139,4 +139,14 @@ def test_gallery_shows_holdout_and_fold_results_together(tmp_path, monkeypatch):
     assert not app.exception
     headings = [item.value for item in app.subheader]
     assert headings.index('Evaluasi holdout') < headings.index('Evaluasi CV') and headings.count('F1-score per jaringan') == 2
-    assert any('Holdout 50% dan 2 fold' in item.value for item in app.markdown)
+    assert any('Holdout 50% dan CV 2 fold' in item.value for item in app.markdown)
+    # Saved settings read as they did on the review step of Latih Model.
+    saved = next(item for item in app.expander if item.label == 'Data dan pengaturan tersimpan')
+    tables = [table.value for table in saved.table]
+    assert [list(table.index) for table in tables] == [
+        ['Data development', 'Data holdout', 'Pembagian', 'Gen kandidat', 'Pra-pemrosesan'],
+        ['Metode seleksi fitur', 'Top-k gen', 'Evaluasi tambahan', 'Classifier', 'Putaran boosting'],
+    ]
+    assert tables[0].loc['Data holdout', 'Nilai'] == '50%'
+    parameters = saved.dataframe[0].value
+    assert 'Learning rate' in parameters['Parameter'].tolist() and 'learning_rate' not in parameters['Parameter'].tolist()

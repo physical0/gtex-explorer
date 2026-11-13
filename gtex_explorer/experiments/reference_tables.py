@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from gtex_explorer.display import METHODS, count, method_name
 from gtex_explorer.experiments.gene_panels import load_cv_gene_rankings
 from gtex_explorer.experiments.selector_diagnostics import load_selector_diagnostics
 from gtex_explorer.platform.paths import APP_ROOT as APP_DIR
@@ -57,9 +58,35 @@ def load_reference_tables() -> dict[str, pd.DataFrame | dict]:
     if len(final_test) != 1 or not final_test["classifier"].eq("xgboost").all():
         raise ValueError("final_test_summary.csv bukan ekspor Part A terbaru (satu model XGBoost terpilih).")
     summary = tables["run_summary"]
+    
     row = final_test.iloc[0]
+    
     if row["selector_id"] != summary["best_selector_id"] or int(row["genes"]) != int(summary["best_feature_count"]):
         raise ValueError("Konfigurasi final tidak cocok dengan run_summary.json.")
     tables["cv_gene_rankings"] = load_cv_gene_rankings(DATA_DIR, summary, tables["cv_folds"])
     tables["selector_diagnostics"] = load_selector_diagnostics(DATA_DIR, summary)
+    _use_app_names(tables)
     return tables
+
+
+def _use_app_names(tables: dict) -> None:
+    """Name the notebook's methods and configurations as the training pages name them.
+
+    The exports carry English labels such as "L1 (C=0.1) — 1,000 genes". Only these display
+    columns change; IDs, scores, and every other column stay as exported.
+    """
+    summary = tables["cv_summary"]
+    selectors = summary.dropna(subset=["selector_id"]).drop_duplicates("selector_id")
+    names = {row.selector_id: method_name(row.feature_selection, l1_c=row.l1_c) for row in selectors.itertuples()}
+    configurations = {
+        row.configuration_id: f"{METHODS['baseline'] if row.experiment_type == 'baseline' else names[row.selector_id]}"
+        f" - {count(row.genes)} gen"
+        for row in summary.itertuples()
+    }
+    for frame in tables.values():
+        if not isinstance(frame, pd.DataFrame) or frame.empty:
+            continue
+        if {"selector_id", "selector_label"} <= set(frame.columns):
+            frame["selector_label"] = frame["selector_id"].map(names).fillna(frame["selector_label"])
+        if {"configuration_id", "configuration_label"} <= set(frame.columns):
+            frame["configuration_label"] = frame["configuration_id"].map(configurations).fillna(frame["configuration_label"])

@@ -81,7 +81,7 @@ hubungan sebab-akibat biologis.
 
 ## Bukti reproduksibilitas
 
-Halaman Perbandingan Metode juga membaca baseline
+Tab Cross-validation dan Hasil akhir - holdout pada Ringkasan juga membaca baseline
 `XGBoost — All 5,000 Genes (No Feature Selection)`. Baseline memakai matriks
 praproses 5.000 gen tanpa pemeringkatan atau pemotongan top-k dan menggunakan
 parameter serta lima split donor yang sama. Baseline hanya menjadi referensi CV

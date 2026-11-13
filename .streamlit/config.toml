@@ -4,6 +4,8 @@ primaryColor = "#078c92"
 backgroundColor = "#fbfbfa"
 secondaryBackgroundColor = "#f7f8f8"
 textColor = "#14213d"
+# Input fields get a visible border before they are focused; the field fill is too close to the page colour alone.
+showWidgetBorder = true
 font = "sans-serif"
 
 [browser]

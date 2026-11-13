@@ -148,3 +148,63 @@ def test_invalid_launcher_target_cannot_change_active_workspace(tmp_path, monkey
     assert state['active_workspace_id'] == entry['id']
     assert state['workspace_entered'] is False
     assert state['training_selected_run'] == 'keep_this_run'
+
+
+def hold_registry(root, seconds):
+    """Another session holding the workspace list's lock for `seconds`; returns its thread once it holds it."""
+    import threading
+    import time
+    from gtex_explorer.platform.workspaces import REGISTRY_LOCK
+    from gtex_explorer.training.jobs import process_lock
+    held = threading.Event()
+
+    def hold():
+        with process_lock(Path(root) / REGISTRY_LOCK):
+            held.set()
+            time.sleep(seconds)
+
+    thread = threading.Thread(target=hold)
+    thread.start()
+    held.wait()
+    return thread
+
+
+def test_opening_a_workspace_waits_for_another_session_writing_the_list(tmp_path):
+    # Two sessions writing the list at once used to fail at once with PermissionError.
+    from gtex_explorer.platform.workspaces import create_workspace, last_workspace, remember_workspace
+    entry = create_workspace(tmp_path, 'Study A')
+    other = hold_registry(tmp_path, 0.4)
+    remember_workspace(tmp_path, entry['id'])
+    other.join()
+    assert last_workspace(tmp_path) == entry['id']
+
+
+def test_a_list_kept_busy_past_the_wait_still_opens_the_workspace_but_blocks_changes(tmp_path, monkeypatch):
+    import gtex_explorer.platform.workspaces as workspaces
+    entry = workspaces.create_workspace(tmp_path, 'Study A')
+    monkeypatch.setattr(workspaces, 'REGISTRY_WAIT', 0.2)
+    other = hold_registry(tmp_path, 1.0)
+    try:
+        # Saving "last used" is skipped rather than failing the workspace that is being opened.
+        workspaces.remember_workspace(tmp_path, entry['id'])
+        assert workspaces.last_workspace(tmp_path) == 'default'
+        with pytest.raises(ValueError, match='sedang digunakan proses lain'):
+            workspaces.create_workspace(tmp_path, 'Study B')
+        with pytest.raises(ValueError, match='sedang digunakan proses lain'):
+            workspaces.rename_workspace(tmp_path, entry['id'], 'Study C')
+    finally:
+        other.join()
+    assert [item['name'] for item in workspaces.list_workspaces(tmp_path)] == ['Default', 'Study A']
+
+
+def test_training_locks_still_give_up_at_once(tmp_path):
+    import time
+    from gtex_explorer.training.jobs import LockBusy, process_lock
+    other = hold_registry(tmp_path, 0.5)  # any lock file behaves the same
+    from gtex_explorer.platform.workspaces import REGISTRY_LOCK
+    started = time.monotonic()
+    with pytest.raises(LockBusy):
+        with process_lock(tmp_path / REGISTRY_LOCK):
+            pass
+    assert time.monotonic() - started < 0.2
+    other.join()

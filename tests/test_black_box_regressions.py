@@ -81,7 +81,8 @@ def test_blank_gene_count_has_a_readable_field_name(tmp_path, monkeypatch):
     app.number_input(key='training_top_k').set_value(None).run()
     assert app.button(key='training_start').disabled
     errors = ' '.join(item.value.lower() for item in app.error)
-    assert 'jumlah gen' in errors and 'isi' in errors
+    # Named by its label on the form.
+    assert 'top-k gen' in errors and 'isi' in errors
 
 
 def test_l1_failure_explains_support_and_recovery_action(tmp_path, monkeypatch):

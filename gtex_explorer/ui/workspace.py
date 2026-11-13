@@ -91,12 +91,14 @@ PAGES = {
     "Pelatihan Model",
     "Prediksi Jaringan",
     "Hasil Pelatihan",
+    "Perbandingan Pelatihan",
     "Panel Gen Pelatihan",
     "Kamus Biologi",
     "Ringkasan",
-    "Perbandingan Metode",
     "Panel Gen",
 }
+# Pages that were merged into another, so saved links still open the right place.
+MERGED_PAGES = {"Perbandingan Metode": "Ringkasan"}
 
 
 def restore_location(root):
@@ -118,7 +120,7 @@ def restore_location(root):
         st.query_params.clear()
         return
     state.workspace_entered = True
-    page = st.query_params.get("page")
+    page = MERGED_PAGES.get(st.query_params.get("page"), st.query_params.get("page"))
     state.page = page if page in PAGES else "Pelatihan Model"
     if st.query_params.get("model"):
         state.active_model_id = st.query_params["model"]

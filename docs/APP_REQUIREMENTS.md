@@ -22,8 +22,8 @@ Pengguna utama adalah mahasiswa peneliti, dosen pembimbing, dan penguji yang ing
 
 ## Ruang lingkup MVP
 
-1. Halaman Ringkasan menampilkan jumlah sampel, donor, kelas jaringan, konfigurasi final, dan metrik uji akhir.
-2. Halaman Perbandingan Metode menampilkan 15 konfigurasi selektor dan satu baseline tanpa seleksi fitur beserta variasi antar-fold.
+1. Halaman Ringkasan menampilkan jumlah sampel, donor, kelas jaringan, alur eksperimen, konfigurasi final, dan metrik uji akhir beserta selisihnya dengan baseline.
+2. Tab Cross-validation pada Ringkasan membandingkan 15 konfigurasi selektor dan satu baseline tanpa seleksi fitur beserta variasi antar-fold. Halaman Perbandingan Metode yang terpisah digabungkan ke Ringkasan.
 3. Halaman Panel Gen menyediakan panel final dan panel 75 fit selektor beserta lima fit baseline, dengan pencarian, filter metode/jumlah gen/fold, tabel, dan unduhan.
 4. Halaman Prediksi Jaringan memisahkan audit matriks dari eksekusi model. Prediksi hanya dapat dijalankan setelah input lolos pemeriksaan.
 5. Hasil prediksi menampilkan seluruh probabilitas kelas, selisih top-1 dan top-2, serta kontribusi lokal gen terhadap kelas prediksi.
@@ -58,7 +58,7 @@ Pengguna utama adalah mahasiswa peneliti, dosen pembimbing, dan penguji yang ing
 - Keterangan kurangnya gen nonzero digunakan hanya untuk L1 ketika didukung diagnostik fold. Konvergensi atau penyebab lain tidak diganti dengan alasan yang tidak terbukti.
 - Kamus hanya memuat konsep biologi molekuler, 13 jaringan target, dan pengukuran ekspresi. Istilah algoritma, metrik evaluasi, dan perangkat lunak tidak dimasukkan.
 - Ringkasan membedakan kohort, split donor, skor CV konfigurasi terpilih, dan evaluasi holdout. Grafik jaringan memuat F1 serta jumlah sampel uji per kelas, dengan pengurutan yang tidak mengubah hasil.
-- Konfigurasi final pada Ringkasan dan Perbandingan Metode mengikuti selector dan jumlah gen yang tersimpan pada notebook, bukan dipilih ulang di aplikasi. Pilihan metrik memperbarui grafik dan kolom skor tabel.
+- Konfigurasi final pada Ringkasan mengikuti selector dan jumlah gen yang tersimpan pada notebook, bukan dipilih ulang di aplikasi. Pilihan metrik memperbarui grafik dan kolom skor tabel.
 - Grafik perbandingan memakai data skor 0–1 dengan label 0–100% secara default. Perbesaran rentang dinyatakan pada sumbu. Skor per fold, rerata, simpangan baku, dan probabilitas sampel tidak dipertukarkan.
 - Metrik evaluasi ditampilkan dalam persen dengan dua desimal. Simpangan baku dan selisih skor dinyatakan dalam poin persentase. Skor seleksi gen dan berkas sumber tidak dikonversi.
 - Identitas model pada halaman Prediksi berasal dari bundle. Tidak ada footer identitas model yang diisi manual atau referensi lokasi jaringan.

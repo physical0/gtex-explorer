@@ -443,7 +443,7 @@ def render_glossary_page() -> None:
     """Show the Kamus Biologi page."""
     st.markdown(page_style("glossary"), unsafe_allow_html=True)
     st.markdown('<div class="glossary-page-marker"></div>', unsafe_allow_html=True)
-    st.title("Kamus Biologi")
+    st.title("Kamus biologi")
     st.caption("Kenali istilah dan jaringan yang digunakan dalam data ekspresi gen.")
     categories = ["Semua kategori", "Biologi molekuler", "Jaringan dan anatomi", "Pengukuran ekspresi"]
     # Drop obsolete category values left in sessions from the previous dictionary.

@@ -218,14 +218,21 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
         try:
             # Load the run and confirm that its data and settings have not changed.
             saved = json.loads((root / "config.json").read_text(encoding="utf-8"))
+           
             if saved.get("data_root") and resolve_job_data(saved, state_root, data_root) != Path(data_root).resolve():
                 raise ValueError("Run dataset path does not match saved data source")
+           
             data = load_training_data(data_root)
             config = validate_training_config(saved["config"], candidate_count=data.manifest["candidate_count"])
+            
+            status("splitting_data")
             assignments, holdout, split = run_split(data, config)
+            
             identity = configuration_fingerprint(config, data.fingerprint, split, runtime_versions())
             if identity != saved["identity"] or data.fingerprint != saved["data_fingerprint"]:
                 raise ValueError("Run identity changed. Start a new run instead of resuming.")
+            
+            transforms = {"log2": config.log2_transform, "standardize": config.standardize}
 
             # A model that was already published only needs its final checks.
             published = Path(state_root) / "models" / run_id
@@ -245,11 +252,15 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
                     raise ValueError("Published model does not match run identity")
                 summary_path = published / "cv_summary.json"
                 summary = json.loads(summary_path.read_text(encoding="utf-8")) if summary_path.exists() else None
+                
                 holdout_path = published / "holdout_summary.json"
                 holdout_result = json.loads(holdout_path.read_text(encoding="utf-8")) if holdout_path.exists() else None
                 status("verifying_results")
+                
                 finalize_gallery(run_id, state_root)
+                
                 status("completed", status="completed", cv_summary=summary, holdout_summary=holdout_result)
+                
                 return 0
 
             # Cross-validation, one fold at a time. Folds that already finished are reused.
@@ -258,7 +269,7 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
                 if cancelled():
                     return 0
                 status("preparing_fold", fold=assignment.fold)
-                prepared = prepare_partition(data, assignment, Path(state_root) / "preprocessing_cache")
+                prepared = prepare_partition(data, assignment, Path(state_root) / "preprocessing_cache", **transforms)
                 output = root / f"fold_{assignment.fold}.json"
                 if output.exists():
                     payload = json.loads(output.read_text(encoding="utf-8"))
@@ -310,18 +321,19 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
             )
 
             # Train the final model, reusing its checkpoint when there is one.
-            status("final_selector")
+            status("final_preprocessing")
             # With a hold-out, the saved model learns from the development part only and is scored on the rest.
             prepared = (
-                prepare_partition(data, holdout, Path(state_root) / "preprocessing_cache")
+                prepare_partition(data, holdout, Path(state_root) / "preprocessing_cache", **transforms)
                 if holdout
-                else load_final_prepared(data)
+                else load_final_prepared(data, cache_dir=Path(state_root) / "preprocessing_cache", **transforms)
             )
             checkpoint = root / "final_fit"
             if checkpoint.exists():
                 result = _load_final_fit(checkpoint, identity, prepared, config)
                 selector = result.selector
             else:
+                status("final_selector")
                 selector = fit_selector(prepared, config, Path(state_root) / "ranking_cache")
                 if cancelled():
                     return 0
@@ -374,9 +386,14 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
             cancelled()
             return 0
         except Exception as error:
+            # Keep where the run stopped, as a stop does.
+            with status_lock:
+                where = {key: current[key] for key in ["fold"] if key in current}
+                where["failed_stage"] = current.get("stage", "queued")
             status(
                 "failed",
                 status="failed",
+                **where,
                 error={
                     "type": type(error).__name__,
                     "message": str(error),

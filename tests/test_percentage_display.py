@@ -18,11 +18,12 @@ def test_overview_formats_percent_without_changing_chart_fractions():
     text = visible_html(app)
     assert "96,25%" in text and "95,49%" in text and "96,37%" in text
     assert "99,27% ± 0,49 poin persentase" in text
-    spec = json.loads(app.get("vega_lite_chart")[0].proto.spec)
+    chart = next(item for item in app.get("vega_lite_chart") if "display_support" in item.proto.spec)
+    spec = json.loads(chart.proto.spec)
     bar = spec["layer"][0]["encoding"]["x"]
     assert bar["scale"]["domain"] == [0, 1]
     assert bar["axis"]["format"] == ".0%"
-    dataset = app.get("vega_lite_chart")[0].proto.datasets[0]
+    dataset = chart.proto.datasets[0]
     rows = pa.ipc.open_stream(dataset.data.data).read_all().to_pandas()
     coronary = rows.loc[rows.tissue.eq("Artery - Coronary")].iloc[0]
     assert coronary["display_f1"] == "82,35%"
@@ -48,14 +49,14 @@ def test_comparison_formats_all_axes_tooltips_tables_and_point_differences():
             assert metric_tooltip["format"] == ".2%"
     raw_cv = app.dataframe[0].value
     display_cv = styled_values(app.dataframe[0])
-    selected = raw_cv.loc[raw_cv.configuration_label.str.startswith("L1 (C=1)") & raw_cv.genes.eq(1000)].index[0]
+    selected = raw_cv.loc[raw_cv.configuration_label.eq("Regresi logistik L1 - C = 1") & raw_cv.genes.eq(1000)].index[0]
     assert display_cv.loc[selected, "mean_macro_f1"] == "99,27%"
     assert display_cv.loc[selected, "std_macro_f1"] == "0,49"
     assert raw_cv.loc[selected, "mean_macro_f1"] < 1
     assert raw_cv.loc[selected, "std_macro_f1"] < 0.01
-    holdout_table = next(item for item in app.dataframe if "macro_f1" in item.value.columns)
-    assert all("%" in value for value in styled_values(holdout_table)["macro_f1"])
-    assert "Selisih Macro-F1: +0,97 poin persentase" in text
+    holdout_table = next(item.value for item in app.dataframe if "Model final" in item.value.columns)
+    assert holdout_table[["Model final", "Baseline"]].map(lambda value: value.endswith("%")).all().all()
+    assert "+0,97 poin vs baseline" in text
     assert "193 sampel - 124 donor" in text
 
 

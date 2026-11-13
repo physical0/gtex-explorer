@@ -26,6 +26,7 @@ from gtex_explorer.training.data import (
     run_split,
     safe_path,
 )
+from gtex_explorer.training.run_labels import RUN_NAME_FILE, RUN_NAME_LIMIT, run_name
 
 # --- Job records ---
 
@@ -89,9 +90,29 @@ def atomic_json(path: Path, value: dict):
         temporary.unlink(missing_ok=True)
 
 
+class LockBusy(OSError):
+    """Another session or process holds the lock."""
+
+
+def _try_lock(handle) -> None:
+    """Take the lock now, or raise OSError if it is held."""
+    if os.name == "nt":
+        import msvcrt
+
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
 @contextmanager
-def process_lock(path: Path):
-    """Hold a lock that also applies across processes."""
+def process_lock(path: Path, *, wait: float = 0.0):
+    """Hold a lock that also applies across processes, and across sessions of one process.
+
+    Without `wait` it gives up at once: the training locks rely on that to tell a running worker apart.
+    With `wait`, it keeps trying for that many seconds, for locks that are only held for a quick write.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     handle = path.open("a+b")
     try:
@@ -100,14 +121,15 @@ def process_lock(path: Path):
             handle.write(b"0")
             handle.flush()
         handle.seek(0)
-        if os.name == "nt":
-            import msvcrt
-
-            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
-
-            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        deadline = time.monotonic() + wait
+        while True:
+            try:
+                _try_lock(handle)
+                break
+            except OSError as error:
+                if time.monotonic() >= deadline:
+                    raise LockBusy(f"{path.name} is held by another process") from error
+                time.sleep(0.05)
         yield
     finally:
         handle.close()  # OS releases ownership even if a worker crashes.
@@ -176,6 +198,47 @@ def _recover_dead_job(path):
     return value
 
 
+# --- Run names ---
+
+
+def clean_run_name(value):
+    """A run name without surrounding spaces, or None when it is empty."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or any(line in value for line in "\r\n") or len(value.strip()) > RUN_NAME_LIMIT:
+        raise ValueError(f"Nama pelatihan harus berisi paling banyak {RUN_NAME_LIMIT} karakter tanpa baris baru.")
+    return value.strip() or None
+
+
+def _assert_unique_name(name, state_root, run_id=None):
+    """Refuse a name another run of the workspace already has, ignoring case."""
+    for path in (Path(state_root) / "runs").glob("run_*"):
+        other = run_name(path)
+        if path.name != run_id and other and other.casefold() == name.casefold():
+            raise ValueError("Nama pelatihan sudah digunakan di workspace ini.")
+
+
+def _write_run_name(root, name):
+    """Save a run's name, or remove it when the name is empty."""
+    if name:
+        atomic_json(root / RUN_NAME_FILE, {"name": name})
+    else:
+        (root / RUN_NAME_FILE).unlink(missing_ok=True)
+
+
+@operation
+def rename_run(run_id: str, state_root: Path, name) -> str | None:
+    """Give a run a new name, or clear it. Returns the saved name."""
+    root = job_path(run_id, state_root)
+    if not (root / "config.json").is_file():
+        raise ValueError("Hasil pelatihan tidak ditemukan.")
+    name = clean_run_name(name)
+    if name:
+        _assert_unique_name(name, state_root, run_id)
+    _write_run_name(root, name)
+    return name
+
+
 # --- Starting jobs ---
 
 
@@ -237,15 +300,20 @@ def _assert_idle(state_root):
 
 
 @operation
-def start_job(config: TrainingConfig, data_root: Path, state_root: Path) -> JobRecord:
-    """Save a new run and start it."""
+def start_job(config: TrainingConfig, data_root: Path, state_root: Path, *, name=None) -> JobRecord:
+    """Save a new run, with its name when one is given, and start it."""
     data_root, state_root = Path(data_root).resolve(), Path(state_root).resolve()
+    name = clean_run_name(name)
+    if name:
+        _assert_unique_name(name, state_root)
+        
     if remote_client():
         state().ensure(data_root)
     data = load_training_data(data_root)
     _, _, split = run_split(data, config)
     identity = configuration_fingerprint(config, data.fingerprint, split, runtime_versions())
     coordinator = coordination_directory(state_root)
+    
     with process_lock(coordinator / "launch.lock"):
         _assert_idle(state_root)
         run_id = "run_" + uuid.uuid4().hex
@@ -281,13 +349,18 @@ def start_job(config: TrainingConfig, data_root: Path, state_root: Path) -> JobR
                 "data_root": str(data_root),
                 "dataset": dataset,
                 "data_fingerprint": data.fingerprint,
+                # Comparisons between runs use this, so a different Gen kandidat count is not a different dataset.
+                "samples_fingerprint": data.samples_fingerprint,
                 "split_hash": split,
             },
         )
+        
+        _write_run_name(root, name)
         atomic_json(
             root / "status.json",
             {"status": "queued", "stage": "queued", "updated": time.time(), "error": None, "cv_summary": None},
         )
+        
         try:
             atomic_json(
                 coordinator / "worker_owner.json",

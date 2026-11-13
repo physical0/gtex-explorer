@@ -83,7 +83,7 @@ def glossary_app():
 
 def test_dictionary_opens_one_definition_and_changes_it_from_the_index():
     app = glossary_app()
-    assert app.title[0].value == "Kamus Biologi"
+    assert app.title[0].value == "Kamus biologi"
     assert app.session_state["glossary_selected_term"] == "Ekspresi gen"
     assert "Ekspresi gen" in [item.value for item in app.header]
     app.button(key="glossary_term_Protein").click().run()
@@ -135,11 +135,11 @@ def test_dictionary_download_contains_entire_filtered_index_and_source_addresses
 def test_comparison_retains_l1_reasons_and_navigates_to_biology_dictionary():
     app = AppTest.from_file(str(APP_DIR / "main.py"), default_timeout=60).run()
     app = enter_application(app)
-    app.button(key="nav_Perbandingan Metode").click().run()
+    app.button(key="nav_Ringkasan").click().run()
     assert not app.exception
     table = next(item.value for item in app.dataframe if "eligibility_reason" in item.value.columns)
     assert table["eligibility_reason"].eq(L1_INSUFFICIENT_GENES).sum() == 7
     app.button(key="nav_Kamus Biologi").click().run()
-    assert not app.exception and app.title[0].value == "Kamus Biologi"
+    assert not app.exception and app.title[0].value == "Kamus biologi"
     app.text_input(key="glossary_search").set_value("coefficient").run()
     assert app.info and not app.header

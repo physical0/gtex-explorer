@@ -3,7 +3,6 @@
 import streamlit as st
 
 TRAINING_FORM_KEYS = (
-    "training_preset",
     "training_selector",
     "training_candidates",
     "training_top_k",
@@ -15,6 +14,8 @@ TRAINING_FORM_KEYS = (
     "training_cv",
     "training_folds",
     "training_holdout",
+    "training_log2",
+    "training_standardize",
     "training_xgb_threads",
     *(
         "training_xgb_" + name

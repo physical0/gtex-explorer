@@ -44,10 +44,19 @@ class TrainingConfig:
     cv_folds: int
     xgboost_parameters: Mapping
     holdout_percent: int | None = None
+    log2_transform: bool = True
+    standardize: bool = True
+
+    def preprocessing(self) -> dict:
+        """The feature transforms that differ from the default log2(TPM+1) and z-score; empty for the default."""
+        return {
+            key: False for key in ("log2_transform", "standardize") if getattr(self, key) is False
+        }
 
     def to_dict(self) -> dict:
         """Return the settings in the form saved with a run."""
-        # Runs saved before hold-outs existed have no such entry, and their saved config must still match.
+        # Runs saved before hold-outs or preprocessing choices existed have no such entries, and their saved
+        # config must still match, so these are written only when they differ from the old fixed behaviour.
         holdout = {"holdout_percent": self.holdout_percent} if self.holdout_percent else {}
         return {
             "selector": self.selector,
@@ -61,6 +70,7 @@ class TrainingConfig:
             "cv_folds": self.cv_folds,
             "xgboost": {k: v for k, v in self.xgboost_parameters.items() if k not in XGB_FIXED},
             **holdout,
+            **self.preprocessing(),
         }
 
     def selector_settings(self) -> dict:
@@ -107,6 +117,8 @@ def validate_training_config(
         "evaluate_cv",
         "cv_folds",
         "holdout_percent",
+        "log2_transform",
+        "standardize",
         "xgboost",
     }
     if set(values) - allowed:
@@ -129,6 +141,10 @@ def validate_training_config(
     holdout = values.get("holdout_percent")
     if holdout is not None:
         holdout = _number(holdout, 5, 50, "holdout_percent", True)
+    log2 = values.get("log2_transform", True)
+    standardize = values.get("standardize", True)
+    if not isinstance(log2, bool) or not isinstance(standardize, bool):
+        raise ValueError("log2_transform and standardize must be boolean")
     custom = values.get("xgboost", {})
     if not isinstance(custom, dict) or set(custom) - set(XGB_DEFAULTS):
         raise ValueError("Unknown or fixed XGBoost parameter")
@@ -163,6 +179,8 @@ def validate_training_config(
         folds,
         MappingProxyType(parameters),
         holdout,
+        log2,
+        standardize,
     )
 
 
@@ -171,6 +189,8 @@ def configuration_fingerprint(
 ) -> str:
     """Return a hash that identifies this training setup."""
     holdout = {"holdout": config.holdout_percent} if config.holdout_percent else {}
+    # Left out for the default transforms, so runs saved before this choice existed keep their identity.
+    preprocessing = {"preprocessing": config.preprocessing()} if config.preprocessing() else {}
     return stable_hash(
         {
             "selector": config.selector_settings(),
@@ -181,15 +201,6 @@ def configuration_fingerprint(
             "folds": config.cv_folds if config.evaluate_cv else None,
             "versions": versions,
             **holdout,
+            **preprocessing,
         }
     )
-
-
-def training_presets() -> dict[str, dict]:
-    """Return the ready-made feature selection settings."""
-    # The number of genes depends on the data, so the names must not promise one.
-    # For L1, top_k is the most the form picks. Baseline always uses every candidate gene.
-    return {
-        "L1 - C = 1": {"selector": "l1", "l1_c": 1.0, "top_k": 1000},
-        "Baseline - semua gen": {"selector": "baseline"},
-    }

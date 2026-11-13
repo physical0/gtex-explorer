@@ -194,6 +194,20 @@ class TrainingData:
         """Return a hash that identifies this dataset."""
         return stable_hash(self.manifest)
 
+    @property
+    def samples_fingerprint(self) -> str:
+        """Identify the samples, donors, labels and values alone, without the Gen kandidat count."""
+        return samples_fingerprint(self.manifest)
+
+
+def samples_fingerprint(manifest: dict) -> str:
+    """Hash a dataset manifest without its Gen kandidat count.
+
+    The count is a preprocessing choice saved with an upload, not part of the data: two runs on the same
+    files with different counts have the same samples and, for the same holdout share and folds, the same split.
+    """
+    return stable_hash({key: value for key, value in manifest.items() if key != "candidate_count"})
+
 
 # --- Loading ---
 
@@ -295,14 +309,28 @@ def _load_prepared(data: TrainingData, spec: dict) -> PreparedData:
     return result
 
 
-def load_final_prepared(data: TrainingData) -> PreparedData:
-    """Return the preprocessed data for training the final model."""
-    if data.manifest["schema_version"] == 2:
-        assignment = FoldAssignment(
-            0, np.arange(len(data.labels)), np.array([], dtype=int), stable_hash({"final": data.fingerprint})
-        )
-        return prepare_partition(data, assignment, data.root / "preprocessing_cache")
-    return _load_prepared(data, data.manifest["final"])
+def load_final_prepared(
+    data: TrainingData, *, log2: bool = True, standardize: bool = True, cache_dir: Path | None = None
+) -> PreparedData:
+    """Return the preprocessed data for training the final model.
+
+    The notebook's final partition is already log2-transformed and standardized. Other transforms
+    are rebuilt from raw TPM on the notebook's candidate genes, so only the transform differs.
+    """
+    notebook = data.manifest["schema_version"] == 1
+    if notebook and log2 and standardize:
+        return _load_prepared(data, data.manifest["final"])
+    assignment = FoldAssignment(
+        0, np.arange(len(data.labels)), np.array([], dtype=int), stable_hash({"final": data.fingerprint})
+    )
+    return prepare_partition(
+        data,
+        assignment,
+        cache_dir or data.root / "preprocessing_cache",
+        log2=log2,
+        standardize=standardize,
+        candidate_genes=data.manifest["final"]["genes"] if notebook else None,
+    )
 
 
 # --- Data splits ---
@@ -440,9 +468,16 @@ def _impute_missing(train):
     return train.loc[:, valid].fillna(medians[valid]), medians
 
 
+# The technical filter, applied to the training part of every partition. Genes expressed too little to be
+# measured reliably, or not varying at all, cannot tell tissues apart, so they are dropped before ranking.
+MIN_TPM = 1
+MIN_SAMPLE_SHARE = 0.2
+TECHNICAL_FILTER_RULE = "TPM ≥ 1 pada sedikitnya 20% sampel training dan varians lebih dari 0"
+
+
 def _technical_filter(train):
-    """Keep genes with at least 1 TPM in 20% of samples and some variation."""
-    return ((train >= 1).mean(axis=0) >= 0.2) & (train.var(axis=0, ddof=0) > 0)
+    """Keep genes with at least MIN_TPM in MIN_SAMPLE_SHARE of samples and some variation."""
+    return ((train >= MIN_TPM).mean(axis=0) >= MIN_SAMPLE_SHARE) & (train.var(axis=0, ddof=0) > 0)
 
 
 def usable_candidate_genes(data: TrainingData, holdout_percent: int | None = None, cv_folds: int | None = None) -> int:
@@ -468,11 +503,25 @@ def usable_candidate_genes(data: TrainingData, holdout_percent: int | None = Non
     )
 
 
-def prepare_partition(data: TrainingData, assignment: FoldAssignment, cache_dir: Path) -> PreparedData:
-    """Preprocess one partition, reusing a saved copy when it still matches."""
+def prepare_partition(
+    data: TrainingData,
+    assignment: FoldAssignment,
+    cache_dir: Path,
+    *,
+    log2: bool = True,
+    standardize: bool = True,
+    candidate_genes: list | None = None,
+) -> PreparedData:
+    """Preprocess one partition, reusing a saved copy when it still matches.
+
+    Candidate genes are always ranked by the variance of log2(TPM+1), so every choice of transform
+    trains on the same genes. `log2` and `standardize` only change the features given to the
+    selector and XGBoost. Without standardization the saved mean is 0 and scale 1, an identity.
+    """
     import pandas as pd
     from sklearn.preprocessing import StandardScaler
 
+    default = log2 and standardize
     # Reuse only verified original memberships under compatible preprocessing libraries.
     specs = data.manifest["cached_folds"]
     versions = {p: importlib.metadata.version(p) for p in ["numpy", "pandas", "scikit-learn"]}
@@ -484,7 +533,11 @@ def prepare_partition(data: TrainingData, assignment: FoldAssignment, cache_dir:
             and spec["train_samples"] == [data.sample_ids[i] for i in assignment.train_indices]
             and spec["validation_samples"] == [data.sample_ids[i] for i in assignment.validation_indices]
         ):
-            return _load_prepared(data, spec)
+            if default:
+                return _load_prepared(data, spec)
+            # The notebook's fold is already transformed; rebuild it from raw TPM on the same genes.
+            candidate_genes = spec["genes"]
+            break
     if data.raw_tpm is None:
         raise ValueError("Raw development data unavailable for this split")
     fingerprint = stable_hash(
@@ -493,6 +546,9 @@ def prepare_partition(data: TrainingData, assignment: FoldAssignment, cache_dir:
             "split": assignment.split_hash,
             "preprocessing": data.manifest["preprocessing_version"],
             "versions": versions,
+            # Left out for the default, so partitions cached before this choice existed stay valid.
+            **({} if default else {"transform": {"log2": log2, "standardize": standardize}}),
+            **({} if candidate_genes is None else {"candidates": stable_hash(list(candidate_genes))}),
         }
     )
     target = Path(cache_dir) / fingerprint
@@ -503,26 +559,45 @@ def prepare_partition(data: TrainingData, assignment: FoldAssignment, cache_dir:
     train, medians = _impute_missing(train)
     if medians is not None:
         val = val.loc[:, medians.notna()]
-    technical = _technical_filter(train)
-    count = int(data.manifest["candidate_count"])
-    if technical.sum() < count:
-        raise ValueError(
-            f"Hanya {technical.sum()} gen lolos filter teknis pada data training partisi ini, "
-            f"sedangkan {count} gen kandidat diminta. Kurangi Gen kandidat dan top-k bila perlu, lalu mulai pelatihan baru."
-        )
-    train_log = np.log2(train.loc[:, technical] + 1.0)
-    variance = train_log.var(axis=0, ddof=0).to_numpy()
-    indices = np.lexsort((np.arange(len(variance)), -variance))[:count]
-    genes = tuple(train_log.columns[indices])
-    selected_medians = train.loc[:, list(genes)].median(axis=0) if medians is None else medians.loc[list(genes)]
+    if candidate_genes is None:
+        technical = _technical_filter(train)
+        count = int(data.manifest["candidate_count"])
+        if technical.sum() < count:
+            raise ValueError(
+                f"Hanya {technical.sum()} gen lolos filter teknis ({TECHNICAL_FILTER_RULE}) pada data training partisi ini, "
+                f"sedangkan {count} gen kandidat diminta. Kurangi Gen kandidat dan Top-k gen bila perlu, lalu mulai pelatihan baru."
+            )
+        technical_log = np.log2(train.loc[:, technical] + 1.0)
+        variance = technical_log.var(axis=0, ddof=0).to_numpy()
+        indices = np.lexsort((np.arange(len(variance)), -variance))[:count]
+        genes = tuple(technical_log.columns[indices])
+    else:
+        genes = tuple(candidate_genes)
+        if not set(genes).issubset(train.columns):
+            raise ValueError("Candidate genes unavailable in raw development data")
+    selected_train = train.loc[:, list(genes)]
+    selected_medians = selected_train.median(axis=0) if medians is None else medians.loc[list(genes)]
     selected_validation = val.loc[:, list(genes)]
     if selected_validation.isna().to_numpy().any():
         selected_validation = selected_validation.fillna(selected_medians)
-    train_log = train_log.iloc[:, indices].to_numpy(copy=True)
-    val_log = np.log2(selected_validation + 1.0).to_numpy(copy=True)
-    scaler = StandardScaler()
-    X = scaler.fit_transform(train_log).astype(np.float32, copy=False)
-    Xval = scaler.transform(val_log).astype(np.float32, copy=False) if len(val_log) else None
+    # Kept on the log2 scale whatever the transform: demo samples are rebuilt from it.
+    train_log = np.log2(selected_train + 1.0).to_numpy(copy=True)
+    if log2:
+        features, val_features = train_log, np.log2(selected_validation + 1.0).to_numpy(copy=True)
+    else:
+        features = selected_train.to_numpy(dtype=float, copy=True)
+        val_features = selected_validation.to_numpy(dtype=float, copy=True)
+    if standardize:
+        scaler = StandardScaler()
+        X = scaler.fit_transform(features)
+        Xval = scaler.transform(val_features) if len(val_features) else None
+        mean, scale = scaler.mean_, scaler.scale_
+    else:
+        X, Xval = features, (val_features if len(val_features) else None)
+        mean, scale = np.zeros(len(genes)), np.ones(len(genes))
+    X = X.astype(np.float32, copy=False)
+    if Xval is not None:
+        Xval = Xval.astype(np.float32, copy=False)
     result = PreparedData(
         X,
         data.labels[assignment.train_indices],
@@ -531,12 +606,12 @@ def prepare_partition(data: TrainingData, assignment: FoldAssignment, cache_dir:
         tuple(data.donor_ids[i] for i in assignment.train_indices),
         fingerprint,
         Xval,
-        data.labels[assignment.validation_indices] if len(val_log) else None,
+        data.labels[assignment.validation_indices] if len(val_features) else None,
         tuple(data.sample_ids[i] for i in assignment.validation_indices),
         tuple(data.donor_ids[i] for i in assignment.validation_indices),
         selected_medians.to_numpy(),
-        scaler.mean_,
-        scaler.scale_,
+        mean,
+        scale,
         train_log,
     )
     _write_partition(result, target)

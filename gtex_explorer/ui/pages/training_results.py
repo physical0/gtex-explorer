@@ -9,6 +9,7 @@ import pandas as pd
 import psutil
 import streamlit as st
 
+from gtex_explorer.display import METRICS, count, decimal, percent, plain, points
 from gtex_explorer.platform.cloud.media import download_button
 from gtex_explorer.training.gallery import list_gallery
 from gtex_explorer.training.jobs import (
@@ -19,23 +20,25 @@ from gtex_explorer.training.jobs import (
     has_active_run,
     pause_job,
     read_job,
+    rename_run,
     request_cancel,
     resume_job,
     unpause_job,
 )
-from gtex_explorer.training.run_labels import method_description, run_created, run_label
-from gtex_explorer.ui.components.training_runs import choose_run, show_diagnostics
+from gtex_explorer.training.run_labels import (
+    NOTEBOOK_DATA,
+    RUN_NAME_LIMIT,
+    evaluation_label,
+    method_description,
+    preprocessing_label,
+    run_created,
+    run_label,
+    run_name,
+)
+from gtex_explorer.ui.components.training_progress import render_run_progress, run_progress
+from gtex_explorer.ui.components.training_runs import choose_run, show_diagnostics, show_settings
 from gtex_explorer.ui.shell.error_messages import user_error
 from gtex_explorer.ui.shell.theme import page_style
-
-METRICS = {
-    "macro_f1": "Macro-F1",
-    "macro_precision": "Macro-precision",
-    "macro_recall": "Macro-recall",
-    "balanced_accuracy": "Balanced accuracy",
-    "accuracy": "Accuracy",
-}
-
 
 # --- Run status ---
 
@@ -60,58 +63,41 @@ def _run_details(data_root: Path, state_root: Path, polling: bool = False):
         record = read_job(run_id, state_root)
         config = saved["config"]
         dataset = saved.get("dataset")
-        st.subheader(method_description(config))
+        # A named run leads with its name; the method then opens the line below it.
+        name, method = run_name(root), method_description(config)
+        with st.container(horizontal=True, vertical_alignment="center", gap="small"):
+            st.subheader(plain(name) if name else method, width="content")
+            _rename_button(run_id, "training_rename_process")
+        context = [method] if name else []
         if dataset:
             source = dataset["source"]
-            st.caption(
-                f"{source.get('expression_file', 'Data notebook')} - {dataset['sample_count']} sampel - "
+            context.append(
+                f"{source.get('expression_file', NOTEBOOK_DATA)} - {dataset['sample_count']} sampel - "
                 f"{dataset['donor_count']} donor - {dataset['class_count']} jaringan"
             )
+        if context:
+            st.caption(" · ".join(context))
 
         # Progress.
         st.subheader("Status proses")
-        labels = {
-            "queued": "Menunggu worker",
-            "preparing_fold": "Persiapan fold",
-            "fitting_selector": "Seleksi fitur",
-            "fitting_xgboost": "Pelatihan XGBoost",
-            "final_selector": (
-                "Seleksi fitur pada data development"
-                if config.get("holdout_percent")
-                else "Seleksi fitur pada seluruh data development"
-            ),
-            "final_xgboost": "Pelatihan model final",
-            "completed": "Selesai",
-            "saving_results": "Menyimpan model dan hasil",
-            "verifying_results": "Memverifikasi model, metrik, dan panel gen",
-            "cancelled": "Dihentikan",
-            "paused": "Dijeda",
-            "cancelling": "Menghentikan pelatihan",
-            "failed": "Gagal",
-        }
-        # A resumed run keeps the stage it stopped at until the worker reports a new one.
-        display_stage = (
-            record.status
-            if record.status in {"paused", "cancelling", "queued", "cancelled"}
-            else record.details.get("stage")
-        )
+        # The stages this run uses, where it is, and on which data.
+        progress = run_progress(config, record.status, record.details)
+        render_run_progress(progress)
+        completed_rounds = record.details.get("rounds_completed")
+        total_rounds = record.details.get("rounds_total")
+        if completed_rounds is not None and total_rounds and record.status != "completed":
+            prefix = "Putaran terakhir tercatat" if record.status == "cancelled" else progress.rounds_label
+            st.progress(
+                int(round(min(1.0, max(0.0, completed_rounds / total_rounds)) * 100)),
+                text=f"{prefix}: {count(completed_rounds)} dari {count(total_rounds)}",
+            )
         elapsed = record.details.get("elapsed_seconds", 0)
         if record.status in {"running", "queued"}:
             elapsed += max(0, time.time() - record.details["updated"])
-        stage_column, time_column, rounds_column = st.columns([1, 1, 1.5])
-        stage_column.markdown("**" + labels.get(display_stage, record.status) + "**")
-        if record.details.get("fold"):
-            stage_column.caption(f"Fold {record.details['fold']} dari {config['cv_folds']}")
-        time_column.caption(f"Waktu proses: {elapsed:.0f} detik")
-        rounds_column.caption(f"Target XGBoost: {config['xgboost']['n_estimators']} putaran per fit.")
-        completed_rounds = record.details.get("rounds_completed")
-        total_rounds = record.details.get("rounds_total")
-        if completed_rounds is not None and total_rounds:
-            prefix = "Putaran terakhir tercatat" if record.status == "cancelled" else "Putaran XGBoost pada fit ini"
-            st.progress(
-                int(round(min(1.0, max(0.0, completed_rounds / total_rounds)) * 100)),
-                text=f"{prefix}: {completed_rounds} dari {total_rounds}",
-            )
+        st.caption(
+            f"Waktu proses: {count(round(elapsed))} detik · Target XGBoost: "
+            f"{count(config['xgboost']['n_estimators'])} putaran per fit."
+        )
         if record.status == "cancelled":
             st.info(
                 "Pelatihan dihentikan. Fold yang sudah selesai tetap tersimpan. "
@@ -215,13 +201,52 @@ def _run_details(data_root: Path, state_root: Path, polling: bool = False):
                 (
                     "Dilatih pada data development. Data holdout hanya dipakai untuk menguji. "
                     if config.get("holdout_percent")
-                    else "Dilatih pada seluruh dataset training ini. "
+                    else "Dilatih pada seluruh sampel. "
                 )
                 + panel_note
             )
             _show_model_actions(run_id)
     except (ValueError, OSError, KeyError, TypeError) as error:
         st.error(f"Hasil pelatihan tidak dapat dibaca: {user_error(error)}")
+
+
+# --- Naming a run ---
+
+
+def _rename_button(run_id, key):
+    """Show the button that opens the rename dialog."""
+    if st.button("Ubah nama", key=key, icon=":material/edit:", type="tertiary"):
+        st.session_state.training_rename_target = run_id
+        # Dialogs open from a full page run, not from inside these panels.
+        st.rerun(scope="app")
+
+
+def _dismiss_rename():
+    """Close the rename dialog."""
+    st.session_state.pop("training_rename_target", None)
+
+
+@st.dialog("Ubah nama pelatihan", on_dismiss=_dismiss_rename)
+def _rename_run_dialog(state_root, run_id):
+    """Ask for a run's new name. An empty name brings back the automatic label."""
+    root = Path(state_root) / "runs" / run_id
+    with st.form("training_rename_form"):
+        name = st.text_input(
+            "Nama pelatihan",
+            value=run_name(root) or "",
+            max_chars=RUN_NAME_LIMIT,
+            placeholder="Misalnya ANOVA 500 gen - holdout 20%",
+            key="training_rename_name_" + run_id,
+        )
+        st.caption("Kosongkan untuk kembali memakai label otomatis dari tanggal, metode, dan dataset.")
+        save = st.form_submit_button("Simpan nama", type="primary", icon=":material/check:", width="stretch")
+    if save:
+        try:
+            rename_run(run_id, state_root, name)
+            _dismiss_rename()
+            st.rerun()
+        except (ValueError, OSError) as error:
+            st.error(user_error(error))
 
 
 # --- Removing a run ---
@@ -267,19 +292,18 @@ def _delete_run_dialog(state_root, run_id):
 
 
 def _show_saved_parameters(saved):
-    """Show the data and settings a run used."""
-    with st.expander("Data dan parameter tersimpan"):
-        dataset = saved.get("dataset")
+    """Show the data and settings a run used, as they were reviewed before training."""
+    with st.expander("Data dan pengaturan tersimpan"):
+        dataset = saved.get("dataset") or {}
         if dataset:
-            st.write("Metadata: " + dataset.get("source", {}).get("metadata_file", "Metadata notebook"))
+            source = dataset.get("source", {})
+            st.caption(
+                f"Data: {source.get('expression_file', NOTEBOOK_DATA)} - "
+                f"metadata: {source.get('metadata_file', 'metadata eksperimen notebook')}"
+            )
+        show_settings(saved["config"], dataset.get("candidate_count"), compact=True)
         if saved.get("data_fingerprint"):
             st.caption("Identitas dataset: " + saved["data_fingerprint"][:16])
-        st.dataframe(
-            pd.DataFrame(
-                [{"Parameter": key, "Nilai": str(value)} for key, value in saved["config"]["xgboost"].items()]
-            ),
-            hide_index=True,
-        )
 
 
 def _show_model_actions(run_id):
@@ -318,22 +342,22 @@ def _show_cv_results(summary, config):
             pd.DataFrame(
                 {
                     "Metrik": list(METRICS.values()),
-                    "Rerata": [f"{summary['mean_' + key]:.2%}".replace(".", ",") for key in METRICS],
-                    "SD (poin persentase)": [f"{summary['std_' + key] * 100:.2f}".replace(".", ",") for key in METRICS],
+                    "Rerata": [percent(summary["mean_" + key]) for key in METRICS],
+                    "SD (poin persentase)": [points(summary["std_" + key]) for key in METRICS],
                 }
             ),
             hide_index=True,
             width="stretch",
         )
-        summary_column.metric("Rerata Macro-F1", f"{summary['mean_macro_f1']:.2%}".replace(".", ","))
+        summary_column.metric("Rerata Macro-F1", percent(summary["mean_macro_f1"]))
         if summary["mean_jaccard"] is not None:
-            summary_column.metric("Jaccard antar-fold", f"{summary['mean_jaccard']:.2%}".replace(".", ","))
+            summary_column.metric("Jaccard antar-fold", percent(summary["mean_jaccard"]))
             summary_column.caption("Kesamaan gen terpilih")
     folds = pd.DataFrame(summary["fold_results"]).drop(columns=["selected_genes", "tissue_f1"], errors="ignore")
     with st.container(horizontal=True, vertical_alignment="top"):
         with st.expander("Hasil setiap fold"):
             st.dataframe(
-                folds.rename(columns=METRICS).style.format({label: "{:.2%}" for label in METRICS.values()}),
+                folds.rename(columns=METRICS).style.format({label: percent for label in METRICS.values()}),
                 hide_index=True,
             )
         download_button(
@@ -383,7 +407,7 @@ def _show_tissue_f1(summary):
     tissues = pd.DataFrame(summary["tissue_f1"]).sort_values(["mean_f1", "tissue"], kind="stable")
     tissues["score"] = tissues["mean_f1"]
     tissues["label"] = [
-        f"{mean:.2%} ± {std * 100:.2f}".replace(".", ",") for mean, std in zip(tissues["mean_f1"], tissues["std_f1"])
+        f"{percent(mean)} ± {points(std)}" for mean, std in zip(tissues["mean_f1"], tissues["std_f1"])
     ]
     _tissue_chart(
         tissues,
@@ -406,9 +430,8 @@ def _show_tissue_f1(summary):
         with st.expander("Nilai setiap jaringan"):
             st.dataframe(
                 shown.style.format(
-                    lambda value: f"{value:.2%}".replace(".", ","),
-                    subset=[name for name in shown if name not in ("Jaringan", deviation)],
-                ).format(lambda value: f"{value:.2f}".replace(".", ","), subset=[deviation]),
+                    percent, subset=[name for name in shown if name not in ("Jaringan", deviation)]
+                ).format(lambda value: decimal(value, 2), subset=[deviation]),
                 hide_index=True,
             )
         download_button(
@@ -422,7 +445,6 @@ def _show_tissue_f1(summary):
 
 def _show_holdout_results(summary):
     """Show the holdout scores."""
-    percent = lambda value: f"{value:.2%}".replace(".", ",")
     st.subheader("Evaluasi holdout")
     st.caption(
         f"Model yang disimpan dilatih pada {summary['training_samples']} sampel data development "
@@ -463,14 +485,6 @@ def _show_holdout_results(summary):
 # --- Model gallery ---
 
 
-def _evaluation_label(config):
-    """Describe how a model was evaluated."""
-    parts = [f"Holdout {config['holdout_percent']}%"] if config.get("holdout_percent") else []
-    if config["evaluate_cv"]:
-        parts.append(f"{config['cv_folds']} fold")
-    return " dan ".join(parts) or "Tanpa CV"
-
-
 def _select_gallery_run(run_id):
     """Open a model from the gallery."""
     st.session_state.training_gallery_run = run_id
@@ -496,10 +510,9 @@ def _gallery_results(state_root, polling: bool = False):
                 {
                     **entry,
                     "saved": saved,
+                    "name": run_name(path.parent),
                     "method": method_description(saved["config"]),
-                    "filename": saved.get("dataset", {})
-                    .get("source", {})
-                    .get("expression_file", "Data eksperimen notebook"),
+                    "filename": saved.get("dataset", {}).get("source", {}).get("expression_file", NOTEBOOK_DATA),
                     "date": time.strftime("%d/%m/%Y %H:%M", time.localtime(run_created(path.parent))),
                 }
             )
@@ -517,7 +530,9 @@ def _gallery_results(state_root, polling: bool = False):
                 .casefold()
             )
             visible = [
-                record for record in records if query in (record["method"] + " " + record["filename"]).casefold()
+                record
+                for record in records
+                if query in " ".join([record["name"] or "", record["method"], record["filename"]]).casefold()
             ]
             if not visible:
                 st.info("Tidak ada model yang cocok dengan pencarian.")
@@ -527,7 +542,11 @@ def _gallery_results(state_root, polling: bool = False):
                 selected = visible[0]["run_id"]
                 _select_gallery_run(selected)
             for record in visible:
-                label = f"**{record['method']}**  \n{record['filename']}  \n{record['date']}"
+                label = (
+                    f"**{plain(record['name'])}**  \n{record['method']}  \n{record['filename']} · {record['date']}"
+                    if record["name"]
+                    else f"**{record['method']}**  \n{record['filename']}  \n{record['date']}"
+                )
                 st.button(
                     label,
                     key="gallery_select_" + record["run_id"],
@@ -542,14 +561,17 @@ def _gallery_results(state_root, polling: bool = False):
         config = saved["config"]
         with details, st.container(key="gallery_detail"):
             with st.container(horizontal=True, vertical_alignment="center", gap="small"):
-                st.subheader(record["method"] + ", XGBoost", width="content")
+                # The transforms are named once, in the line below; a named run names its method there too.
+                model = method_description(config, with_preprocessing=False) + " - XGBoost"
+                st.subheader(plain(record["name"]) if record["name"] else model, width="content")
                 st.badge("Tersimpan dan terverifikasi", icon=":material/check:", color="green")
-            evaluation = _evaluation_label(config)
-            context = [f"{config['xgboost']['n_estimators']} putaran", evaluation]
+                _rename_button(selected, "training_rename_gallery")
+            context = [model] if record["name"] else []
+            context += [preprocessing_label(config), evaluation_label(config), f"{config['xgboost']['n_estimators']} putaran"]
             dataset = saved.get("dataset", {})
             for key, label in [("sample_count", "sampel"), ("donor_count", "donor"), ("class_count", "jaringan")]:
                 if key in dataset:
-                    context.append(f"{dataset[key]:,} {label}".replace(",", "."))
+                    context.append(f"{count(dataset[key])} {label}")
             st.write(" - ".join(context))
             st.caption("Dataset: " + record["filename"])
             _show_model_actions(selected)
@@ -592,3 +614,9 @@ def render_training_results_page(data_root: Path, state_root: Path):
                 _delete_run_dialog(state_root, target)
             else:
                 _dismiss_delete()
+        target = st.session_state.get("training_rename_target")
+        if target:
+            if (Path(state_root) / "runs" / target).is_dir():
+                _rename_run_dialog(state_root, target)
+            else:
+                _dismiss_rename()

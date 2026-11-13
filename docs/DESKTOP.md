@@ -1,21 +1,30 @@
 # GTEx Tissue Explorer desktop offline
 
-## Menjalankan versi portable
+## Menjalankan versi desktop
 
-Buka `dist/workspace_switch_20261030/GTExTissueExplorer/GTExTissueExplorer.exe` untuk build
-launcher workspace 30 Oktober 2026. Jendela desktop menjalankan
-antarmuka Streamlit dan model XGBoost secara lokal. Tidak perlu membuka browser,
-menginstal Python, mengunduh GTEx, atau menjalankan notebook.
+Jalankan dari folder aplikasi, dengan `.venv` yang memuat `requirements-desktop.txt`:
 
-Untuk memindahkan aplikasi, salin **seluruh folder GTExTissueExplorer**, termasuk
-folder `_internal`. Jangan memindahkan hanya berkas `.exe`. Semua tabel,
-model final, data contoh, dan dependensi Python sudah disertakan.
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-desktop.txt
+.\.venv\Scripts\python.exe desktop.py
+```
+
+Jendela desktop menjalankan antarmuka Streamlit dan model XGBoost secara lokal,
+tanpa membuka browser, mengunduh GTEx, atau menjalankan notebook. Pemasangan
+dependensi pertama dapat memerlukan internet. `desktop.py` tidak menjalankan pip
+saat aplikasi dibuka. Untuk mode browser, lihat bagian Menjalankan aplikasi pada
+[README](../README.md).
+
+Executable portable (`GTExTissueExplorer.exe`) tidak tersedia di repository ini.
+Build lama dihapus pada 11 November 2026 karena tidak memuat perubahan terbaru.
+Skrip build (`build_desktop.ps1`) dan spesifikasi PyInstaller tidak tersimpan,
+sehingga executable baru memerlukan skrip build PyInstaller yang disiapkan ulang
+dari `desktop.py`. PyInstaller sudah dipin di `requirements-desktop.txt`.
 
 Target: Windows 10/11 64-bit dengan Microsoft Edge WebView2 Runtime dan .NET
 Framework yang tersedia. WebView2 telah terpasang di komputer pengembangan.
-Jika runtime belum tersedia pada komputer tujuan, pasang menggunakan installer
-offline resmi sebelum menjalankan aplikasi. Aplikasi tidak memasangnya atau
-mengunduhnya otomatis. Runtime Windows ini tidak disertakan dalam folder portable.
+Jika runtime belum tersedia, pasang menggunakan installer offline resmi sebelum
+menjalankan aplikasi. Aplikasi tidak memasangnya atau mengunduhnya otomatis.
 
 ## Apa yang dimaksud offline
 
@@ -38,37 +47,26 @@ pengguna melalui dialog unduh. Log dan profil WebView berada di
 `%LOCALAPPDATA%/GTExTissueExplorer`. Log digunakan untuk diagnostik startup,
 bukan untuk menyimpan matriks unggahan.
 
-## Menjalankan dari source
+## Pemeriksaan
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements-desktop.txt
-.\run_desktop_app.bat
-```
-
-Pemasangan dependensi untuk pengembangan dapat memerlukan internet. Ini terpisah
-dari pemakaian executable. Launcher tidak menjalankan pip saat aplikasi dibuka.
-Launcher browser `run_offline_app.bat` tetap tersedia sebagai alternatif.
-
-## Pemeriksaan dan build
-
-```powershell
-.\run_desktop_app.ps1 -CheckOnly
-.\build_desktop.ps1
+.\.venv\Scripts\python.exe desktop.py --check
+.\.venv\Scripts\python.exe desktop.py --check-training
 .\.venv\Scripts\python.exe -m pytest tests -q -p no:cacheprovider
 ```
 
-`--check` juga tersedia pada executable. Pemeriksaan memvalidasi hash model,
-memuat tabel dan aset, menjalankan audit dan inferensi data contoh, serta memeriksa
-server dan halaman lokal dengan akses jaringan eksternal backend diblokir.
-Server uji dihentikan setelah pemeriksaan. Ini tidak membuka jendela.
+`--check` memvalidasi hash model, memuat tabel dan aset, menjalankan audit dan
+inferensi data contoh, serta memeriksa server dan halaman lokal dengan akses
+jaringan eksternal backend diblokir. Server uji dihentikan setelah pemeriksaan.
+Ini tidak membuka jendela. `--check-training` memeriksa worker dengan fit ANOVA
+singkat.
 
-Build menggunakan versi Streamlit dan pywebview yang dipin agar API desktop
-konsisten. Ketika model atau tabel penelitian berubah, jalankan build kembali.
-Pengubahan kemasan desktop tidak mengubah selector, preprocessing, atau model.
+Versi Streamlit dan pywebview dipin di `requirements-desktop.txt` agar API desktop
+konsisten.
 
 Jika startup gagal, baca `last_error.txt` dan `desktop.log` pada direktori log.
-Penyebab yang perlu diperiksa mencakup runtime WebView2 yang tidak tersedia,
-berkas `_internal` yang tidak ikut disalin, atau bundle model yang rusak.
+Penyebab yang perlu diperiksa mencakup runtime WebView2 yang tidak tersedia atau
+bundle model yang rusak.
 # Pelatihan model
 
 Layar **Pilih workspace** tampil sebelum antarmuka utama. Cari atau pilih

@@ -116,10 +116,13 @@ def fit_selector(prepared: PreparedData, config: TrainingConfig, ranking_cache: 
         meta = json.loads((target / "ranking.json").read_text())
         if meta["key"] != key:
             raise ValueError("Ranking cache identity mismatch")
+        
         verify_files(target, meta["files"])
         frame = pd.read_csv(target / "genes.csv", float_precision="round_trip")
+        
         if frame.gene.tolist() != list(prepared.gene_names):
             raise ValueError("Ranking gene axis mismatch")
+        
         info = meta["diagnostics"]
         elapsed = meta["seconds"]
     else:
@@ -215,18 +218,25 @@ def fit_selector(prepared: PreparedData, config: TrainingConfig, ranking_cache: 
 def fit_classifier(prepared: PreparedData, selector: SelectorFit, config: TrainingConfig, progress=None) -> FitResult:
     """Train XGBoost on the selected genes and score any validation data."""
     classes = np.unique(prepared.y_train)
+    
     if not np.array_equal(classes, np.arange(len(classes))):
         raise ValueError("Training labels must contain the full encoded class mapping")
+    
     if len(classes) < 2:
         raise ValueError("At least two tissue classes are required")
+    
     parameters = dict(config.xgboost_parameters)
+    
     if progress is not None:
         parameters["callbacks"] = [_RoundProgress(progress)]
+    
     classifier = XGBClassifier(num_class=len(classes), **parameters)
     started = time.monotonic()
+    
     classifier.fit(prepared.X_train[:, selector.selected_indices], prepared.y_train)
     elapsed = time.monotonic() - started
     predictions, metrics = None, None
+    
     if prepared.X_validation is not None:
         # Explicit argmax also handles two-class fixtures with multi:softprob.
         probabilities = classifier.predict_proba(prepared.X_validation[:, selector.selected_indices])
