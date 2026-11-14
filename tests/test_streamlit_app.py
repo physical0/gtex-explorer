@@ -255,3 +255,13 @@ def test_overview_has_no_dummy_and_chart_has_selector_legend() -> None:
         assert [legend.index(label) for label in order] == sorted(legend.index(label) for label in order)
         # No translucent bands: the spread is drawn as thin SD bars.
         assert not any(layer.get("mark", {}).get("type") == "errorband" for layer in spec["layer"])
+
+
+def test_app_is_named_htx_tissue_classifier():
+    from streamlit.testing.v1 import AppTest
+    app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "main.py"), default_timeout=60).run()
+    # The workspace screen and, once a workspace is open, the menu show the name.
+    assert any("HTx Tissue Classifier" in item.value for item in app.markdown)
+    assert not any("GTEx Tissue Classifier" in item.value for item in app.markdown)
+    source = (Path(__file__).resolve().parents[1] / "main.py").read_text(encoding="utf-8")
+    assert 'page_title="HTx Tissue Classifier"' in source

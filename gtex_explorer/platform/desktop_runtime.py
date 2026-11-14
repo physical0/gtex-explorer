@@ -17,7 +17,7 @@ from urllib.request import ProxyHandler, build_opener
 
 from gtex_explorer.platform.paths import APP_ROOT
 
-TITLE = "GTEx Tissue Explorer"
+TITLE = "HTx Tissue Classifier"
 
 
 # --- Local state and network safety ---
@@ -320,7 +320,7 @@ def check_training() -> dict:
 
 def main() -> int:
     """Handle the desktop command-line options."""
-    parser = argparse.ArgumentParser(description="GTEx Tissue Explorer offline desktop")
+    parser = argparse.ArgumentParser(description="HTx Tissue Classifier offline desktop")
     parser.add_argument(
         "--check", action="store_true", help="Check artifacts and demo inference without opening a window"
     )

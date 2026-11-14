@@ -9,6 +9,7 @@ import pandas as pd
 import streamlit as st
 
 from gtex_explorer.display import METRICS, count, decimal, method_name, percent, points
+from gtex_explorer.training.data import TECHNICAL_FILTER_RULE
 from gtex_explorer.ui.components.method_comparison import render_method_comparison
 from gtex_explorer.ui.shell.theme import page_style
 
@@ -19,11 +20,24 @@ THESIS_NOTICE = (
     "Program Studi Teknik Informatika, Universitas Tarumanagara. Hasilnya tetap dan tidak berubah "
     "oleh pelatihan di aplikasi."
 )
+# Where the experiment's data came from, cited as in the thesis (IEEE style).
+DATA_FILES = [
+    ("matriks gene TPM non-LCM", "GTEx_Analysis_2025-08-22_v11_RNASeQCv2.4.3_gene_tpm_non_lcm.gct"),
+    ("atribut sampel", "GTEx_Analysis_v11_Annotations_SampleAttributesDS.txt"),
+]
+GTEX_PORTAL = "https://gtexportal.org"
+GTEX_CITATION = (
+    "GTEx Consortium, “The GTEx Consortium atlas of genetic regulatory effects across human tissues,” "
+    "<em>Science</em>, vol. 369, no. 6509, pp. 1318–1330, 2020, doi: "
+    '<a href="https://doi.org/10.1126/science.aaz1776" target="_blank">10.1126/science.aaz1776</a>.'
+)
 
 
 def _join(items: list) -> str:
-    """Join a list as 'a, b, dan c'."""
-    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " dan " + items[-1]
+    """Join a list as 'a dan b' or 'a, b, dan c'."""
+    if len(items) < 3:
+        return " dan ".join(items)
+    return ", ".join(items[:-1]) + ", dan " + items[-1]
 
 
 def _pipeline_steps(tables: dict, chosen, selector_label: str) -> tuple:
@@ -42,69 +56,81 @@ def _pipeline_steps(tables: dict, chosen, selector_label: str) -> tuple:
     folds = int(summary["cv_folds"])
     development = f"{count(summary['development_samples'])} sampel ({count(summary['development_donors'])} donor)"
     holdout = f"{count(summary['test_samples'])} sampel ({count(summary['test_donors'])} donor)"
+    # The same sizes for use inside parentheses.
+    development_size = f"{count(summary['development_samples'])} sampel dari {count(summary['development_donors'])} donor"
+    holdout_size = f"{count(summary['test_samples'])} sampel dari {count(summary['test_donors'])} donor"
     total = len(selectors["configuration_id"].unique()) + int(summary["baseline_configurations"])
     escape = html.escape
     return [
         (
             "Data dan kohort",
-            f"Matriks TPM dan metadata sampel GTEx V11 untuk {tables['labels']['tissue'].nunique()} jaringan. "
-            f"<strong>{count(summary['samples_loaded'])} sampel</strong> dipilih berstrata menurut jaringan dari "
-            "sampel yang cocok antara metadata dan matriks TPM.",
+            "Matriks TPM dan metadata sampel GTEx V11 dicocokkan menurut ID sampel; hanya sampel yang terdapat pada "
+            f"keduanya yang dipakai. Dari {tables['labels']['tissue'].nunique()} jaringan target, "
+            f"<strong>{count(summary['samples_loaded'])} sampel</strong> dipilih secara berstrata, yaitu diambil per "
+            "jaringan agar setiap jaringan terwakili.",
             "",
         ),
         (
             "Pembagian data utama",
-            f"Sampel dibagi menurut donor: <strong>data development {development}</strong> dan "
-            f"<strong>data holdout {holdout}</strong>. Donor tidak tumpang tindih, dan holdout disimpan "
-            "sampai evaluasi akhir.",
+            f"Sampel dipartisi per donor menjadi <strong>data development {development}</strong> dan "
+            f"<strong>data holdout {holdout}</strong>, sehingga seluruh sampel dari satu donor berada pada satu "
+            "partisi saja. Data holdout disisihkan dan baru dipakai pada langkah 6 (Evaluasi akhir pada holdout).",
             "",
         ),
         (
             f"Cross-validation {folds} fold pada data development",
-            f"Data development dibagi menjadi {folds} fold menurut donor. Pada setiap fold, langkah berikut "
-            "dipelajari dari data training fold saja, lalu dinilai pada data validation fold.",
+            f"Data development dibagi menjadi {folds} fold per donor. Setiap fold bergantian menjadi data validation, "
+            "sedangkan fold lainnya menjadi data training. Langkah 3.1 sampai 3.4 dijalankan pada setiap fold: "
+            "nilainya dihitung dari data training fold saja, lalu diterapkan pada data validation fold untuk mencegah "
+            "kebocoran data.",
             "Hasil: tab Cross-validation di bawah dan panel CV pada Panel Gen Eksperimen",
         ),
         (
             "Pemilihan konfigurasi",
-            f"Dari {eligible} konfigurasi seleksi fitur yang memenuhi syarat, rerata Macro-F1 CV tertinggi dipilih: "
-            f"<strong>{escape(selector_label)}, {count(chosen['genes'])} gen</strong>. Jika seri, dipakai balanced "
-            "accuracy, jumlah gen lebih sedikit, lalu ID selector. Baseline hanya pembanding.",
+            f"Konfigurasi dengan rerata Macro-F1 CV tertinggi dipilih dari {eligible} konfigurasi seleksi fitur yang "
+            f"memenuhi syarat: <strong>{escape(selector_label)}, {count(chosen['genes'])} gen</strong>. Konfigurasi L1 "
+            "tidak memenuhi syarat bila pada suatu fold jumlah gen berkoefisien bukan nol lebih sedikit daripada jumlah "
+            "gen yang diminta. Bila rerata Macro-F1 sama, dipilih balanced accuracy yang lebih tinggi, lalu jumlah gen "
+            "yang lebih sedikit, lalu urutan ID metode. Baseline tidak ikut dipilih karena hanya menjadi pembanding.",
             "Hasil: tab Cross-validation di bawah",
         ),
         (
             "Pelatihan ulang pada data development",
-            f"Pra-pemrosesan dipelajari ulang pada seluruh {development}, sehingga {candidates} gen kandidat final "
-            "dapat berbeda dari fold. Seleksi fitur terpilih dan XGBoost dilatih ulang; baseline juga.",
+            f"Proses pra-pemrosesan dilakukan satu kali pada seluruh data development ({development_size}), sehingga daftar "
+            f"{candidates} gen kandidat model final dapat sedikit berbeda dari daftar pada fold. Seleksi fitur terpilih "
+            "dan XGBoost lalu dilatih pada hasilnya. Baseline dilatih ulang dengan cara yang sama sebagai pembanding.",
             "Hasil: panel Model final pada Panel Gen Eksperimen",
         ),
         (
             "Evaluasi akhir pada holdout",
-            f"Model final dan baseline diuji sekali pada {holdout}. Skor holdout tidak dipakai untuk memilih "
-            "ulang konfigurasi.",
+            f"Data holdout ({holdout_size}) diproses dengan nilai pra-pemrosesan dari data development, lalu model final "
+            "dan baseline dievaluasi satu kali tanpa diubah. Skor holdout tidak dipakai untuk memilih ulang "
+            "konfigurasi, sehingga menjadi perkiraan kinerja pada data yang belum pernah dilihat model.",
             "Hasil: tab Hasil akhir - holdout di bawah",
         ),
     ], [
         (
             "Pra-pemrosesan",
-            "Imputasi median bila ada nilai kosong, filter teknis (TPM ≥ 1 pada ≥ 20% sampel training, "
-            f"varians > 0), log2(TPM+1), {candidates} gen kandidat dengan varians tertinggi, lalu standardisasi (z-score).",
+            "Nilai kosong diisi median gen; filter teknis membuang gen yang terlalu jarang terekspresi atau tidak "
+            f"bervariasi ({TECHNICAL_FILTER_RULE}); nilai ditransformasi log2(TPM+1); {candidates} gen kandidat "
+            "dengan varians tertinggi dipertahankan; lalu setiap gen distandardisasi (z-score).",
         ),
         (
             "Seleksi fitur",
             f"ANOVA, Mutual Information (n_neighbors = {summary['mi_primary_n_neighbors']}), dan regresi logistik L1 "
-            f"(C = {c_values}), masing-masing {counts} gen: {int(summary['selector_configurations'])} konfigurasi. "
-            f"Baseline memakai seluruh {count(summary['baseline_genes'])} gen kandidat.",
+            f"(C = {c_values}) memeringkat gen kandidat. Setiap metode mempertahankan {counts} gen teratas, sehingga "
+            f"terbentuk {int(summary['selector_configurations'])} konfigurasi. Baseline memakai seluruh "
+            f"{count(summary['baseline_genes'])} gen kandidat tanpa seleksi fitur.",
         ),
         (
             "XGBoost",
-            f"{summary['xgboost_parameters']['n_estimators']} putaran boosting dengan parameter yang sama untuk "
-            "setiap konfigurasi.",
+            f"XGBoost dilatih pada gen terpilih dengan {summary['xgboost_parameters']['n_estimators']} putaran boosting "
+            "dan hiperparameter yang sama untuk setiap konfigurasi.",
         ),
         (
             "Skor validation",
-            f"{total} konfigurasi × {folds} fold = {len(tables['cv_folds'])} hasil evaluasi: Macro-F1, balanced "
-            "accuracy, dan accuracy.",
+            "Model dievaluasi pada data validation fold dengan Macro-F1, balanced accuracy, dan accuracy: "
+            f"{total} konfigurasi × {folds} fold = {len(tables['cv_folds'])} hasil evaluasi.",
         ),
     ]
 
@@ -172,9 +198,9 @@ def _render_pipeline_details(tables: dict, chosen, selector_label: str) -> None:
     st.markdown(
         '<section class="overview-flow" aria-label="Rincian alur eksperimen">'
         f'<ol class="pipeline-steps">{"".join(items)}</ol>'
-        '<p class="overview-note">Latih Model mengikuti urutan yang sama untuk satu konfigurasi per pelatihan: '
-        "Pembagian data utama, Pra-pemrosesan, Seleksi fitur, Evaluasi tambahan (CV), dan Parameter XGBoost. "
-        "Beberapa pelatihan dibandingkan pada Perbandingan Model.</p></section>",
+        '<p class="overview-note">Latih Model menjalankan urutan yang sama untuk satu konfigurasi per pelatihan, '
+        "dengan nama tahap seperti pada panduan Cara kerja pelatihan. Beberapa pelatihan dapat dibandingkan pada "
+        "Perbandingan Model.</p></section>",
         unsafe_allow_html=True,
     )
 
@@ -270,8 +296,10 @@ def render_overview_page(tables: dict) -> None:
         ["Cross-validation", "Hasil akhir - holdout"],
         default="Hasil akhir - holdout",
     )
-    # How the configuration was chosen.
+    # Every method and gene count first, then the configuration chosen from them.
     with cv_tab:
+        render_method_comparison(tables)
+        st.markdown('<div class="overview-rule"></div>', unsafe_allow_html=True)
         st.markdown(
             '<section class="overview-search" aria-label="Hasil cross-validation">'
             '<h2 class="overview-section-title">Pemilihan konfigurasi dengan cross-validation</h2>'
@@ -293,7 +321,7 @@ def render_overview_page(tables: dict) -> None:
         st.caption(
             "Data training digunakan untuk melatih selector dan XGBoost. Skor dihitung pada data validation tiap fold."
         )
-        with st.expander("Metrik lengkap CV"):
+        with st.expander("Metrik lengkap konfigurasi terpilih CV"):
             for field, label in METRICS.items():
                 st.markdown(
                     f"**{label}:** {percent(chosen[f'mean_{field}'])} ± {points(chosen[f'std_{field}'])} poin persentase"
@@ -302,9 +330,6 @@ def render_overview_page(tables: dict) -> None:
             st.caption(
                 "Konfigurasi dipilih dari hasil CV yang memenuhi syarat seleksi, lalu dilatih ulang pada seluruh data development."
             )
-        # Every method and gene count, to see the choice above among the alternatives.
-        st.markdown('<div class="overview-rule"></div>', unsafe_allow_html=True)
-        render_method_comparison(tables)
 
     # Final result on the holdout data.
     with holdout_tab:
@@ -318,10 +343,7 @@ def render_overview_page(tables: dict) -> None:
             unsafe_allow_html=True,
         )
         if baseline is not None:
-            st.caption(
-                f"Pembanding: {baseline_name}. Keduanya dilatih pada data development yang sama dan diuji "
-                "pada holdout yang sama; holdout tidak dipakai untuk memilih ulang model."
-            )
+            _render_baseline_comparison(final, baseline, baseline_name)
         _render_holdout_tissue_chart(tables)
         with st.expander("Metrik lengkap holdout"):
             if baseline is not None:
@@ -346,41 +368,6 @@ def render_overview_page(tables: dict) -> None:
             )
             st.caption("Holdout dipisahkan sebelum cross-validation dan tidak digunakan untuk memilih konfigurasi.")
 
-    # Where the numbers come from.
-    with st.expander("Asal angka dan rincian eksperimen"):
-        st.markdown(
-            "Sampel dihitung dari SAMPID unik, donor dari SUBJID unik, dan kelas dari label SMTSD. "
-            "Kohort dipilih secara berstrata menurut jaringan setelah pencocokan ID metadata dengan matriks TPM. "
-            "Pembagian donor diaudit melalui sample_split.csv. Sampel adalah profil yang diklasifikasikan, "
-            "sedangkan gen merupakan variabel masukan model."
-        )
-        selector_rows = configurations.loc[configurations["experiment_type"].eq("feature_selection")]
-        labels = selector_rows.drop_duplicates("selector_id").set_index("selector_id")["selector_label"]
-        selector_names = ", ".join(str(labels.loc[key]) for key in summary["selector_ids"] if key in labels.index)
-        counts = ", ".join(count(value) for value in sorted(selector_rows["genes"].astype(int).unique()))
-        baseline_genes = count(summary["baseline_genes"])
-        st.markdown(
-            f"**{selector_count} konfigurasi seleksi fitur:** {selector_names}, masing-masing pada **{counts} gen**. "
-            f"Baseline memakai **{baseline_genes} gen** tanpa seleksi fitur. Satu hasil evaluasi adalah satu "
-            "pasangan konfigurasi–fold, bukan satu sampel atau satu jaringan, dan tidak mencakup evaluasi akhir pada holdout."
-        )
-        source_rows = [
-            ("Kohort dan split", "run_summary.json", "Jumlah sampel serta donor pada setiap kelompok."),
-            ("Kelas jaringan", "label_mapping.csv", "Label jaringan yang digunakan model."),
-            ("Pemilihan dan skor CV", "experiment_cv_summary.csv", "Ringkasan setiap konfigurasi pada fold validation."),
-            ("Hasil per fold", "experiment_cv_folds.csv", "Satu baris per pasangan konfigurasi–fold."),
-            ("Evaluasi akhir", "final_test_summary.csv", "Skor model final pada holdout."),
-            ("F1 dan sampel tiap kelas", "test_per_tissue_xgboost.csv", "Skor per jaringan dan jumlah sampel holdout."),
-        ]
-        rows_html = "".join(
-            "<tr>" + "".join(f"<td>{html.escape(value)}</td>" for value in row) + "</tr>" for row in source_rows
-        )
-        st.markdown(
-            '<table class="overview-source-table"><thead><tr><th>Hasil</th><th>Berkas</th><th>Isi</th></tr>'
-            f"</thead><tbody>{rows_html}</tbody></table>",
-            unsafe_allow_html=True,
-        )
-
     # Links to the other pages.
     actions = st.columns(2)
     for column, label, destination, key in [
@@ -390,6 +377,88 @@ def render_overview_page(tables: dict) -> None:
         if column.button(label, key=key, width="stretch"):
             st.session_state.page = destination
             st.rerun()
+
+    # The data source, last, as a reference.
+    files = " dan ".join(f"{name} (<code>{html.escape(file)}</code>)" for name, file in DATA_FILES)
+    st.markdown(
+        '<section class="overview-source" aria-label="Sumber data">'
+        '<h2 class="overview-section-title">Sumber data</h2>'
+        '<p class="overview-note">Data ekspresi gen dan metadata sampel berasal dari Genotype-Tissue Expression '
+        f'(GTEx) V11, yang diunduh dari <a href="{GTEX_PORTAL}" target="_blank">GTEx Portal</a>: {files}.</p>'
+        f'<p class="overview-reference">{GTEX_CITATION}</p></section>',
+        unsafe_allow_html=True,
+    )
+
+
+BASELINE_MODELS = ["Model final", "Baseline XGBoost"]
+
+
+def _render_baseline_comparison(final, baseline, baseline_name: str) -> None:
+    """The final model next to the XGBoost baseline on every holdout metric, as on the tissue chart below."""
+    gap = points(final["macro_f1"] - baseline["macro_f1"], sign=True)
+    st.markdown(
+        '<div class="overview-chart-heading"><h2 class="overview-section-title">Perbandingan dengan baseline XGBoost</h2>'
+        f'<p class="overview-note">Data holdout - selisih Macro-F1 <strong>{gap} poin persentase</strong></p></div>',
+        unsafe_allow_html=True,
+    )
+    # The bars start at zero, so the final model's label also carries its difference from the baseline.
+    frame = pd.DataFrame(
+        [
+            {
+                "metric": label,
+                "model": model,
+                "score": float(source[field]),
+                "display": percent(source[field])
+                + (f" ({points(final[field] - baseline[field], sign=True)})" if source is final else ""),
+            }
+            for field, label in METRICS.items()
+            for model, source in zip(BASELINE_MODELS, [final, baseline])
+        ]
+    )
+    base = alt.Chart(frame).encode(
+        y=alt.Y(
+            "metric:N",
+            sort=list(METRICS.values()),
+            title=None,
+            scale=alt.Scale(paddingInner=0.3),
+            axis=alt.Axis(labelLimit=0, labelFontSize=13, labelPadding=10, ticks=False, domain=False),
+        ),
+        yOffset=alt.YOffset("model:N", sort=BASELINE_MODELS),
+        tooltip=[
+            alt.Tooltip("metric:N", title="Metrik"),
+            alt.Tooltip("model:N", title="Model"),
+            alt.Tooltip("score:Q", title="Skor", format=".2%"),
+        ],
+    )
+    bars = base.mark_bar(size=15).encode(
+        x=alt.X(
+            "score:Q",
+            title="Skor holdout",
+            scale=alt.Scale(domain=[0, 1], nice=False),
+            axis=alt.Axis(values=[0, 0.25, 0.5, 0.75, 1], format=".0%", gridColor="#e2e8ec"),
+        ),
+        color=alt.Color(
+            "model:N",
+            title=None,
+            scale=alt.Scale(domain=BASELINE_MODELS, range=["#0f8b8d", "#7d8797"]),
+            legend=alt.Legend(orient="top", labelFontSize=12, symbolType="square"),
+        ),
+    )
+    scores = base.mark_text(align="left", dx=10, fontSize=12, color="#344054", clip=False).encode(
+        x=alt.XDatum(1), text="display:N"
+    )
+    chart = (
+        (bars + scores)
+        .properties(height=len(METRICS) * 62, padding={"right": 120})
+        .configure_view(stroke=None)
+        .configure_axis(labelColor="#657184", labelFont="Segoe UI", titleFont="Segoe UI")
+        .configure_legend(labelColor="#344054", labelFont="Segoe UI")
+    )
+    st.altair_chart(chart, width="stretch", theme=None)
+    st.caption(
+        f"Pembanding: {baseline_name}. Keduanya dilatih pada data development yang sama dan diuji "
+        "pada holdout yang sama; holdout tidak dipakai untuk memilih ulang model."
+    )
 
 
 def _render_holdout_tissue_chart(tables: dict) -> None:

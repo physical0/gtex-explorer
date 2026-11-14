@@ -50,7 +50,7 @@ def test_overview_shows_saved_results_and_readable_labels():
     assert [len(table.value) for table in app.dataframe] == [4, 16, 5]
 
 
-def test_overview_keeps_scope_and_source_details_in_their_respective_sections():
+def test_overview_keeps_scope_notes_and_leaves_out_source_files():
     app = overview_app()
     text = visible_html(app)
     assert "Holdout dipisahkan sebelum cross-validation" in text
@@ -58,14 +58,9 @@ def test_overview_keeps_scope_and_source_details_in_their_respective_sections():
     assert "dilatih ulang pada seluruh data development" in text
     assert "**Macro-F1:** 99,27% ± 0,49 poin persentase" in text
     assert "bukan interval kepercayaan atau skor holdout" in text
-    sources = next(item for item in app.expander if item.label == "Asal angka dan rincian eksperimen")
-    assert not sources.proto.expanded
-    for filename in ["sample_split.csv", "run_summary.json", "label_mapping.csv",
-                     "experiment_cv_summary.csv", "experiment_cv_folds.csv",
-                     "final_test_summary.csv", "test_per_tissue_xgboost.csv"]:
-        assert filename in text
-    assert "bukan satu sampel atau satu jaringan" in text
-    assert "500, 1.000, 2.000 gen" in text
+    # The file-by-file source notes are not part of the page.
+    assert not any(item.label == "Asal angka dan rincian eksperimen" for item in app.expander)
+    assert "run_summary.json" not in text
 
 
 def test_cohort_numbers_reconcile_to_original_split_and_saved_cv_results():
@@ -192,18 +187,26 @@ def test_pipeline_lists_the_experiment_steps_in_order_from_the_exports():
     text = pipeline_html(overview_app())
     steps = ["Data dan kohort", "Pembagian data utama", "Cross-validation 5 fold pada data development",
              "Pemilihan konfigurasi", "Pelatihan ulang pada data development", "Evaluasi akhir pada holdout"]
-    positions = [text.index(step) for step in steps]
+    # Steps refer to each other by name, so find each step by its title.
+    positions = [text.index(f'<p class="pipeline-title">{step}</p>') for step in steps]
     assert positions == sorted(positions)
     # The steps repeated in every fold sit inside step 3, in pipeline order.
     loop = [text.index(f"3.{number} {title}") for number, title in
             enumerate(["Pra-pemrosesan", "Seleksi fitur", "XGBoost", "Skor validation"], 1)]
     assert positions[2] < loop[0] < loop[-1] < positions[3] and loop == sorted(loop)
     for expected in ["1.000 sampel", "data development 807 sampel (494 donor)", "data holdout 193 sampel (124 donor)",
-                     "TPM ≥ 1 pada ≥ 20% sampel training", "log2(TPM+1), 5.000 gen kandidat", "standardisasi (z-score)",
-                     "n_neighbors = 3", "C = 1 / 0,1 / 0,01", "500, 1.000 dan 2.000 gen: 15 konfigurasi",
-                     "16 konfigurasi × 5 fold = 80 hasil evaluasi", "Dari 8 konfigurasi seleksi fitur",
+                     "TPM ≥ 1 pada sedikitnya 20% sampel training dan varians lebih dari 0",
+                     "5.000 gen kandidat dengan varians tertinggi", "distandardisasi (z-score)",
+                     "n_neighbors = 3", "C = 1 / 0,1 / 0,01", "500, 1.000, dan 2.000 gen teratas",
+                     "terbentuk 15 konfigurasi", "16 konfigurasi × 5 fold = 80 hasil evaluasi",
+                     "dari 8 konfigurasi seleksi fitur yang memenuhi syarat",
                      "Regresi logistik L1 - C = 1, 1.000 gen", "300 putaran boosting"]:
         assert expected in text
+    # Plain wording, the same as the training guide.
+    assert "seluruh sampel dari satu donor berada pada satu partisi saja" in text
+    assert "diambil per jaringan agar setiap jaringan terwakili" in text
+    assert "proses pra-pemrosesan dilakukan satu kali pada seluruh data development".lower() in text.lower()
+    assert "tumpang tindih" not in text
 
 
 @pytest.mark.parametrize("changes, expected", [
@@ -220,3 +223,37 @@ def test_overview_says_the_results_come_from_the_thesis_experiment():
     app = overview_app()
     assert app.caption[0].value.startswith("Hasil di bawah ini berasal dari eksperimen perbandingan metode seleksi fitur")
     assert "tidak berubah oleh pelatihan di aplikasi" in app.caption[0].value
+
+
+def test_holdout_tab_compares_the_final_model_with_the_xgboost_baseline_on_every_metric():
+    from gtex_explorer.display import METRICS
+    from gtex_explorer.experiments.reference_tables import load_reference_tables
+    app = overview_app()
+    text = visible_html(app)
+    holdout = load_reference_tables()["final_holdout"]
+    final = holdout.loc[holdout["experiment_type"].eq("feature_selection")].iloc[0]
+    baseline = holdout.loc[holdout["experiment_type"].eq("baseline")].iloc[0]
+    gap = f"{(final['macro_f1'] - baseline['macro_f1']) * 100:+.2f}".replace(".", ",")
+    assert "Perbandingan dengan baseline XGBoost" in text
+    assert f"selisih Macro-F1 <strong>{gap} poin persentase</strong>" in text
+    chart = next(item for item in app.get("vega_lite_chart") if "Baseline XGBoost" in item.proto.spec)
+    import pyarrow as pa
+    data = pa.ipc.open_stream(chart.proto.datasets[0].data.data).read_all().to_pandas()
+    values = {(row.metric, row.model): row.score for row in data.itertuples()}
+    assert len(values) == 2 * len(METRICS)
+    for field, label in METRICS.items():
+        assert values[(label, "Model final")] == pytest.approx(float(final[field]))
+        assert values[(label, "Baseline XGBoost")] == pytest.approx(float(baseline[field]))
+
+
+def test_ringkasan_ends_with_the_gtex_data_source_and_its_reference():
+    app = overview_app()
+    source = next(item.value for item in app.markdown if 'aria-label="Sumber data"' in item.value)
+    for expected in ["Genotype-Tissue Expression (GTEx) V11", 'href="https://gtexportal.org"',
+                     "GTEx_Analysis_2025-08-22_v11_RNASeQCv2.4.3_gene_tpm_non_lcm.gct",
+                     "GTEx_Analysis_v11_Annotations_SampleAttributesDS.txt",
+                     "The GTEx Consortium atlas of genetic regulatory effects across human tissues",
+                     'href="https://doi.org/10.1126/science.aaz1776"']:
+        assert expected in source
+    # It is the last thing on the page.
+    assert 'aria-label="Sumber data"' in app.markdown[-1].value

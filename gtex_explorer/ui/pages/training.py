@@ -20,7 +20,13 @@ from gtex_explorer.training.data import (
     usable_candidate_genes,
 )
 from gtex_explorer.training.jobs import start_job
-from gtex_explorer.training.run_labels import L1_OPTION_LABELS, NOTEBOOK_DATA, RUN_NAME_LIMIT, XGBOOST_LABELS
+from gtex_explorer.training.run_labels import (
+    L1_OPTION_LABELS,
+    MISSING_LABELS,
+    NOTEBOOK_DATA,
+    RUN_NAME_LIMIT,
+    XGBOOST_LABELS,
+)
 from gtex_explorer.training.uploads import (
     UploadAudit,
     audit_uploads,
@@ -64,9 +70,13 @@ def _data(root: str, version: tuple):
 
 
 @st.cache_data(max_entries=16, show_spinner=False)
-def _usable_genes(_audit, source: tuple, holdout_percent: int, cv_folds: int | None) -> int:
-    """Return how many genes pass the filter for this split."""
-    return usable_candidate_genes(upload_preview(_audit), holdout_percent, cv_folds)
+def _usable_genes(
+    _audit, source: tuple, holdout_percent: int, cv_folds: int | None, missing: str, technical_filter: bool
+) -> int:
+    """Return how many genes can become candidates for this split and these pra-pemrosesan choices."""
+    return usable_candidate_genes(
+        upload_preview(_audit), holdout_percent, cv_folds, missing=missing, technical_filter=technical_filter
+    )
 
 
 def cached_data(root):
@@ -405,10 +415,35 @@ def _development_holdout_step() -> tuple:
 
 
 def _preprocessing_step(samples: TrainingSamples, available: int, usable: int | None) -> tuple:
-    """Choose the candidate genes and the transforms applied to them before feature selection and XGBoost."""
+    """Choose, in pipeline order, how empty values and the technical filter decide the candidate genes, how many
+    candidates to keep, and the transforms applied to them before feature selection and XGBoost."""
     st.subheader("Pra-pemrosesan")
     st.session_state.setdefault("training_log2", True)
     st.session_state.setdefault("training_standardize", True)
+    st.session_state.setdefault("training_missing", "median")
+    st.session_state.setdefault("training_technical_filter", True)
+    missing_column, filter_column = st.columns(2)
+    with missing_column:
+        missing = st.selectbox(
+            "Nilai kosong",
+            list(MISSING_LABELS),
+            format_func=MISSING_LABELS.get,
+            key="training_missing",
+            help=(
+                "Cara menangani nilai kosong pada data training. Isi dengan median mempertahankan gen dan mengisi "
+                "nilainya dengan median gen tersebut; buang gen tidak memakai nilai isian. Nilai kosong pada data "
+                "evaluasi dan prediksi tetap diisi median data training."
+            ),
+        )
+    with filter_column:
+        technical_filter = st.checkbox(
+            "Filter teknis",
+            key="training_technical_filter",
+            help=(
+                f"Bila aktif, gen dipertahankan hanya jika memenuhi {TECHNICAL_FILTER_RULE}. Bila nonaktif, hanya gen "
+                "yang tidak bervariasi yang dibuang. Pengaturan bawaan sama dengan eksperimen skripsi."
+            ),
+        )
     genes_column, transform_column = st.columns(2)
     with genes_column:
         count = _candidate_genes_input(samples, available, usable)
@@ -426,13 +461,20 @@ def _preprocessing_step(samples: TrainingSamples, available: int, usable: int | 
                 "dari data training saja, termasuk pada setiap fold, lalu dipakai ulang untuk validasi dan prediksi."
             ),
         )
+    after = "filter teknis" if technical_filter else "pembuangan gen yang tidak bervariasi"
     st.caption(
-        f"Gen kandidat disaring dengan filter teknis ({TECHNICAL_FILTER_RULE}) lalu diperingkat menurut varians "
-        "log2(TPM+1), sehingga sama untuk setiap pilihan transformasi."
+        f"Gen kandidat diperingkat menurut varians log2(TPM+1) setelah langkah nilai kosong dan {after}, "
+        "sehingga sama untuk setiap pilihan transformasi."
     )
     st.divider()
     candidate_blank = count is None
-    return {"log2_transform": log2, "standardize": standardize}, available if candidate_blank else count, candidate_blank
+    choices = {
+        "missing_values": missing,
+        "technical_filter": technical_filter,
+        "log2_transform": log2,
+        "standardize": standardize,
+    }
+    return choices, available if candidate_blank else count, candidate_blank
 
 
 def _genes_passing_filter(samples: TrainingSamples, holdout: int) -> int | None:
@@ -445,6 +487,8 @@ def _genes_passing_filter(samples: TrainingSamples, holdout: int) -> int | None:
         tuple(sorted(samples.audit.source.items())),
         holdout,
         st.session_state.get("training_folds", 5) if st.session_state.get("training_cv") else None,
+        st.session_state.get("training_missing", "median"),
+        st.session_state.get("training_technical_filter", True),
     )
 
 
@@ -500,15 +544,19 @@ def _candidate_genes_input(samples: TrainingSamples, available: int, usable: int
         key="training_candidates",
         disabled=data is not None,
         help=(
-            f"Jumlah gen yang dipertahankan setelah filter teknis ({TECHNICAL_FILTER_RULE}) dan pemeringkatan "
-            "varians. Dipelajari dari data training setiap fold."
+            "Jumlah gen dengan varians log2(TPM+1) tertinggi yang dipertahankan setelah langkah nilai kosong dan "
+            "filter teknis. Dipelajari dari data training setiap fold."
         ),
     )
     if usable is not None and usable < min(5000, dataset["genes"]):
-        st.caption(
-            f"Maksimum {usable} dari {dataset['genes']} gen. Gen lain tidak lolos filter teknis pada pembagian data ini "
-            f"({TECHNICAL_FILTER_RULE})."
+        reason = (
+            f"tidak lolos filter teknis ({TECHNICAL_FILTER_RULE})"
+            if st.session_state.get("training_technical_filter", True)
+            else "tidak bervariasi"
         )
+        if st.session_state.get("training_missing") == "drop":
+            reason += " atau memiliki nilai kosong"
+        st.caption(f"Maksimum {usable} dari {dataset['genes']} gen. Gen lain {reason} pada pembagian data ini.")
     return count
 
 
@@ -630,8 +678,8 @@ def _check_choices(
             raise ValueError("Isi jumlah gen kandidat sebelum memulai training.")
         if usable == 0:
             raise ValueError(
-                f"Tidak ada gen yang lolos filter teknis ({TECHNICAL_FILTER_RULE}) pada pembagian data ini. "
-                "Periksa nilai TPM atau ubah pembagian data."
+                "Tidak ada gen yang dapat menjadi gen kandidat pada pembagian data ini dengan pengaturan Nilai kosong "
+                "dan Filter teknis yang dipilih. Periksa nilai TPM, ubah pembagian data, atau ubah pengaturan tersebut."
             )
         config = validate_training_config(values, candidate_count=count)
         _show_split_sizes(samples, config, values, evaluation_note, fold_note)

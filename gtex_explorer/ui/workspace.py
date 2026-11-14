@@ -337,7 +337,7 @@ def render_workspace_launcher(root, brand_path):
         ):
             image(brand_path, width=44)
             st.markdown(
-                '<div class="brand-title">GTEx Tissue Classifier</div>'
+                '<div class="brand-title">HTx Tissue Classifier</div>'
                 '<div class="brand-subtitle">Analisis ekspresi gen lokal</div>',
                 unsafe_allow_html=True,
             )

@@ -232,7 +232,7 @@ def run_job(run_id: str, data_root: Path, state_root: Path, *, interruptible=Fal
             if identity != saved["identity"] or data.fingerprint != saved["data_fingerprint"]:
                 raise ValueError("Run identity changed. Start a new run instead of resuming.")
             
-            transforms = {"log2": config.log2_transform, "standardize": config.standardize}
+            transforms = config.transforms()
 
             # A model that was already published only needs its final checks.
             published = Path(state_root) / "models" / run_id

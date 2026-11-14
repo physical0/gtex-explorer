@@ -1,4 +1,4 @@
-# GTEx Tissue Explorer desktop offline
+# HTx Tissue Classifier desktop offline
 
 ## Menjalankan versi desktop
 

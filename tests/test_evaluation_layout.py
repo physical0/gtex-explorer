@@ -29,7 +29,9 @@ def test_overview_keeps_cv_and_holdout_scores_in_different_tabs():
         layer["encoding"]["y"]["field"].startswith(("mean_", "lower"))
         for layer in json.loads(method_chart.proto.spec)["layer"]
     )
-    [tissue] = holdout.get("vega_lite_chart")
+    # The holdout tab charts the final model against the XGBoost baseline, then each tissue.
+    baseline, tissue = holdout.get("vega_lite_chart")
+    assert "Baseline XGBoost" in baseline.proto.spec
     assert "display_support" in tissue.proto.spec
 
 
@@ -90,3 +92,14 @@ def test_holdout_tab_compares_the_final_model_with_the_baseline():
 def test_biology_dictionary_excludes_the_three_data_partition_entries():
     for term in ["Data development", "Data training", "Data validation"]:
         assert find_terms(term).empty
+
+
+def test_cv_tab_shows_the_method_comparison_with_its_summary_before_the_chosen_configuration():
+    app = overview_app()
+    cv = app.tabs[0]
+    blocks = [item.value for item in cv.markdown]
+    position = lambda text: next(i for i, value in enumerate(blocks) if text in value)
+    comparison = position("Perbandingan metode")
+    summary = position("Ringkasan konfigurasi")
+    chosen = position("Pemilihan konfigurasi dengan cross-validation")
+    assert comparison < summary < chosen

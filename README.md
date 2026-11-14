@@ -1,9 +1,17 @@
-# GTEx Tissue Classifier
+# HTx Tissue Classifier
 
 Aplikasi Streamlit lokal untuk menampilkan hasil eksperimen, menjelajahi panel gen
 terpilih, dan memprediksi kelas jaringan dari matriks TPM menggunakan bundle
 XGBoost final. Seluruh pemrosesan, model, tabel, dan aset berjalan dari komputer
 lokal tanpa API atau layanan web.
+
+Data eksperimen berasal dari Genotype-Tissue Expression (GTEx) V11 yang diunduh dari
+[GTEx Portal](https://gtexportal.org): matriks gene TPM non-LCM
+(`GTEx_Analysis_2025-08-22_v11_RNASeQCv2.4.3_gene_tpm_non_lcm.gct`) dan atribut sampel
+(`GTEx_Analysis_v11_Annotations_SampleAttributesDS.txt`). Rujukan: GTEx Consortium,
+"The GTEx Consortium atlas of genetic regulatory effects across human tissues," *Science*,
+vol. 369, no. 6509, pp. 1318–1330, 2020, doi: 10.1126/science.aaz1776. Halaman Ringkasan
+menampilkan rujukan yang sama pada bagian **Sumber data**.
 
 ## Pelatihan model lokal
 
@@ -63,6 +71,15 @@ standardisasi, serta seleksi supervised dipelajari terpisah pada data training
 setiap fold. Model final menggunakan seluruh dataset training ini. Opsi **Data
 eksperimen notebook** secara eksplisit memilih 807 sampel development tersimpan.
 Holdout eksperimen asli tidak dipakai dan hasil aslinya tidak berubah.
+
+Pada bagian Pra-pemrosesan, **Nilai kosong** menentukan apakah nilai kosong pada data
+training diisi median gen (bawaan) atau gen yang memiliki nilai kosong dibuang; nilai
+kosong pada data evaluasi dan prediksi tetap diisi median data training. **Filter
+teknis** (bawaan aktif) mempertahankan gen dengan TPM ≥ 1 pada sedikitnya 20% sampel
+training dan varians lebih dari 0; bila nonaktif, hanya gen yang tidak bervariasi yang
+dibuang. Pengaturan bawaan sama dengan eksperimen skripsi. Pilihan selain bawaan
+tercatat pada konfigurasi run, identitas run, dan label model, sehingga run lama tetap
+dapat dilanjutkan dan dibandingkan.
 
 Worker berjalan di proses lokal terpisah. Progres dan hasil fold disimpan di
 direktori state aplikasi (`GTEX_DESKTOP_STATE_DIR` dapat menggantinya). Tombol
@@ -318,11 +335,10 @@ karena keduanya tidak tumpang tindih. Cross-validation hanya menggunakan data
 development. Setelah konfigurasi dipilih, model dilatih ulang pada seluruh
 data development dan dievaluasi pada holdout.
 
-Bagian “Asal angka dan rincian eksperimen” menjelaskan SAMPID, SUBJID, SMTSD,
-konfigurasi, pasangan konfigurasi–fold, serta berkas asal metrik. Data tampilan
-tetap dibaca dari ekspor lokal, bukan angka yang ditetapkan dalam antarmuka.
+Data tampilan dibaca dari ekspor lokal, bukan angka yang ditetapkan dalam
+antarmuka.
 
-Ringkasan memakai tab **CV Folding** dan **Hasil akhir - holdout**, dengan tab
+Ringkasan memakai tab **Cross-validation** dan **Hasil akhir - holdout**, dengan tab
 holdout aktif saat pertama dibuka. Skor CV adalah rerata Macro-F1 dan simpangan
 baku konfigurasi terpilih pada lima fold, bukan skor holdout.
 Grafik F1 per jaringan menampilkan seluruh kelas dan jumlah sampel uji (n),

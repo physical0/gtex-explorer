@@ -39,6 +39,8 @@ SETTING_ORDER = [
     "Data development",
     "Data holdout",
     "Pembagian",
+    "Nilai kosong",
+    "Filter teknis",
     "Gen kandidat",
     "Pra-pemrosesan",
     "Metode seleksi fitur",

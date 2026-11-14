@@ -59,7 +59,7 @@ FLOW = [
         "Pelatihan model final",
         False,
         "Dengan atau tanpa cross-validation, proses pra-pemrosesan dilakukan satu kali pada data development "
-        "(seluruh sampel bila porsi holdout 0%), lalu seleksi fitur dan XGBoost dilatih pada hasilnya. Nilai dari "
+        "(seluruh sampel bila porsi holdout 0%), lalu XGBoost menggunakan seleksi fitur (jika digunakan) dilatih pada hasilnya. Nilai dari "
         "fold tidak digunakan.",
     ),
     (
@@ -79,35 +79,42 @@ FLOW = [
 
 # Pra-pemrosesan: its steps with the settings that belong to them, as (title, text, only when its setting is on).
 PREPROCESSING_LEAD = (
-    "Dijalankan pada tahap 3 (Cross-validation) dan tahap 4 (Pelatihan model final). Nilai setiap langkah dihitung "
+    "Dijalankan pada tahap 3 (Cross-validation) jika digunakan dan tahap 4 (Pelatihan model final). Nilai setiap langkah dihitung "
     "dari data yang dilatih pada tahap itu (data training fold atau data development), lalu diterapkan tanpa diubah "
     "pada data evaluasi untuk mencegah kebocoran data."
 )
+# As (title, text, tag): the tag marks a step the form lets the user choose or switch off.
 PREPROCESSING_STEPS = [
-    ("Imputasi median", "Nilai kosong diisi dengan median gen tersebut.", False),
+    (
+        "Nilai kosong",
+        "Nilai kosong pada data training diisi median gen tersebut, atau gen yang memiliki nilai kosong dibuang. "
+        "Nilai kosong pada data evaluasi tetap diisi median data training.",
+        "Pilihan",
+    ),
     (
         "Filter teknis",
-        "Gen yang ekspresinya terlalu rendah untuk diukur secara andal atau tidak bervariasi dibuang. Gen "
-        f"dipertahankan hanya jika memenuhi {TECHNICAL_FILTER_RULE}.",
-        False,
+        "Gen yang ekspresinya terlalu rendah untuk diukur atau tidak bervariasi dipotong dan tidak digunakan. Gen "
+        f"dipertahankan hanya jika memenuhi {TECHNICAL_FILTER_RULE}. Bila nonaktif, hanya gen yang tidak bervariasi "
+        "yang dibuang.",
+        "Bila aktif",
     ),
     (
         "Gen kandidat",
         "Gen diperingkat menurut varians nilai log2(TPM+1), baik transformasi log2(TPM+1) aktif maupun tidak; sejumlah "
         "<em>Gen kandidat</em> teratas dipertahankan sebagai masukan seleksi fitur.",
-        False,
+        None,
     ),
     (
         "Transformasi log2(TPM+1)",
         "Nilai gen kandidat diteruskan sebagai log2(TPM+1) untuk mengompresi distribusi ekspresi yang condong; bila "
         "nonaktif, diteruskan sebagai TPM asli.",
-        True,
+        "Bila aktif",
     ),
     (
         "Standardisasi (z-score)",
         "Menskalakan gen menjadi rerata 0 dan simpangan baku 1; berpengaruh besar pada L1, kecil pada ANOVA, Mutual "
         "Information, dan XGBoost.",
-        True,
+        "Bila aktif",
     ),
 ]
 
@@ -216,9 +223,9 @@ def _preprocessing_html() -> str:
     steps = "".join(
         f'<li class="guide-prep-step"><p class="guide-prep-title"><span class="guide-prep-number">{number}</span>'
         f"{html.escape(title)}"
-        + ('<span class="guide-tag">Bila aktif</span>' if conditional else "")
+        + (f'<span class="guide-tag">{tag}</span>' if tag else "")
         + f'</p><p class="guide-text">{text}</p></li>'
-        for number, (title, text, conditional) in enumerate(PREPROCESSING_STEPS, 1)
+        for number, (title, text, tag) in enumerate(PREPROCESSING_STEPS, 1)
     )
     return (
         '<section class="guide-prep" aria-label="Pra-pemrosesan">'

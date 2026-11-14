@@ -20,6 +20,9 @@ XGB_DEFAULTS = {
     "gamma": 0.0,
     "n_jobs": 4,
 }
+# Ways to handle empty values in the training data: fill each gene's gaps with its median, or leave out
+# every gene that has a gap.
+MISSING_VALUES = ("median", "drop")
 XGB_FIXED = {
     "objective": "multi:softprob",
     "eval_metric": "mlogloss",
@@ -46,11 +49,27 @@ class TrainingConfig:
     holdout_percent: int | None = None
     log2_transform: bool = True
     standardize: bool = True
+    # How empty values in the training data are handled, and whether the technical filter runs.
+    missing_values: str = "median"
+    technical_filter: bool = True
 
     def preprocessing(self) -> dict:
-        """The feature transforms that differ from the default log2(TPM+1) and z-score; empty for the default."""
+        """The pra-pemrosesan choices that differ from the default (median, technical filter, log2(TPM+1), z-score).
+
+        Empty for the default, so runs saved before these were choices keep their saved settings and identity.
+        """
+        result = {key: False for key in ("log2_transform", "standardize", "technical_filter") if getattr(self, key) is False}
+        if self.missing_values != "median":
+            result["missing_values"] = self.missing_values
+        return result
+
+    def transforms(self) -> dict:
+        """The keyword arguments that prepare a partition with these choices."""
         return {
-            key: False for key in ("log2_transform", "standardize") if getattr(self, key) is False
+            "log2": self.log2_transform,
+            "standardize": self.standardize,
+            "missing": self.missing_values,
+            "technical_filter": self.technical_filter,
         }
 
     def to_dict(self) -> dict:
@@ -119,6 +138,8 @@ def validate_training_config(
         "holdout_percent",
         "log2_transform",
         "standardize",
+        "missing_values",
+        "technical_filter",
         "xgboost",
     }
     if set(values) - allowed:
@@ -145,6 +166,12 @@ def validate_training_config(
     standardize = values.get("standardize", True)
     if not isinstance(log2, bool) or not isinstance(standardize, bool):
         raise ValueError("log2_transform and standardize must be boolean")
+    missing = values.get("missing_values", "median")
+    if missing not in MISSING_VALUES:
+        raise ValueError("missing_values must be median or drop")
+    technical_filter = values.get("technical_filter", True)
+    if not isinstance(technical_filter, bool):
+        raise ValueError("technical_filter must be boolean")
     custom = values.get("xgboost", {})
     if not isinstance(custom, dict) or set(custom) - set(XGB_DEFAULTS):
         raise ValueError("Unknown or fixed XGBoost parameter")
@@ -181,6 +208,8 @@ def validate_training_config(
         holdout,
         log2,
         standardize,
+        missing,
+        technical_filter,
     )
 
 

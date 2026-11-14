@@ -1,4 +1,4 @@
-# Kebutuhan Aplikasi GTEx Tissue Explorer
+# Kebutuhan Aplikasi HTx Tissue Classifier
 
 ## Tujuan
 

@@ -22,7 +22,7 @@ def navigation() -> str:
             image(APP_DIR / "assets" / "brand_dna.png", width=44)
         with brand_columns[1]:
             st.markdown(
-                '<div class="brand-title">GTEx Tissue Classifier</div>'
+                '<div class="brand-title">HTx Tissue Classifier</div>'
                 '<div class="brand-subtitle">Analisis ekspresi gen lokal</div>',
                 unsafe_allow_html=True,
             )

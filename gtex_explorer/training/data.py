@@ -310,7 +310,13 @@ def _load_prepared(data: TrainingData, spec: dict) -> PreparedData:
 
 
 def load_final_prepared(
-    data: TrainingData, *, log2: bool = True, standardize: bool = True, cache_dir: Path | None = None
+    data: TrainingData,
+    *,
+    log2: bool = True,
+    standardize: bool = True,
+    missing: str = "median",
+    technical_filter: bool = True,
+    cache_dir: Path | None = None,
 ) -> PreparedData:
     """Return the preprocessed data for training the final model.
 
@@ -318,7 +324,8 @@ def load_final_prepared(
     are rebuilt from raw TPM on the notebook's candidate genes, so only the transform differs.
     """
     notebook = data.manifest["schema_version"] == 1
-    if notebook and log2 and standardize:
+    default_genes = missing == "median" and technical_filter
+    if notebook and log2 and standardize and default_genes:
         return _load_prepared(data, data.manifest["final"])
     assignment = FoldAssignment(
         0, np.arange(len(data.labels)), np.array([], dtype=int), stable_hash({"final": data.fingerprint})
@@ -329,7 +336,9 @@ def load_final_prepared(
         cache_dir or data.root / "preprocessing_cache",
         log2=log2,
         standardize=standardize,
-        candidate_genes=data.manifest["final"]["genes"] if notebook else None,
+        missing=missing,
+        technical_filter=technical_filter,
+        candidate_genes=data.manifest["final"]["genes"] if notebook and default_genes else None,
     )
 
 
@@ -480,8 +489,31 @@ def _technical_filter(train):
     return ((train >= MIN_TPM).mean(axis=0) >= MIN_SAMPLE_SHARE) & (train.var(axis=0, ddof=0) > 0)
 
 
-def usable_candidate_genes(data: TrainingData, holdout_percent: int | None = None, cv_folds: int | None = None) -> int:
-    """How many genes pass the technical filter on every part a run would train on."""
+def _handle_missing(train, missing="median"):
+    """Fill empty training values with each gene's median, or leave out every gene that has one.
+
+    Returns the training values and the medians used to fill them (None when nothing was filled).
+    """
+    if missing == "drop":
+        return train.loc[:, train.notna().all(axis=0)], None
+    return _impute_missing(train)
+
+
+def _candidate_mask(train, technical_filter=True):
+    """Genes that may become candidates: those passing the technical filter, or with the filter off, every gene
+    that varies. A constant gene carries no information and breaks the ANOVA F statistic, so it is always left out."""
+    return _technical_filter(train) if technical_filter else train.var(axis=0, ddof=0) > 0
+
+
+def usable_candidate_genes(
+    data: TrainingData,
+    holdout_percent: int | None = None,
+    cv_folds: int | None = None,
+    *,
+    missing: str = "median",
+    technical_filter: bool = True,
+) -> int:
+    """How many genes can become candidates on every part a run would train on."""
     import pandas as pd
 
     parts = [np.arange(len(data.labels))]
@@ -495,8 +527,11 @@ def usable_candidate_genes(data: TrainingData, holdout_percent: int | None = Non
         pass
     return min(
         int(
-            _technical_filter(
-                _impute_missing(pd.DataFrame(np.array(data.raw_tpm[part], copy=True), columns=data.raw_gene_names))[0]
+            _candidate_mask(
+                _handle_missing(
+                    pd.DataFrame(np.array(data.raw_tpm[part], copy=True), columns=data.raw_gene_names), missing
+                )[0],
+                technical_filter,
             ).sum()
         )
         for part in parts
@@ -510,18 +545,23 @@ def prepare_partition(
     *,
     log2: bool = True,
     standardize: bool = True,
+    missing: str = "median",
+    technical_filter: bool = True,
     candidate_genes: list | None = None,
 ) -> PreparedData:
     """Preprocess one partition, reusing a saved copy when it still matches.
 
-    Candidate genes are always ranked by the variance of log2(TPM+1), so every choice of transform
-    trains on the same genes. `log2` and `standardize` only change the features given to the
-    selector and XGBoost. Without standardization the saved mean is 0 and scale 1, an identity.
+    `missing` and `technical_filter` decide which genes can become candidates. Candidate genes are always
+    ranked by the variance of log2(TPM+1), so every choice of transform trains on the same genes. `log2` and
+    `standardize` only change the features given to the selector and XGBoost. Without standardization the
+    saved mean is 0 and scale 1, an identity.
     """
     import pandas as pd
     from sklearn.preprocessing import StandardScaler
 
     default = log2 and standardize
+    # The notebook chose its candidates with median imputation and the technical filter.
+    default_genes = missing == "median" and technical_filter
     # Reuse only verified original memberships under compatible preprocessing libraries.
     specs = data.manifest["cached_folds"]
     versions = {p: importlib.metadata.version(p) for p in ["numpy", "pandas", "scikit-learn"]}
@@ -533,10 +573,12 @@ def prepare_partition(
             and spec["train_samples"] == [data.sample_ids[i] for i in assignment.train_indices]
             and spec["validation_samples"] == [data.sample_ids[i] for i in assignment.validation_indices]
         ):
-            if default:
+            if default and default_genes:
                 return _load_prepared(data, spec)
-            # The notebook's fold is already transformed; rebuild it from raw TPM on the same genes.
-            candidate_genes = spec["genes"]
+            # The notebook's fold is already transformed; rebuild it from raw TPM, on the same genes when the
+            # candidates are chosen the same way.
+            if default_genes:
+                candidate_genes = spec["genes"]
             break
     if data.raw_tpm is None:
         raise ValueError("Raw development data unavailable for this split")
@@ -548,6 +590,7 @@ def prepare_partition(
             "versions": versions,
             # Left out for the default, so partitions cached before this choice existed stay valid.
             **({} if default else {"transform": {"log2": log2, "standardize": standardize}}),
+            **({} if default_genes else {"genes": {"missing": missing, "technical_filter": technical_filter}}),
             **({} if candidate_genes is None else {"candidates": stable_hash(list(candidate_genes))}),
         }
     )
@@ -556,16 +599,18 @@ def prepare_partition(
         return _read_partition(target, fingerprint)
     train = pd.DataFrame(np.array(data.raw_tpm[assignment.train_indices], copy=True), columns=data.raw_gene_names)
     val = pd.DataFrame(np.array(data.raw_tpm[assignment.validation_indices], copy=True), columns=data.raw_gene_names)
-    train, medians = _impute_missing(train)
-    if medians is not None:
-        val = val.loc[:, medians.notna()]
+    train, medians = _handle_missing(train, missing)
+    val = val.loc[:, train.columns]
     if candidate_genes is None:
-        technical = _technical_filter(train)
+        technical = _candidate_mask(train, technical_filter)
         count = int(data.manifest["candidate_count"])
         if technical.sum() < count:
+            reason = (
+                f"lolos filter teknis ({TECHNICAL_FILTER_RULE})" if technical_filter else "bervariasi (varians lebih dari 0)"
+            )
             raise ValueError(
-                f"Hanya {technical.sum()} gen lolos filter teknis ({TECHNICAL_FILTER_RULE}) pada data training partisi ini, "
-                f"sedangkan {count} gen kandidat diminta. Kurangi Gen kandidat dan Top-k gen bila perlu, lalu mulai pelatihan baru."
+                f"Hanya {technical.sum()} gen {reason} pada data training partisi ini, sedangkan {count} gen kandidat "
+                "diminta. Kurangi Gen kandidat dan Top-k gen bila perlu, lalu mulai pelatihan baru."
             )
         technical_log = np.log2(train.loc[:, technical] + 1.0)
         variance = technical_log.var(axis=0, ddof=0).to_numpy()

@@ -119,8 +119,6 @@
 }
 [data-testid="stAppViewContainer"]:has(.overview-page-marker) [data-baseweb="tab"][aria-selected="true"] { color: #0f8b8d; }
 [data-testid="stAppViewContainer"]:has(.overview-page-marker) [data-baseweb="tab-highlight"] { background-color: #0f8b8d; }
-.overview-source-table { width: 100%; border-collapse: collapse; font-size: .85rem; line-height: 1.5; }
-.overview-source-table th, .overview-source-table td { text-align: left; vertical-align: top; padding: .5rem; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .overview-sidebar-status { color: var(--muted); font-size: .8rem; position: fixed; bottom: 1.4rem; left: 1.5rem; max-width: 200px; }
 @media (max-width: 1100px) {
     .overview-flow ol.pipeline-row { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 1.4rem; }
@@ -129,6 +127,12 @@
     .overview-model-grid { grid-template-columns: 1fr; gap: 1rem; }
     .overview-cv-summary { border-left: 0; padding: .8rem 0; border-top: 1px solid var(--line); }
 }
+/* Sumber data: the GTEx reference at the end of Ringkasan. */
+.overview-source { margin-top: 1.6rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.overview-source p.overview-note, .overview-source p.overview-reference { overflow-wrap: anywhere; }
+.overview-source code { font-size: .8rem; padding: .05rem .25rem; border-radius: .25rem; background: var(--soft); color: var(--ink); }
+.overview-source p.overview-reference { margin: .5rem 0 0; padding-left: .8rem; border-left: 3px solid var(--line); color: var(--ink); font-size: .9rem; line-height: 1.55; }
+.overview-source a { color: var(--teal-dark); }
 @media (max-width: 640px) {
     .overview-flow ol.pipeline-row { grid-template-columns: 1fr; row-gap: .9rem; }
     .overview-flow li.pipeline-row-step { display: grid; grid-template-columns: 1.9rem minmax(0, 1fr); column-gap: .7rem; }

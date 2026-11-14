@@ -1,1 +1,1 @@
-"""GTEx Tissue Explorer ui modules."""
+"""HTx Tissue Classifier ui modules."""

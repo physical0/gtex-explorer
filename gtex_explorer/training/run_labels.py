@@ -22,6 +22,8 @@ XGBOOST_LABELS = {
     "gamma": "Gamma",
     "n_jobs": "Thread CPU",
 }
+# How empty values in the training data are handled, as the form names the choices.
+MISSING_LABELS = {"median": "Isi dengan median", "drop": "Buang gen yang memiliki nilai kosong"}
 L1_OPTION_LABELS = {"l1_max_iter": "Maksimum iterasi", "l1_tol": "Toleransi", "l1_class_weight": "Bobot kelas"}
 
 
@@ -70,13 +72,24 @@ def preprocessing_label(config):
     }[(config.get("log2_transform", True), config.get("standardize", True))]
 
 
+def gene_preparation_notes(config):
+    """The ways a run chose its candidate genes differently from the default (median, technical filter)."""
+    notes = []
+    if config.get("missing_values", "median") == "drop":
+        notes.append("gen bernilai kosong dibuang")
+    if not config.get("technical_filter", True):
+        notes.append("tanpa filter teknis")
+    return notes
+
+
 def method_description(config, *, with_preprocessing=True):
-    """Describe the selection method of a run, naming its transforms only when they are not the default."""
+    """Describe the selection method of a run, naming its pra-pemrosesan only where it is not the default."""
     method = method_name(config["selector"], l1_c=config.get("l1_c"), n_neighbors=config.get("mi_neighbors"))
     text = f"{method} - {count(config['top_k'])} gen"
-    if not with_preprocessing or default_preprocessing(config):
+    if not with_preprocessing:
         return text
-    return f"{text} - {preprocessing_label(config)}"
+    parts = ([] if default_preprocessing(config) else [preprocessing_label(config)]) + gene_preparation_notes(config)
+    return " - ".join([text, *parts])
 
 
 def evaluation_label(config):
@@ -105,6 +118,10 @@ def data_settings(config, candidate_count=None):
     ]
     if config["evaluate_cv"] or holdout:
         rows.append(("Pembagian", "Donor terpisah"))
+    rows += [
+        ("Nilai kosong", MISSING_LABELS[config.get("missing_values", "median")]),
+        ("Filter teknis", "Aktif" if config.get("technical_filter", True) else "Nonaktif"),
+    ]
     if candidate_count is not None:
         rows.append(("Gen kandidat", count(candidate_count)))
     rows.append(("Pra-pemrosesan", preprocessing_label(config)))

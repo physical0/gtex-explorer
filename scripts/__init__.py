@@ -1,1 +1,1 @@
-"""GTEx Tissue Explorer scripts modules."""
+"""HTx Tissue Classifier scripts modules."""

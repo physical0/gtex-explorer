@@ -1,1 +1,1 @@
-"""GTEx Tissue Explorer training modules."""
+"""HTx Tissue Classifier training modules."""

@@ -1,1 +1,1 @@
-"""GTEx Tissue Explorer cloud modules."""
+"""HTx Tissue Classifier cloud modules."""

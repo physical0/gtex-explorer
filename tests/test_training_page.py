@@ -278,7 +278,11 @@ def test_steps_follow_the_pipeline_and_the_review_uses_the_form_labels(tmp_path,
     candidates = position(lambda item: getattr(item, 'key', None) == 'training_candidates')
     method = position(lambda item: getattr(item, 'key', None) == 'training_selector')
     # Candidate genes belong to preprocessing; the method and its gene count to feature selection.
-    assert heading('Pembagian data utama') < heading('Pra-pemrosesan') < candidates < heading('Seleksi fitur') < method
+    missing = position(lambda item: getattr(item, 'key', None) == 'training_missing')
+    technical = position(lambda item: getattr(item, 'key', None) == 'training_technical_filter')
+    # Pra-pemrosesan follows the pipeline: empty values, the technical filter, then the candidate count.
+    assert heading('Pembagian data utama') < heading('Pra-pemrosesan') < missing < technical < candidates
+    assert candidates < heading('Seleksi fitur') < method
     assert method < position(lambda item: getattr(item, 'key', None) == 'training_l1_c') < heading('Evaluasi tambahan')
     # The notebook data is named once in the data summary.
     assert not any(item.value.startswith('Data eksperimen notebook') for item in app.tabs[1].caption)
@@ -289,7 +293,10 @@ def test_steps_follow_the_pipeline_and_the_review_uses_the_form_labels(tmp_path,
     assert [item.value for item in review.subheader] == [
         'Tinjau data dan konfigurasi', 'Data dan pra-pemrosesan', 'Seleksi fitur dan model']
     data_table, model_table = (table.value for table in review.table)
-    assert list(data_table.index) == ['Data development', 'Data holdout', 'Pembagian', 'Gen kandidat', 'Pra-pemrosesan']
+    assert list(data_table.index) == ['Data development', 'Data holdout', 'Pembagian', 'Nilai kosong', 'Filter teknis',
+                                      'Gen kandidat', 'Pra-pemrosesan']
+    assert data_table.loc['Nilai kosong'].iloc[0] == 'Isi dengan median'
+    assert data_table.loc['Filter teknis'].iloc[0] == 'Aktif'
     assert list(model_table.index) == ['Metode seleksi fitur', 'Top-k gen', 'C (regularisasi)', 'Evaluasi tambahan',
                                        'Classifier', 'Putaran boosting']
     assert review.expander[0].label == 'Parameter XGBoost dan opsi selector'

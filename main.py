@@ -12,7 +12,7 @@ from gtex_explorer.ui.shell.theme import apply_theme
 from gtex_explorer.ui.workspace import enter_workspace
 
 st.set_page_config(
-    page_title="GTEx Tissue Classifier",
+    page_title="HTx Tissue Classifier",
     page_icon=str(APP_ROOT / "assets" / "brand_dna.png"),
     layout="wide",
     initial_sidebar_state="auto",
